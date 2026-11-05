@@ -1,0 +1,22 @@
+Flea vendors two ES module bundles under ui/vendor/, built from pinned npm
+packages. The bundle files are generated output; the sources of record are the
+pinned packages plus the entry files in tools/vendor-js/.
+
+1. MathJax 4.1.3 (https://github.com/mathjax/mathjax), Apache-2.0.
+   Packages: @mathjax/src 4.1.3, @mathjax/mathjax-tex-font 4.1.3.
+   Licence text: ui/vendor/LICENSES/Apache-2.0-mathjax.txt.
+   Used for: texToSvg(source, display) in ui/vendor/math.mjs.
+
+2. Pele 1.6.0 (https://github.com/obsidianmd/pele), MIT.
+   Package: pele 1.6.0 from npm, published from commit
+   659c3593ce43794dce7ec7ab45d424ad2de182a5 (tag 1.6.0).
+   Licence text: ui/vendor/LICENSES/MIT-pele.txt, the package's LICENSE file
+   as published. That file also carries the ISC notice of the Lucide icon in
+   Pele's zoom controls; the bundle does not include the zoom controls.
+   Used for: mermaidToSvg(source, theme) in ui/vendor/mermaid.mjs.
+   Unmodified: tools/vendor-js/mermaid-entry.mjs only calls Pele's render()
+   with a text measurer built from the request's advance tables, and
+   resolves its theme variables and its one colour mix to the colours Flea
+   hands it.
+
+Build tool esbuild 0.28.2 is a dev-only build dependency and is not shipped.

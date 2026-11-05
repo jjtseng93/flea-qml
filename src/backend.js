@@ -1,0 +1,116 @@
+// flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
+// line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
+// So far: list, window, sort, fsinfo, peek, meta, code and quit. Any other request is noted on stderr and
+// left unanswered, which ui/ already survives for an operation that never reports back.
+import { createInterface } from "node:readline";
+import { fsinfo } from "./fsinfo.js";
+import { code } from "./code.js";
+import { meta } from "./meta.js";
+import { peek } from "./peek.js";
+import { Listing, directoryFacts } from "./listing.js";
+import { SORT_KEYS } from "./order.js";
+import { lstatSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
+
+const send = (object) => process.stdout.write(`${JSON.stringify(object)}\n`);
+const error = (where, path, msg, extra = {}) => send({ t: "error", where, path, msg, ...extra });
+
+let listing = null,
+  // The numbering a row index is read in; the first listing is 1 (docs/protocol.md "listing").
+  stamp = 0,
+  order = { by: "name", desc: false, foldersFirst: true, groupByKind: false, hiddenLast: false };
+
+const orderFrom = (request, previous) => ({
+  by: request.by ?? previous.by,
+  desc: request.desc ?? previous.desc,
+  foldersFirst: request.foldersFirst ?? previous.foldersFirst,
+  groupByKind: request.groupByKind ?? previous.groupByKind,
+  hiddenLast: request.hiddenLast ?? previous.hiddenLast,
+});
+const listed = (read, sorted, extra = {}) =>
+  send({ t: "listed", n: listing.rows.length, read, sort: sorted, ...directoryFacts(listing.path), path: listing.path, ...extra });
+const rows = (start, count) => send({ t: "rows", ...listing.window(start, count), listing: stamp });
+
+function list(request) {
+  const path = request.path ?? "",
+    first = request.first ?? 0;
+  // A list with no ordering fields is name ascending, folders first, without kind groups.
+  const next = orderFrom(request, { by: "name", desc: false, foldersFirst: true, groupByKind: false, hiddenLast: false });
+  if (!SORT_KEYS.has(next.by)) return error("sort", next.by, `no order is named ${next.by}`);
+  let fresh;
+  const started = performance.now();
+  try {
+    fresh = Listing.scan(path, request.hidden === true);
+  } catch (e) {
+    // A failed list leaves the previous listing in place; `mode` only when the path could be stat'd.
+    let mode;
+    try {
+      mode = lstatSync(path || ".").mode;
+    } catch {}
+    return error("scan", path, e.code === "EACCES" ? "permission denied" : e.message, mode === undefined ? {} : { mode });
+  }
+  const scanned = performance.now() - started;
+  const [read, sorted] = fresh.sort(next);
+  let changed;
+  if (request.wantChanged && listing && resolve(listing.path || ".") === resolve(path || ".")) {
+    const before = new Set(listing.rows.map((row) => row.name)),
+      after = new Set(fresh.rows.map((row) => row.name));
+    changed = 0;
+    for (const name of before) if (!after.has(name)) changed++;
+    for (const name of after) if (!before.has(name)) changed++;
+  }
+  listing = fresh;
+  order = next;
+  stamp++;
+  listed(scanned + read, sorted, changed === undefined ? {} : { changed });
+  // `select` moves the first window onto its row when that row lies past `first`.
+  let start = 0;
+  if (typeof request.select === "string" && resolve(dirname(request.select)) === resolve(path || ".")) {
+    const index = listing.indexOfName(basename(request.select));
+    if (index >= first) start = Math.max(0, Math.min(index - Math.floor(first / 2), listing.rows.length - first));
+  }
+  rows(start, first);
+}
+
+function sort(request) {
+  const next = orderFrom(request, order);
+  if (!SORT_KEYS.has(next.by)) return error("sort", String(request.by), `no order is named ${request.by}`);
+  if (!listing) return;
+  const [read, sorted] = listing.sort(next);
+  order = next;
+  stamp++;
+  listed(read, sorted);
+}
+
+const handlers = {
+  list,
+  sort,
+  window: (request) => listing && rows(request.start ?? 0, request.count ?? 0),
+  fsinfo: () => listing && send(fsinfo(listing.path)),
+  peek: (request) => send(peek(request)),
+  code: (request) => send(code(request)),
+  // A row the listing no longer holds is dropped in silence; the client asks again after its rows.
+  meta: (request) => {
+    const line = meta(listing, request);
+    if (line) send(line);
+  },
+  quit: () => process.exit(0),
+};
+
+export function runBackend() {
+  const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  lines.on("line", (line) => {
+    if (!line.trim()) return;
+    let request;
+    try {
+      request = JSON.parse(line);
+    } catch {
+      return error("read", "", "a request line is not JSON");
+    }
+    const handler = handlers[request.c];
+    if (handler) handler(request);
+    else console.error(`flea-qml backend: not implemented yet: ${request.c}`);
+  });
+  // Stdin closing ends the backend as quit does, with exit code 0 either way.
+  lines.on("close", () => process.exit(0));
+}

@@ -82,13 +82,28 @@ function sort(request) {
   listed(read, sorted);
 }
 
+// The `code` job running for each slot.
+const codeJobs = new Map();
+
 const handlers = {
   list,
   sort,
   window: (request) => listing && rows(request.start ?? 0, request.count ?? 0),
   fsinfo: () => listing && send(fsinfo(listing.path)),
   peek: (request) => send(peek(request)),
-  code: (request) => send(code(request)),
+  // Answered when ready, off the read loop; a newer request on the same slot ends the older job,
+  // whose reply is never sent.
+  code: (request) => {
+    const slot = request.slot ?? "";
+    codeJobs.get(slot)?.abort();
+    const job = new AbortController();
+    codeJobs.set(slot, job);
+    code(request, job.signal).then((line) => {
+      if (codeJobs.get(slot) !== job) return;
+      codeJobs.delete(slot);
+      if (line) send(line);
+    });
+  },
   // A row the listing no longer holds is dropped in silence; the client asks again after its rows.
   meta: (request) => {
     const line = meta(listing, request);

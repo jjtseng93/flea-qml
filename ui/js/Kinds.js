@@ -107,7 +107,7 @@ var EMOJI_STATES = {
     "📄": TEXT, "📝": TEXT,
     "🔣": CODE, "💲": CODE, "🟨": CODE, "🟦": CODE, "🐍": CODE, "🔧": CODE, "🧩": CODE, "➕": CODE,
     "🦀": CODE, "🐹": CODE, "☕": CODE, "🟪": CODE, "💎": CODE, "🐘": CODE, "🌙": CODE, "🎯": CODE,
-    "❄️": CODE, "🌐": CODE, "🎨": CODE
+    "❄️": CODE, "🌐": CODE, "🎨": CODE, "🐳": CODE
 }
 
 function kindState(icon) {

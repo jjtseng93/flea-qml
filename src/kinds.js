@@ -47,10 +47,16 @@ const TABLE = [
   ["code", "❄️", "nix", "Nix expression"],
   ["code", "🌐", "html htm", "HTML document"],
   ["code", "🎨", "css", "CSS stylesheet"],
+  ["code", "🐳", "dockerfile", "Dockerfile"],
 ];
 const BY_EXTENSION = new Map();
 for (const [group, icon, extensions, kind] of TABLE)
   for (const ext of extensions.split(" ")) BY_EXTENSION.set(ext, { group, icon, kind });
+// Files known by their whole name rather than an extension, compared case-insensitively.
+const BY_NAME = new Map([
+  ["dockerfile", BY_EXTENSION.get("dockerfile")],
+  ["containerfile", BY_EXTENSION.get("dockerfile")],
+]);
 
 export const FOLDER = "📁",
   LINK = "🔗",
@@ -71,7 +77,7 @@ export function describeKind(name, isDir, mode, target) {
   if (isDir) return { icon: FOLDER, kind: "Folder", group: "folder" };
   const ext = extensionOf(name),
     upper = ext.toUpperCase(),
-    known = BY_EXTENSION.get(ext);
+    known = BY_NAME.get(name.toLowerCase()) ?? BY_EXTENSION.get(ext);
   let icon, kind, group;
   if (known) [icon, kind, group] = [known.icon, typeof known.kind === "function" ? known.kind(upper) : known.kind, known.group];
   else if ((mode & S_IFMT) !== S_IFLNK && mode & ANY_EXECUTE_BIT) [icon, kind, group] = [PROGRAM, "Program", "program"];

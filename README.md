@@ -15,8 +15,11 @@ fast, keyboard-first file manager for Omarchy.
   frontend.
 
 The repository aims to be self-contained, needing only buninu-browser to run.
-The backend reads no system database and runs no other program; the one
-system file it reads is Linux's mount table, for a folder's filesystem name. Some interface
+The backend reads no system database; the one system file it reads is Linux's
+mount table, for a folder's filesystem name. The one program it runs is
+[jsmdcui](https://github.com/jjtseng93/jsmdcui), for syntax colours in previews,
+found beside this repository as `../jsmdcui` or on PATH as `jmi` or `jsmdcui`;
+without it previews are plain text. Some interface
 code carried over from upstream and Omarchy still asks Linux tools such as
 `hyprctl`, `lsblk` and `fc-match`, and does without them where they are missing.
 
@@ -61,9 +64,11 @@ This needs a buninu-browser whose QML `TapHandler` understands
 `longPressThreshold`, which is newer than 0.9.2. Until that is published, run a
 checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml`.
 
-The backend lists folders so far: `list`, `window`, `sort`, `fsinfo` and
-`quit`. Other requests, and `flea` modes such as `--ui-state`, are not ported
-yet; the interface reports them as failed, as with an unreachable backend.
+Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
+`meta`, `code` and `quit`, and `flea --ui-state`, which keeps
+`~/.local/state/flea/ui.json` the way upstream does. Other requests and `flea`
+modes are not ported yet; the interface reports them as failed, as with an
+unreachable backend.
 Setting `FLEA_BIN` to upstream's `flea` binary uses it instead, for what is
 not ported yet.
 

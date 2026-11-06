@@ -121,9 +121,9 @@ const handlers = {
     });
   },
   // A row the listing no longer holds is dropped in silence; the client asks again after its rows.
+  // A compressed tar's listing streams, so the line is sent when it is ready.
   meta: (request) => {
-    const line = meta(listing, request);
-    if (line) send(line);
+    meta(listing, request).then((line) => line && send(line)).catch((err) => send({ t: "error", where: "meta", msg: String(err?.message ?? err) }));
   },
   // Answered off the read loop: a slow clipboard owner holds up no other request.
   clipSet: (request) => clipSet(request, send),

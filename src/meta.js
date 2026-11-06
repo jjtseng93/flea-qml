@@ -4,14 +4,12 @@
 // Not read yet: media duration and rate, EXIF orientation and camera facts, RAW previews, owners.
 import { closeSync, fstatSync, lstatSync, openSync, readSync, readlinkSync, statSync, constants } from "node:fs";
 import { join } from "node:path";
-import { gunzipSync } from "node:zlib";
+import { listArchive } from "./archive.js";
 
 // A line count stops here and says it is a floor (`partial`).
 const LINE_BUDGET = 1 << 20;
 // A tile lists this many archive names and states the rest as "+ N more".
 const ARCHIVE_NAME_CAP = 64;
-// A compressed tar is inflated whole to be listed, so a big one is left unread.
-const TGZ_LIMIT = 64 << 20;
 
 const blank = () => ({
   w: 0, h: 0, orient: 1, ms: 0, rate: 0,
@@ -86,67 +84,19 @@ function addEntry(meta, name, isDir, size) {
   if (meta.names.length < ARCHIVE_NAME_CAP) meta.names.push({ n: name, d: isDir });
 }
 
-// A zip's central directory, found from its end record.
-function listZip(b, meta) {
-  const from = Math.max(0, b.length - 65557);
-  let end = -1;
-  for (let i = b.length - 22; i >= from; i--)
-    if (b.readUInt32LE(i) === 0x06054b50) {
-      end = i;
-      break;
-    }
-  if (end < 0) throw new Error("no end of central directory");
-  const count = b.readUInt16LE(end + 10);
-  let at = b.readUInt32LE(end + 16);
-  for (let i = 0; i < count; i++) {
-    if (b.readUInt32LE(at) !== 0x02014b50) throw new Error("bad central directory");
-    const size = b.readUInt32LE(at + 24),
-      nameLength = b.readUInt16LE(at + 28),
-      extra = b.readUInt16LE(at + 30),
-      comment = b.readUInt16LE(at + 32);
-    const name = b.toString("utf8", at + 46, at + 46 + nameLength);
-    addEntry(meta, name.replace(/\/$/, ""), name.endsWith("/"), size);
-    at += 46 + nameLength + extra + comment;
-  }
-}
-
-// A ustar or old tar: 512-byte headers, each followed by its data rounded up to 512.
-function listTar(b, meta) {
-  for (let at = 0; at + 512 <= b.length; ) {
-    const header = b.subarray(at, at + 512);
-    if (header.every((byte) => byte === 0)) break;
-    const field = (start, length) => header.toString("utf8", start, start + length).replace(/\0.*$/s, "");
-    const size = parseInt(field(124, 12).trim() || "0", 8);
-    const type = String.fromCharCode(header[156] || 48);
-    const prefix = field(257, 6).startsWith("ustar") ? field(345, 155) : "";
-    const name = (prefix ? `${prefix}/` : "") + field(0, 100);
-    // Long-name and pax headers describe the next member rather than being one.
-    if (!"xgLK".includes(type)) addEntry(meta, name.replace(/\/$/, ""), type === "5" || name.endsWith("/"), size);
-    at += 512 + Math.ceil(size / 512) * 512;
-  }
-}
-
-function listArchive(path, name, meta) {
-  const lower = name.toLowerCase();
+// Every member through src/archive.js, which reads a zip's directory and a tar's headers only.
+async function listMembers(path, name, meta) {
   try {
-    const st = statSync(path);
-    if (!st.isFile()) throw new Error("not a file");
-    const whole = head(path, lower.endsWith(".zip") || lower.endsWith(".tar") ? st.size : TGZ_LIMIT + 1);
-    if (!whole) throw new Error("unreadable");
-    if (lower.endsWith(".zip")) listZip(whole.bytes, meta);
-    else if (lower.endsWith(".tar")) listTar(whole.bytes, meta);
-    else if (lower.endsWith(".tar.gz") || lower.endsWith(".tgz")) {
-      if (whole.size > TGZ_LIMIT) throw new Error("too large");
-      listTar(gunzipSync(whole.bytes), meta);
-    } else throw new Error("format not read here");
+    await listArchive(path, name, (member) => addEntry(meta, member.name, member.dir, member.size));
   } catch {
     // A failed read carries nothing, so a partial count never reads as a total.
     Object.assign(meta, { entries: 0, unpacked: 0, names: [], afailed: true });
   }
 }
 
-/** The facts for row `row` of `listing`, or null for a row the listing no longer holds. */
-export function meta(listing, request) {
+/** The facts for row `row` of `listing`, or null for a row the listing no longer holds. Async,
+ * because a compressed tar's listing streams. */
+export async function meta(listing, request) {
   const row = listing?.rows[request.row];
   if (!row) return null;
   const path = join(listing.path, row.name),
@@ -163,6 +113,6 @@ export function meta(listing, request) {
   const size = file && imageSize(file.bytes);
   if (size) [out.w, out.h] = size;
   if (request.text) countLines(path, out);
-  if (request.archive) listArchive(path, row.name, out);
+  if (request.archive) await listMembers(path, row.name, out);
   return { t: "meta", row: request.row, ...out, token: request.token ?? 0 };
 }

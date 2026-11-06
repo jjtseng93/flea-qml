@@ -37,8 +37,8 @@ so far:
 - The interface runs this repository's `src/flea.js` (`ui/js/FleaBin.js`)
   instead of a `flea` on PATH.
 - Upstream's links to `/usr/share/omarchy/shell` are replaced by a copy of the
-  two Omarchy QML modules the interface imports, `ui/qs/Commons` and
-  `ui/qs/Ui`, from
+  two Omarchy QML modules the interface imports, `ui/boot/Commons` and
+  `ui/boot/Ui`, from
   [`omacom/omarchy@3c7027d`](https://github.com/omacom/omarchy/commit/3c7027db2a4fa9fa6a49d7af7f87c27ac48e677d).
 
 ## Layout
@@ -46,7 +46,7 @@ so far:
 | Path | What it is |
 | --- | --- |
 | `ui/` | The QML interface and its JS libraries |
-| `ui/qs/` | Omarchy's `Commons` (theme, colours) and `Ui` (panels, dialogs) modules |
+| `ui/boot/Commons`, `ui/boot/Ui` | Omarchy's `Commons` (theme, colours) and `Ui` (panels, dialogs) modules, where `import qs.Commons` finds them: Quickshell's `qs` is the folder `shell.qml` sits in |
 | `src/flea.js` | The `flea` the interface runs; `--backend` answers `ui/Backend.qml` |
 | `src/` (rest) | The backend: listing, ordering, kinds and emoji, filesystem facts |
 | `docs/protocol.md` | Upstream's description of the backend line protocol |

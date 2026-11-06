@@ -1,13 +1,14 @@
 // flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
 // line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
 // So far: list, window, sort, fsinfo, peek, meta, code, the four clip requests,
-// paths, collisions, transfer, transfercancel and quit. Any other request is noted on stderr and
+// paths, collisions, transfer, transfercancel and quit, and `changed` lines for watched folders. Any other request is noted on stderr and
 // left unanswered, which ui/ already survives for an operation that never reports back.
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
+import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
 import { Listing, directoryFacts } from "./listing.js";
@@ -47,10 +48,12 @@ function list(request) {
   const next = orderFrom(request, { by: "name", desc: false, foldersFirst: true, groupByKind: false, hiddenLast: false });
   if (!SORT_KEYS.has(next.by)) return error("sort", next.by, `no order is named ${next.by}`);
   let fresh;
-  const started = performance.now();
+  const started = performance.now(),
+    armed = watchList(path);
   try {
     fresh = Listing.scan(path, request.hidden === true);
   } catch (e) {
+    listFailed(armed);
     // A failed list leaves the previous listing in place; `mode` only when the path could be stat'd.
     let mode;
     try {
@@ -68,6 +71,7 @@ function list(request) {
     for (const name of before) if (!after.has(name)) changed++;
     for (const name of after) if (!before.has(name)) changed++;
   }
+  listDone(armed);
   listing = fresh;
   order = next;
   stamp++;
@@ -99,7 +103,10 @@ const handlers = {
   sort,
   window: (request) => listing && rows(request.start ?? 0, request.count ?? 0),
   fsinfo: () => listing && send(fsinfo(listing.path)),
-  peek: (request) => send(peek(request)),
+  peek: (request) => {
+    if (request.watch === true && typeof request.path === "string") watchColumn(request.path, request.keep);
+    send(peek(request));
+  },
   // Answered when ready, off the read loop; a newer request on the same slot ends the older job,
   // whose reply is never sent.
   code: (request) => {
@@ -135,6 +142,7 @@ const handlers = {
 };
 
 export function runBackend() {
+  onChanged(send);
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   lines.on("line", (line) => {
     if (!line.trim()) return;

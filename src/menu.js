@@ -2,10 +2,12 @@
 // deletion"). Upstream: src/backend/menuaction*.rs.
 //
 // Ported: snapshot, which captures the selection's paths with each one's identity; activate and
-// validate, which check those identities again and hand the paths back; close. Every other
-// operation answers ok:false, so the menu says so instead of waiting.
-import { constants, lstatSync } from "node:fs";
-import { join } from "node:path";
+// validate, which check those identities again and hand the paths back; close; and Delete
+// permanently's prepareDelete, checkDelete, refreshDelete and delete, which remove only what the
+// confirmation reviewed. Every other operation answers ok:false, so the menu says so instead of
+// waiting.
+import { constants, lstatSync, readdirSync, rmSync } from "node:fs";
+import { dirname, join, resolve, isAbsolute } from "node:path";
 
 const CHANGED = "Selected items changed; reopen the menu.";
 
@@ -87,5 +89,89 @@ export function menuaction(request, send, listing, stamp) {
     const single = action.startsWith("taildrop:") || action === "sharelink";
     return answer({ action, ok: true, paths: single ? [held.cursor] : held.paths, ...(request.dest === undefined ? {} : { dest: request.dest }) });
   }
+  if (op === "prepareDelete" || op === "refreshDelete") {
+    if (!held) return answer({ ok: false, error: CHANGED });
+    // A refresh reviews only the paths already captured: missing ones drop out, replaced ones are
+    // captured anew, and nothing outside them can join.
+    held.token = undefined;
+    held.review = undefined;
+    if (op === "refreshDelete") {
+      const kept = [];
+      for (const path of held.paths)
+        try {
+          kept.push([path, identity(lstatSync(path))]);
+        } catch {}
+      held.paths = kept.map(([path]) => path);
+      held.identities = kept.map(([, id]) => id);
+      held.cursor = held.paths[0] ?? "";
+      held.cursorIdentity = held.identities[0];
+    } else if (!unchanged(held)) return answer({ ok: false, error: CHANGED });
+    if (!held.paths.length) return answer({ ok: false, error: "Nothing selected is still there." });
+    try {
+      held.review = reviewTrees(held.paths);
+      if (!unchanged(held)) throw new Error(CHANGED);
+      held.token = ++deleteTokens;
+      return answer({ ok: true, token: held.token, count: held.paths.length, bytes: held.review.bytes, partial: false });
+    } catch (error) { return answer({ ok: false, error: error.message }); }
+  }
+  if (op === "checkDelete") {
+    return answer({ ok: true, valid: !!held && held.token !== undefined && held.token === request.token && reviewUnchanged(held) });
+  }
+  if (op === "delete") {
+    // Only the token the confirmation showed deletes, once; a changed selection asks for a fresh review.
+    if (!held || held.token === undefined || held.token !== request.token || !reviewUnchanged(held))
+      return answer({ ok: false, stale: true, error: CHANGED });
+    held.token = undefined;
+    let deleted = 0,
+      firstError = "";
+    const remaining = [],
+      folders = new Set();
+    held.paths.forEach((path, index) => {
+      try {
+        // Checked again just before the removal, so a name swapped since the review is left alone.
+        if (identity(lstatSync(path)) !== held.identities[index]) throw new Error(CHANGED);
+        // A link is removed as a link; rm never follows one into its target.
+        rmSync(path, { recursive: true, force: false });
+        deleted++;
+        folders.add(dirname(path));
+      } catch (e) {
+        firstError ||= e.code === "EACCES" || e.code === "EPERM" ? "permission denied" : e.message;
+        try {
+          if (identity(lstatSync(path)) === held.identities[index]) remaining.push(path);
+        } catch {}
+      }
+    });
+    const failed = held.paths.length - deleted;
+    answer({ ok: true, deleted, failed, cancelled: false, error: failed ? firstError : "", remaining });
+    for (const path of folders) send({ t: "changed", path });
+    return;
+  }
   answer({ ok: false, error: `${op || "That menu action"} is not ported to flea-qml yet.` });
+}
+
+let deleteTokens = 0;
+
+// Bounded, non-following review. A confirmation cannot silently include newly added
+// or replaced descendants. No path-based check makes concurrent filesystem mutation atomic.
+function reviewTrees(paths) {
+  const rows = [], pending = paths.map(path => ({ path, dev: null }));
+  const deadline = performance.now() + 2000;
+  let bytes = 0;
+  while (pending.length) {
+    if (rows.length >= 100000 || performance.now() > deadline) throw new Error("The selected trees are too large to review safely.");
+    const { path, dev } = pending.pop();
+    if (!isAbsolute(path) || resolve(path) === dirname(resolve(path))) throw new Error("Refusing to delete a filesystem root or relative path.");
+    const st = lstatSync(path);
+    if (dev !== null && st.dev !== dev) throw new Error("Refusing to delete across a mounted filesystem.");
+    rows.push([path, identity(st), st.size, st.mtimeMs, st.ctimeMs]);
+    if (st.isDirectory()) {
+      for (const name of readdirSync(path).sort().reverse()) pending.push({path: join(path, name), dev: st.dev});
+    } else bytes += st.size;
+  }
+  return { rows, bytes };
+}
+function reviewUnchanged(held) {
+  if (!held.review || !unchanged(held)) return false;
+  try { return JSON.stringify(reviewTrees(held.paths).rows) === JSON.stringify(held.review.rows); }
+  catch { return false; }
 }

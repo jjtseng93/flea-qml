@@ -68,7 +68,7 @@ checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p 
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
 `meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`,
-`transfer`, `transfercancel`, `menuaction` (snapshot, activate, validate, close) and `quit`, and `flea --ui-state`, which keeps
+`transfer`, `transfercancel`, `trash`, `menuaction` (selection snapshots and permanent-delete confirmation) and `quit`, and `flea --ui-state`, which keeps
 `~/.local/state/flea/ui.json` the way upstream does. A transfer copies and moves
 files, folders and links and answers keep, skip and refuse; it has no undo yet,
 and refuses replace (it needs the Trash), merge and special files. Other requests and `flea`
@@ -82,6 +82,20 @@ whole archive into memory. Compressed tar member data is streamed and discarded;
 metadata records over 1 MiB and malformed or truncated archives are rejected.
 Keyboard hints are enabled by default; an explicitly saved disabled setting is
 preserved.
+
+## Deleting files
+
+Move to Trash uses freedesktop-style `Trash/files` and `Trash/info`, without
+invoking `gio`. Windows also uses this private Trash folder, not the Windows
+Recycle Bin. Cross-filesystem copies are not attempted: an unusable Trash leaves
+the source in place. Trash browsing, restore, emptying and undo are not ported yet.
+
+Permanent deletion requires a fresh confirmation token. Changes to the reviewed
+tree invalidate it; refresh reviews only the originally selected paths. Reviews
+refuse filesystem roots, cross-device subtrees, unreadable entries, and trees
+exceeding 100,000 entries or the two-second walk budget. Review failures never
+pretend to be complete totals. Path-based filesystem checks do not provide
+atomic protection against concurrent renames by other processes.
 
 ## The clipboard
 

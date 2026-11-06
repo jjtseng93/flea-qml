@@ -9,6 +9,7 @@ import { code } from "./code.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction } from "./menu.js";
+import { trash } from "./trash.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
@@ -137,6 +138,11 @@ const handlers = {
     send(named.stale ?? { t: "paths", paths: named.paths });
   },
   menuaction: (request) => menuaction(request, send, listing, stamp),
+  trash: (request) => {
+    const named = sources(request, listing, stamp, "trash");
+    if (named.stale) return send(named.stale);
+    trash(request, send, named);
+  },
   collisions: (request) => collisions(request, send, listing, stamp),
   transfer: (request) => transfer(request, send, listing, stamp),
   transfercancel: (request) => transferCancel(request),

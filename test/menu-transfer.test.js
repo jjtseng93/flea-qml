@@ -50,3 +50,8 @@ test('cursor outside selection also retains identity',()=>{
  menuaction({id:s.id,op:'activate',action:'sharelink'},s.send,s.listing,1);
  expect(s.messages.at(-1).ok).toBe(false);
 });
+test('keyboard menuId zero copies without a menu snapshot',async()=>{
+ const s=setup();collisions({id:99,menuId:0,rows:[0],dest:s.dest},s.send,s.listing,1);
+ const result=await done(s,{menuId:0,collideId:99,rows:[0],dest:s.dest,op:'copy',collide:'refuse'});
+ expect(result.ok).toBe(1);expect(readFileSync(join(s.dest,'hello'),'utf8')).toBe('original');
+});

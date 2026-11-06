@@ -27,7 +27,8 @@ class Cancelled extends Error {}
 // The paths a request names: `paths` wins, else `rows` against the listing in force.
 export function sources(request, listing, stamp, command) {
   // A menu's Copy to and Move to run on the selection its snapshot captured.
-  if (request.menuId !== undefined && command !== "paths") {
+  // A menu id is a positive count; the keyboard path sends 0 for "not from a menu".
+  if (request.menuId && command !== "paths") {
     const captured = capturedPaths(request.menuId);
     if (!captured) return { stale: { t: "error", where: command, path: "", msg: "Selected items changed; reopen the menu." } };
     return { paths: captured };
@@ -97,7 +98,7 @@ let question = null;
 export function collisions(request, send, listing, stamp) {
   question = null;
   const named = sources(request, listing, stamp, "collisions");
-  if (named.stale) return send(request.menuId === undefined ? named.stale : { t: "collisions", id: request.id ?? 0, total: 0, names: [], mergeable: false });
+  if (named.stale) return send(!request.menuId ? named.stale : { t: "collisions", id: request.id ?? 0, total: 0, names: [], mergeable: false });
   const id = request.id ?? 0,
     dest = request.dest,
     held = new Map(),
@@ -120,7 +121,7 @@ export function collisions(request, send, listing, stamp) {
     }
   }
   question = { id, dest: typeof dest === "string" ? resolve(dest) : "", held,
-    menuId: request.menuId, selection: request.menuId === undefined ? null : captureSelection(request.menuId) };
+    menuId: request.menuId, selection: !request.menuId ? null : captureSelection(request.menuId) };
   send({ t: "collisions", id, total, names, mergeable: false });
 }
 
@@ -288,9 +289,9 @@ export function transfer(request, send, listing, stamp) {
   const dest = request.dest, problem = destProblem(dest);
   const matches = asked && asked.id === request.collideId && typeof dest === "string"
     && asked.dest === resolve(dest) && asked.menuId === request.menuId;
-  const selection = request.menuId === undefined ? null
+  const selection = !request.menuId ? null
     : matches ? asked.selection : captureSelection(request.menuId);
-  const named = request.menuId !== undefined && selection
+  const named = request.menuId && selection
     ? { paths: selection.paths } : sources(request, listing, stamp, "transfer");
   if (named.stale) return send(named.stale);
   if (problem) return send({ t: "error", where: "transfer", path: String(dest ?? ""), msg: problem });

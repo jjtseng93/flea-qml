@@ -519,7 +519,7 @@ function pathsResolved(pane, list) {
         return
     }
     // MenuAdditions040: every Copy as variant covers the whole selection, one
-    // path per line, through wl-copy; nothing reaches the file clipboard.
+    // path per line, as plain text; nothing reaches the file clipboard.
     if (pending && pending.kind === "copyAs") {
         if (list.length > 0)
             pane.opener.copyText(CopyAs.lines(list, pending.format))

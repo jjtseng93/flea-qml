@@ -32,8 +32,19 @@ function cleanPaste(text) {
 
 // Hands a query line's paste to its own typing route; the chord is consumed even when nothing is left to type.
 function pasteInto(host, typeText) {
-    var pasted = cleanPaste(host.clipboardText())
-    if (pasted.length > 0)
-        typeText(pasted)
+    var type = function (value) {
+        var pasted = cleanPaste(value)
+        if (pasted.length > 0)
+            typeText(pasted)
+    }
+    // flea-qml: a Promise where the runtime reads its clipboard asynchronously (buninu-browser).
+    var failed = function (error) { console.warn("Clipboard read failed: " + String(error)) }
+    try {
+        var text = host.clipboardText()
+        if (text && typeof text.then === "function")
+            Promise.resolve(text).then(type).catch(failed)
+        else
+            type(text)
+    } catch (error) { failed(error) }
     return true
 }

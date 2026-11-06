@@ -77,7 +77,7 @@ Loader {
         }
     }
 
-    // Copy as covers the whole selection, one path per line, through wl-copy; the leaves read the snapshot, whose paths a window cannot hold.
+    // Copy as covers the whole selection, one path per line, as plain text; the leaves read the snapshot, whose paths a window cannot hold.
     property var copyKinds: ({ copyPath: "path", copyName: "name", copyStem: "stem",
         copydirpath: "dirpath", copyUri: "uri", copyQuoted: "quoted" })
     function copyVariant(action, paths) {

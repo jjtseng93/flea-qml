@@ -3,7 +3,7 @@
 .import "Format.js" as Format
 
 // Sample input: "/home/gm/archive.tar.gz"; every Copy as variant covers the
-// whole selection, one path per line, through wl-copy.
+// whole selection, one path per line, as plain text.
 function leaf(path) {
     var text = String(path)
     var cut = text.lastIndexOf("/")

@@ -1,3 +1,4 @@
+import Quickshell
 import Quickshell.Io
 import QtQuick
 
@@ -10,7 +11,6 @@ Item {
     property string pending: ""
     property string pendingUrl: ""
     property bool _shareAwaitingStart: false
-    property bool _clipboardAwaitingStart: false
     property string _shareOutput: ""
 
     function copy(path) {
@@ -36,7 +36,6 @@ Item {
         pending = ""
         pendingUrl = ""
         _shareAwaitingStart = false
-        _clipboardAwaitingStart = false
         if (reason) root.failed(reason)
         else root.copied(url)
     }
@@ -60,22 +59,9 @@ Item {
                 return
             }
             root.pendingUrl = url
-            root._clipboardAwaitingStart = true
-            copyToClipboard.command = ["wl-copy", url]
-            copyToClipboard.running = true
-        }
-    }
-
-    Process {
-        id: copyToClipboard
-        onStarted: root._clipboardAwaitingStart = false
-        onRunningChanged: {
-            if (root._clipboardAwaitingStart && !running)
-                root.finish("The share link could not be copied to the clipboard.")
-        }
-        onExited: function(exitCode) {
-            root._clipboardAwaitingStart = false
-            root.finish(exitCode === 0 ? "" : "The share link could not be copied to the clipboard.")
+            // flea-qml: the link is plain text, so Quickshell's own clipboard takes it rather than wl-copy.
+            Quickshell.clipboardText = url
+            root.finish("")
         }
     }
 }

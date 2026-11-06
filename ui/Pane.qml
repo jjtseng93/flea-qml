@@ -1230,6 +1230,8 @@ FocusScope {
     }
 
     // The query lines' paste source (issue 287), read only when Ctrl+V or Shift+Insert reaches one.
-    function clipboardText() { return Quickshell.clipboardText }
+    // flea-qml: buninu-browser reads its clipboard asynchronously and offers readClipboardText's
+    // Promise for it; Quickshell itself answers the text at once.
+    function clipboardText() { return Quickshell.readClipboardText ? Quickshell.readClipboardText() : Quickshell.clipboardText }
 
 }

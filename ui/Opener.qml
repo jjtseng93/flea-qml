@@ -100,19 +100,11 @@ Item {
         }
     }
 
-    // The system clipboard, for the listing menu's Copy Path row. wl-copy reads the text on stdin,
-    // so the one-liner hands it over; flea's own copy clipboard (Ops.clip) is a different thing
-    // and must stay a different thing.
+    // The system clipboard, for the listing menu's Copy Path row; flea's own copy clipboard
+    // (Ops.clip) is a different thing and must stay a different thing.
+    // flea-qml: Copy as is plain text, so it goes through Quickshell's own clipboard rather than wl-copy.
     function copyText(text) {
-        if (copier.running) {
-            return
-        }
-        copier.command = ["sh", "-c", "printf '%s' \"$1\" | wl-copy", "_", text]
-        copier.running = true
-    }
-
-    Process {
-        id: copier
+        Quickshell.clipboardText = text
     }
 
     // A library cannot name a singleton, so the menu's Update Flea row comes through here, and the pane's footer says what it did.

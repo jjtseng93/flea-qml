@@ -345,11 +345,12 @@ function canCompare(kinds) {
 }
 
 // The Copy as flyout: six leaves in board order, letters on keyHint.
+// flea-qml: `mark` names the letter the label draws bold when it differs from the key.
 function copyAsEntries() {
     return [
         { id: "copyPath", label: "Path", glyph: "file-text", keyHint: "p" },
         { id: "copyName", label: "Name", glyph: "type", keyHint: "n" },
-        { id: "copyStem", label: "Name without extension", glyph: "type", keyHint: "e" },
+        { id: "copyStem", label: "Name without Extension", glyph: "type", keyHint: "e", mark: "E" },
         { id: "copydirpath", label: "Folder path", glyph: "folder", keyHint: "f" },
         { id: "copyUri", label: "File URI", glyph: "globe", keyHint: "u" },
         { id: "copyQuoted", label: "Shell-quoted", glyph: "terminal", keyHint: "s" }

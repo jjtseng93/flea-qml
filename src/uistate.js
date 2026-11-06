@@ -28,7 +28,8 @@ const DEFAULTS = {
   openMode: "double",
   clickRename: true,
   openFoldersWhileDragging: false,
-  keyHints: false,
+  // flea-qml: on by default, so menus show their keys and flyout letters; upstream starts it off.
+  keyHints: true,
   startIn: "home",
   startFolder: "",
   lastPath: "",

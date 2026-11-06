@@ -632,6 +632,9 @@ Item {
                               hint: subRow.modelData.hint !== undefined ? subRow.modelData.hint
                                   : subRow.modelData.keyHint !== undefined && ViewState.keyHints
                                   ? subRow.modelData.keyHint : undefined,
+                              // flea-qml: the leaf's letter, bold in its label while key hints are on.
+                              mnemonic: subRow.modelData.keyHint !== undefined && ViewState.keyHints
+                                  ? (subRow.modelData.mark !== undefined ? subRow.modelData.mark : subRow.modelData.keyHint) : undefined,
                               icon: subRow.modelData.icon,
                               tagRow: subRow.modelData.tagRow,
                               glyph: subRow.modelData.glyph !== undefined ? subRow.modelData.glyph

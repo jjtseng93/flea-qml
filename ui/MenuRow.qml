@@ -209,6 +209,20 @@ Item {
         }
     }
 
+    // flea-qml: a row that carries a mnemonic draws that letter of its label bold, the same case first
+    // and then either case; a letter the label lacks leaves it plain. Sample input: "Path", "p"
+    // -> "<b>P</b>ath".
+    readonly property string markedLabel: {
+        var text = root.entry.label !== undefined ? String(root.entry.label) : ""
+        var letter = root.isSeparator || root.entry.mnemonic === undefined ? "" : String(root.entry.mnemonic)
+        if (letter.length !== 1) return ""
+        var at = text.indexOf(letter)
+        if (at < 0) at = text.toLowerCase().indexOf(letter.toLowerCase())
+        if (at < 0) return ""
+        var escape = function (t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+        return escape(text.substring(0, at)) + "<b>" + escape(text.charAt(at)) + "</b>" + escape(text.substring(at + 1))
+    }
+
     Text {
         id: label
         visible: !root.isSeparator
@@ -217,12 +231,12 @@ Item {
         anchors.right: root.tagItem !== null && root.entry.tagRow !== undefined ? root.tagItem.left : statusSquare.visible ? statusSquare.left : hintText.left
         anchors.rightMargin: Theme.spacing.gap
         anchors.verticalCenter: parent.verticalCenter
-        text: root.entry.label !== undefined ? root.entry.label : ""
+        text: root.markedLabel !== "" ? root.markedLabel : root.entry.label !== undefined ? root.entry.label : ""
         opacity: root.available ? 1 : Theme.disabledOpacity
         color: root.labelColor
         font.family: Theme.font.family
         font.pixelSize: Theme.font.body
-        textFormat: Text.PlainText
+        textFormat: root.markedLabel !== "" ? Text.StyledText : Text.PlainText
         elide: Text.ElideRight
     }
 

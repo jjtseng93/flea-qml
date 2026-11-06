@@ -84,6 +84,10 @@ function route(root, message) {
         root.paths(message.paths || [])
     } else if (message.t === "located") {
         root.located(message)
+    // flea-qml: the backend's Trash count, sent at start and whenever it changes.
+    } else if (message.t === "trashcount") {
+        root.trashCount = message.count
+        root.trashRevision = message.revision || 0
     } else if (message.t === "trashbrowse") {
         root.trashResult(message)
     } else if (message.t === "permissions") {

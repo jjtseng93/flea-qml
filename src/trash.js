@@ -8,22 +8,40 @@
 // `.Trash-$uid`, made if missing. An item is never copied between filesystems: a drive with no
 // usable Trash fails that item and leaves it in place. Every system keeps this same Trash,
 // Windows included: flea's Trash is this folder, not the Recycle Bin.
-import { closeSync, constants, lstatSync, mkdirSync, openSync, renameSync, statSync, unlinkSync, writeSync } from "node:fs";
+import { appendFileSync, closeSync, constants, lstatSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, relative, resolve, sep, isAbsolute } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { storePaths } from "./uistore.js";
+import { basename, dirname, join, resolve, sep, isAbsolute } from "node:path";
 
 const NAME_TRIES = 1000;
 
-const homeTrash = () => join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "Trash");
+export const homeTrash = () => join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "Trash");
 
-// Percent-encoding as the specification asks for Path: every byte outside the unreserved set and '/'.
-function encodePath(path) {
-  let out = "";
-  for (const byte of Buffer.from(path)) {
-    const c = String.fromCharCode(byte);
-    out += byte < 128 && /[A-Za-z0-9\-_.~/]/.test(c) ? c : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
-  }
-  return out;
+// Path= as the specification asks: the item's path in URI form, through Bun's pathToFileURL on
+// every system, so a Windows drive letter is written /C:/... like any other path. In a per-drive
+// Trash it is relative to the drive's top: the same conversion, with the top's own part cut off.
+// Sample: /media/usb/照片/x.jpg under /media/usb gives %E7%85%A7%E7%89%87/x.jpg.
+export function trashInfoPath(full, base) {
+  const url = pathToFileURL(full),
+    path = url.host ? `//${url.host}${url.pathname}` : url.pathname;
+  if (!base) return path;
+  const top = pathToFileURL(base.endsWith(sep) ? base : base + sep).pathname;
+  return url.pathname.startsWith(top) ? url.pathname.slice(top.length) : path;
+}
+
+// Decode relative paths as filesystem paths, not URL schemes (a name may contain ':').
+// Invalid metadata cannot supply a restore destination outside its declared volume.
+export function trashInfoOriginal(path, base) {
+  if (!path) return "";
+  try {
+    if (path.startsWith("/")) return fileURLToPath(path.startsWith("//") ? `file:${path}` : `file://${path}`);
+    if (!base) return "";
+    const decoded = decodeURIComponent(path);
+    if (decoded.includes("\0") || isAbsolute(decoded)) return "";
+    const top = resolve(base), full = resolve(top, decoded);
+    return full !== top && full.startsWith(top.endsWith(sep) ? top : top + sep) ? full : "";
+  } catch { return ""; }
 }
 
 // Local time without a zone, YYYY-MM-DDThh:mm:ss, as the specification's DeletionDate.
@@ -47,7 +65,7 @@ function topDirectory(path, dev) {
   }
 }
 
-function usableTrash(trash) {
+export function usableTrash(trash) {
   // Never follow a pre-existing symlink for a user-owned Trash or its children.
   for (const path of [trash, join(trash, "files"), join(trash, "info")]) {
     try { mkdirSync(path, { mode: 0o700 }); }
@@ -57,6 +75,24 @@ function usableTrash(trash) {
       throw Object.assign(new Error("Trash directory is not private and owned by this user"), {code: "EUNSAFETRASH"});
   }
   return trash;
+}
+
+// Every per-drive Trash flea has written into, one path a line beside ui.json, so the Trash view
+// finds them again on any system, whether or not that system has a mount table to read.
+export const knownTrashesFile = () => join(dirname(storePaths().file), "trash-folders");
+export function knownTrashes() {
+  try {
+    return readFileSync(knownTrashesFile(), "utf8").split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+function remember(trash) {
+  if (knownTrashes().includes(trash)) return;
+  try {
+    mkdirSync(dirname(knownTrashesFile()), { recursive: true });
+    appendFileSync(knownTrashesFile(), `${trash}\n`);
+  } catch {}
 }
 
 // { trash, base } for an item: base is what Path= is relative to ("" for the home Trash).
@@ -75,9 +111,15 @@ function trashFor(path, st) {
   // $topdir/.Trash/$uid only when .Trash is a real folder with the sticky bit, never a link.
   try {
     const shared = lstatSync(join(top, ".Trash"));
-    if (shared.isDirectory() && shared.mode & constants.S_ISVTX) return { trash: usableTrash(join(top, ".Trash", String(uid))), base: top };
+    if (shared.isDirectory() && shared.mode & constants.S_ISVTX) {
+      const trash = usableTrash(join(top, ".Trash", String(uid)));
+      remember(trash);
+      return { trash, base: top };
+    }
   } catch {}
-  return { trash: usableTrash(join(top, `.Trash-${uid}`)), base: top };
+  const trash = usableTrash(join(top, `.Trash-${uid}`));
+  remember(trash);
+  return { trash, base: top };
 }
 
 // Reserves a name in the Trash by creating its .trashinfo exclusively, then writes the record.
@@ -127,8 +169,7 @@ export function trashOne(path) {
     throw new Error("This drive has no Trash that could be used, so the item was left in place");
   }
   if (full === where.trash || full.startsWith(where.trash + sep) || where.trash.startsWith(full + sep)) throw new Error("That item is already in the Trash");
-  const original = where.base ? relative(where.base, full) : full;
-  const record = `[Trash Info]\nPath=${encodePath(original)}\nDeletionDate=${deletionDate()}\n`;
+  const record = `[Trash Info]\nPath=${trashInfoPath(full, where.base)}\nDeletionDate=${deletionDate()}\n`;
   const name = reserve(where.trash, basename(full), record);
   try {
     const current = lstatSync(full);

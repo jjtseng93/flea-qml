@@ -10,6 +10,7 @@ import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction } from "./menu.js";
 import { trash } from "./trash.js";
+import { trashbrowse, watchTrashCount } from "./trashbrowse.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
@@ -138,6 +139,7 @@ const handlers = {
     send(named.stale ?? { t: "paths", paths: named.paths });
   },
   menuaction: (request) => menuaction(request, send, listing, stamp),
+  trashbrowse: (request) => trashbrowse(request, send),
   trash: (request) => {
     const named = sources(request, listing, stamp, "trash");
     if (named.stale) return send(named.stale);
@@ -151,6 +153,9 @@ const handlers = {
 
 export function runBackend() {
   onChanged(send);
+  // The sidebar's Trash count, sent when it changes; upstream's UI ran `gio monitor` for it.
+  let trashRevision = 0;
+  watchTrashCount((count) => send({ t: "trashcount", count, revision: ++trashRevision }));
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   lines.on("line", (line) => {
     if (!line.trim()) return;

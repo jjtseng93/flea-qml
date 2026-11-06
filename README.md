@@ -68,7 +68,7 @@ checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p 
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
 `meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`,
-`transfer`, `transfercancel`, `trash`, `menuaction` (selection snapshots and permanent-delete confirmation) and `quit`, and `flea --ui-state`, which keeps
+`transfer`, `transfercancel`, `trash`, `trashbrowse`, `menuaction` (selection snapshots and permanent-delete confirmation) and `quit`, and `flea --ui-state`, which keeps
 `~/.local/state/flea/ui.json` the way upstream does. A transfer copies and moves
 files, folders and links and answers keep, skip and refuse; it has no undo yet,
 and refuses replace (it needs the Trash), merge and special files. Other requests and `flea`
@@ -88,7 +88,14 @@ preserved.
 Move to Trash uses freedesktop-style `Trash/files` and `Trash/info`, without
 invoking `gio`. Windows also uses this private Trash folder, not the Windows
 Recycle Bin. Cross-filesystem copies are not attempted: an unusable Trash leaves
-the source in place. Trash browsing, restore, emptying and undo are not ported yet.
+the source in place. Trash browsing, restore and confirmed permanent deletion/emptying
+are supported; undo is not yet ported. Restore refuses an occupied destination.
+The backend discovers home and mounted-volume Trash folders and remembers the
+per-drive folders it has used. Sidebar counts use filesystem watches with a
+five-second reconciliation for newly available volumes, without GIO processes.
+Same-count replacements also refresh the listing. Deletion reviews reuse the
+bounded, non-following tree checks below, including descendant changes and
+single-use confirmation tokens; cancelling invalidates the review.
 
 Permanent deletion requires a fresh confirmation token. Changes to the reviewed
 tree invalidate it; refresh reviews only the originally selected paths. Reviews

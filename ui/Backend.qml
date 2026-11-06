@@ -89,6 +89,9 @@ Item {
     signal paths(var list)
     signal located(var message)
     signal trashResult(var message)
+    // flea-qml: the Trash's item count as the backend last reported it; -1 until it has.
+    property int trashCount: -1
+    property int trashRevision: 0
     signal permissionsResult(var message)
     signal pickerResult(var message)
     signal menuResult(var message)

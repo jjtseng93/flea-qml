@@ -153,7 +153,7 @@ let deleteTokens = 0;
 
 // Bounded, non-following review. A confirmation cannot silently include newly added
 // or replaced descendants. No path-based check makes concurrent filesystem mutation atomic.
-function reviewTrees(paths) {
+export function reviewTrees(paths) {
   const rows = [], pending = paths.map(path => ({ path, dev: null }));
   const deadline = performance.now() + 2000;
   let bytes = 0;

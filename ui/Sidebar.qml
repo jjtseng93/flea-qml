@@ -79,6 +79,7 @@ Item {
     function refreshTrash() { trashMonitor.refresh() }
     TrashMonitor {
         id: trashMonitor
+        backend: root.navigationPane ? root.navigationPane.backend : null
         watching: root.trashActive || root.placesState.showTrash !== false
         onChanged: root.trashChanged()
         // A background poll the operator never asked for must not take the status bar: the count is

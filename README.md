@@ -68,7 +68,7 @@ checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p 
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
 `meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`,
-`transfer`, `transfercancel` and `quit`, and `flea --ui-state`, which keeps
+`transfer`, `transfercancel`, `menuaction` (snapshot, activate, validate, close) and `quit`, and `flea --ui-state`, which keeps
 `~/.local/state/flea/ui.json` the way upstream does. A transfer copies and moves
 files, folders and links and answers keep, skip and refuse; it has no undo yet,
 and refuses replace (it needs the Trash), merge and special files. Other requests and `flea`
@@ -76,6 +76,12 @@ modes are not ported yet; the interface reports them as failed, as with an
 unreachable backend.
 Setting `FLEA_BIN` to upstream's `flea` binary uses it instead, for what is
 not ported yet.
+
+Archive previews list ZIP, tar, tar.gz/tgz and tar.zst/tzst without loading the
+whole archive into memory. Compressed tar member data is streamed and discarded;
+metadata records over 1 MiB and malformed or truncated archives are rejected.
+Keyboard hints are enabled by default; an explicitly saved disabled setting is
+preserved.
 
 ## The clipboard
 
@@ -92,6 +98,16 @@ There is no clipboard daemon: the backend owns the selection and gives it up
 when it exits. The plain text is what a compositor such as buninu-land keeps
 after that, so a later Flea still reads it back as a copy or a cut, as long as
 every path in it exists.
+
+Text-only Copy as and share links use the QML runtime's clipboard. Query-field
+paste accepts either synchronous Quickshell text or buninu-browser's asynchronous
+host clipboard read. These operations do not require `wl-copy`.
+
+## Tests
+
+Run `bun test test` for archive bounds, menu identity/transfer lifetime and
+clipboard tests. Fixtures are generated in temporary directories and removed
+afterward; no compositor is required.
 
 ## License
 

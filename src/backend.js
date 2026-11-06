@@ -1,13 +1,14 @@
 // flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
 // line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
 // So far: list, window, sort, fsinfo, peek, meta, code, the four clip requests,
-// paths, collisions, transfer, transfercancel and quit, and `changed` lines for watched folders. Any other request is noted on stderr and
+// paths, menuaction (snapshot, activate, validate, close), collisions, transfer, transfercancel and quit, and `changed` lines for watched folders. Any other request is noted on stderr and
 // left unanswered, which ui/ already survives for an operation that never reports back.
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
+import { menuaction } from "./menu.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
@@ -135,6 +136,7 @@ const handlers = {
     const named = sources(request, listing, stamp, "paths");
     send(named.stale ?? { t: "paths", paths: named.paths });
   },
+  menuaction: (request) => menuaction(request, send, listing, stamp),
   collisions: (request) => collisions(request, send, listing, stamp),
   transfer: (request) => transfer(request, send, listing, stamp),
   transfercancel: (request) => transferCancel(request),

@@ -11,6 +11,7 @@ import { constants, promises as fsp, lstatSync, statSync, accessSync } from "nod
 import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import { fsTypeOf } from "./fsinfo.js";
 import { describeKind } from "./kinds.js";
+import { capturedPaths, captureSelection, selectionItemUnchanged } from "./menu.js";
 
 const WORDS = new Set(["keep", "replace", "skip", "refuse", "merge"]);
 const FAT = new Set(["vfat", "exfat", "fat", "fat12", "fat16", "fat32", "msdos", "ntfs", "ntfs3"]);
@@ -25,6 +26,12 @@ class Cancelled extends Error {}
 
 // The paths a request names: `paths` wins, else `rows` against the listing in force.
 export function sources(request, listing, stamp, command) {
+  // A menu's Copy to and Move to run on the selection its snapshot captured.
+  if (request.menuId !== undefined && command !== "paths") {
+    const captured = capturedPaths(request.menuId);
+    if (!captured) return { stale: { t: "error", where: command, path: "", msg: "Selected items changed; reopen the menu." } };
+    return { paths: captured };
+  }
   if (Array.isArray(request.paths) && request.paths.length) return { paths: request.paths.map(String) };
   if (Array.isArray(request.rows)) {
     if (request.listing !== undefined && request.listing !== stamp)
@@ -88,8 +95,9 @@ function freeCopyPath(dest, name) {
 let question = null;
 
 export function collisions(request, send, listing, stamp) {
+  question = null;
   const named = sources(request, listing, stamp, "collisions");
-  if (named.stale) return send(named.stale);
+  if (named.stale) return send(request.menuId === undefined ? named.stale : { t: "collisions", id: request.id ?? 0, total: 0, names: [], mergeable: false });
   const id = request.id ?? 0,
     dest = request.dest,
     held = new Map(),
@@ -111,7 +119,8 @@ export function collisions(request, send, listing, stamp) {
       }
     }
   }
-  question = { id, dest: typeof dest === "string" ? resolve(dest) : "", held };
+  question = { id, dest: typeof dest === "string" ? resolve(dest) : "", held,
+    menuId: request.menuId, selection: request.menuId === undefined ? null : captureSelection(request.menuId) };
   send({ t: "collisions", id, total, names, mergeable: false });
 }
 
@@ -272,13 +281,18 @@ const jobs = new Map(),
   queues = new Map();
 
 export function transfer(request, send, listing, stamp) {
-  const named = sources(request, listing, stamp, "transfer");
-  if (named.stale) return send(named.stale);
-  const dest = request.dest,
-    problem = destProblem(dest);
-  // The question is spent by the next transfer whether or not this one names it.
+  // A Copy to dialog closes its menu before it submits the collision answer.
+  // Keep the captured identities with that one-shot question, not with the UI's lifetime.
   const asked = question;
   question = null;
+  const dest = request.dest, problem = destProblem(dest);
+  const matches = asked && asked.id === request.collideId && typeof dest === "string"
+    && asked.dest === resolve(dest) && asked.menuId === request.menuId;
+  const selection = request.menuId === undefined ? null
+    : matches ? asked.selection : captureSelection(request.menuId);
+  const named = request.menuId !== undefined && selection
+    ? { paths: selection.paths } : sources(request, listing, stamp, "transfer");
+  if (named.stale) return send(named.stale);
   if (problem) return send({ t: "error", where: "transfer", path: String(dest ?? ""), msg: problem });
   const collide = request.collide;
   if (collide !== undefined && !WORDS.has(collide))
@@ -287,7 +301,7 @@ export function transfer(request, send, listing, stamp) {
     paths = named.paths,
     id = nextId++,
     job = new Job(id, send);
-  const answered = collide !== undefined && asked && asked.id === request.collideId && asked.dest === resolve(dest) ? asked.held : new Map();
+  const answered = collide !== undefined && matches ? asked.held : new Map();
   jobs.set(id, job);
   send({ t: "transferstarted", id, n: paths.length, moving });
   let drive;
@@ -296,13 +310,13 @@ export function transfer(request, send, listing, stamp) {
   } catch {
     drive = dest;
   }
-  const run = () => runTransfer(job, { paths, dest, moving, collide, answered }).finally(() => jobs.delete(id));
+  const run = () => runTransfer(job, { paths, dest, moving, collide, answered, selection }).finally(() => jobs.delete(id));
   const tail = (queues.get(drive) ?? Promise.resolve()).then(run, run);
   queues.set(drive, tail);
   tail.finally(() => queues.get(drive) === tail && queues.delete(drive));
 }
 
-async function runTransfer(job, { paths, dest, moving, collide, answered }) {
+async function runTransfer(job, { paths, dest, moving, collide, answered, selection }) {
   const send = job.send,
     fstype = (() => {
       try {
@@ -331,6 +345,10 @@ async function runTransfer(job, { paths, dest, moving, collide, answered }) {
       retryPaths.push(src);
       send({ t: "transferitem", id: job.id, index, name, ok: false, err });
     };
+    if (selection && !selectionItemUnchanged(selection, index)) {
+      fail("Selected items changed; reopen the menu.");
+      continue;
+    }
     const source = isAbsolute(src) ? lstatOrNull(src) : null;
     if (!source) {
       fail(isAbsolute(src) ? "it no longer exists" : "the path is not absolute");

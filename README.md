@@ -16,7 +16,9 @@ fast, keyboard-first file manager for Omarchy.
 
 The repository aims to be self-contained, needing only buninu-browser to run.
 The backend reads no system database; the one system file it reads is Linux's
-mount table, for a folder's filesystem name. The one program it runs is
+mount table, for a folder's filesystem name. For the clipboard it speaks
+Wayland data-control itself, loading only libc (kernel32 on Windows) to pass
+file descriptors. The one program it runs is
 [jsmdcui](https://github.com/jjtseng93/jsmdcui), for syntax colours in previews,
 found beside this repository as `../jsmdcui` or on PATH as `jmi` or `jsmdcui`;
 without it previews are plain text. Some interface
@@ -65,12 +67,31 @@ This needs a buninu-browser whose QML `TapHandler` understands
 checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml`.
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
-`meta`, `code` and `quit`, and `flea --ui-state`, which keeps
-`~/.local/state/flea/ui.json` the way upstream does. Other requests and `flea`
+`meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`,
+`transfer`, `transfercancel` and `quit`, and `flea --ui-state`, which keeps
+`~/.local/state/flea/ui.json` the way upstream does. A transfer copies and moves
+files, folders and links and answers keep, skip and refuse; it has no undo yet,
+and refuses replace (it needs the Trash), merge and special files. Other requests and `flea`
 modes are not ported yet; the interface reports them as failed, as with an
 unreachable backend.
 Setting `FLEA_BIN` to upstream's `flea` binary uses it instead, for what is
 not ported yet.
+
+## The clipboard
+
+Copied files are offered the way other file managers read them
+(`text/uri-list`, GNOME's and KDE's forms) and, as plain text, shell-quoted on
+one line, so a paste into a shell is ready to use:
+
+```sh
+'/home/a/file a' '/home/a/it'\''s'        # copied
+""'/home/a/file a' '/home/a/it'\''s'""    # cut: the same words between two empty ""
+```
+
+There is no clipboard daemon: the backend owns the selection and gives it up
+when it exits. The plain text is what a compositor such as buninu-land keeps
+after that, so a later Flea still reads it back as a copy or a cut, as long as
+every path in it exists.
 
 ## License
 

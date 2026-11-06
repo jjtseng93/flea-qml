@@ -8,7 +8,7 @@ const minorOf = (dev) => Number((dev & 0xffn) | ((dev >> 12n) & ~0xffn));
 
 // The mount holding a device id, by its "major:minor" in /proc/self/mountinfo. Linux only:
 // elsewhere the name stays empty, which the status bar draws as no filesystem name.
-function fsTypeOf(dev) {
+export function fsTypeOf(dev) {
   if (process.platform !== "linux") return "";
   let text = "";
   try {

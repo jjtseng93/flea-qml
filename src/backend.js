@@ -1,10 +1,13 @@
 // flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
 // line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
-// So far: list, window, sort, fsinfo, peek, meta, code and quit. Any other request is noted on stderr and
+// So far: list, window, sort, fsinfo, peek, meta, code, the four clip requests,
+// paths, collisions, transfer, transfercancel and quit. Any other request is noted on stderr and
 // left unanswered, which ui/ already survives for an operation that never reports back.
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
+import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
+import { collisions, sources, transfer, transferCancel } from "./transfer.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
 import { Listing, directoryFacts } from "./listing.js";
@@ -12,7 +15,13 @@ import { SORT_KEYS } from "./order.js";
 import { lstatSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
-const send = (object) => process.stdout.write(`${JSON.stringify(object)}\n`);
+// FLEA_BACKEND_LOG=/some/file appends every request and answer there, for debugging.
+const trace = process.env.FLEA_BACKEND_LOG ? (await import("node:fs")).appendFileSync.bind(null, process.env.FLEA_BACKEND_LOG) : null;
+const send = (object) => {
+  const line = `${JSON.stringify(object)}\n`;
+  trace?.(`< ${line}`);
+  process.stdout.write(line);
+};
 const error = (where, path, msg, extra = {}) => send({ t: "error", where, path, msg, ...extra });
 
 let listing = null,
@@ -109,6 +118,19 @@ const handlers = {
     const line = meta(listing, request);
     if (line) send(line);
   },
+  // Answered off the read loop: a slow clipboard owner holds up no other request.
+  clipSet: (request) => clipSet(request, send),
+  clipGet: (request) => clipGet(request, send),
+  clipClear: (request) => clipClear(request, send),
+  clipWatch: (request) => clipWatch(request, send),
+  // Rows read as paths, the way copy, cut and drag name a selection wider than the client's window.
+  paths: (request) => {
+    const named = sources(request, listing, stamp, "paths");
+    send(named.stale ?? { t: "paths", paths: named.paths });
+  },
+  collisions: (request) => collisions(request, send, listing, stamp),
+  transfer: (request) => transfer(request, send, listing, stamp),
+  transfercancel: (request) => transferCancel(request),
   quit: () => process.exit(0),
 };
 
@@ -116,6 +138,7 @@ export function runBackend() {
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   lines.on("line", (line) => {
     if (!line.trim()) return;
+    trace?.(`> ${line}\n`);
     let request;
     try {
       request = JSON.parse(line);

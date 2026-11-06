@@ -2,32 +2,23 @@
 // is read back into the protocol's roles: 0 the foreground, then red, green, yellow, blue, magenta
 // and cyan (docs/protocol.md "code"). Upstream runs `bat` for the same lines.
 // jsmdcui is looked for beside this repository first, then as `jmi` or `jsmdcui` on PATH, and its
-// src/index.js is always run with this Bun, never through a launcher's shebang.
-import { existsSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+// a sibling checkout runs with Bun while PATH commands keep their own launcher semantics.
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 const BUN = Bun.which("bun") || process.argv0;
 const REPO = join(import.meta.dir, "..");
 
 let found;
-/** The jsmdcui entry script, or null when none can be found. Looked up once per process. */
+/** The command argv prefix, or null when none can be found. Looked up once per process. */
 export function jsmdcui() {
   if (found !== undefined) return found;
   found = null;
   const beside = join(REPO, "..", "jsmdcui", "src", "index.js");
-  if (existsSync(beside)) return (found = beside);
+  if (existsSync(beside)) return (found = [BUN, beside]);
   for (const name of ["jmi", "jsmdcui"]) {
     const command = Bun.which(name);
-    if (!command) continue;
-    let real;
-    try {
-      real = realpathSync(command);
-    } catch {
-      continue;
-    }
-    // jsmdcui's own bin is src/index.js; jmi is its shell launcher in the checkout's root.
-    const entry = real.endsWith(".js") ? real : join(dirname(real), "src", "index.js");
-    if (existsSync(entry)) return (found = entry);
+    if (command) return (found = [command]);
   }
   return found;
 }
@@ -97,10 +88,10 @@ export function runsOf(line) {
  * cancelled through `signal`. Every line of the file is returned; the caller takes its window.
  */
 export async function highlightFile(path, signal) {
-  const entry = jsmdcui();
-  if (!entry) return null;
+  const command = jsmdcui();
+  if (!command) return null;
   try {
-    const child = Bun.spawn([BUN, entry, "--cat", "--edit", path], { stdout: "pipe", stderr: "ignore", stdin: "ignore", signal });
+    const child = Bun.spawn([...command, "--cat", "--edit", path], { stdout: "pipe", stderr: "ignore", stdin: "ignore", signal });
     const [text, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
     if (code !== 0 || signal?.aborted) return null;
     return text.split("\n").map(runsOf);

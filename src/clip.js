@@ -12,8 +12,8 @@
 // empty "" joins the word beside it. Single quotes keep a newline in a name as it is.
 import { randomBytes } from "node:crypto";
 import { lstatSync } from "node:fs";
-import { isAbsolute } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isAbsolute, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const FLEA = "application/x-flea-clip",
   GNOME = "x-special/gnome-copied-files",
@@ -22,9 +22,9 @@ export const FLEA = "application/x-flea-clip",
   TEXT = ["text/plain;charset=utf-8", "text/plain", "UTF8_STRING"],
   PNG = "image/png";
 
-const WINDOWS = process.platform === "win32";
 const LIMIT = 8 * 1024 * 1024;
-const PARTS = WINDOWS ? /[\\/]/ : /\//;
+// A path's parts, split on this system's own separator and on '/', which every system accepts.
+const PARTS = new RegExp(`[${sep === "\\" ? "\\\\" : sep}/]`);
 
 // ---- the text form ----
 
@@ -89,21 +89,9 @@ function usable(path) {
 
 // ---- the file-manager forms ----
 
-// Every byte outside the unreserved set and '/' is percent-encoded, as upstream does.
-export function encodeUri(path) {
-  let p = path;
-  if (WINDOWS) {
-    p = p.replaceAll("\\", "/");
-    if (!p.startsWith("//")) p = `/${p}`;
-  }
-  let out = WINDOWS && p.startsWith("//") ? "file:" : "file://";
-  for (const byte of Buffer.from(p)) {
-    const c = String.fromCharCode(byte);
-    out += /[A-Za-z0-9\-_.~/]/.test(c) && byte < 128 ? c : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
-  }
-  // A drive letter's colon stays readable: file:///C:/...
-  return WINDOWS ? out.replace(/^file:\/\/\/([A-Za-z])%3A/, "file:///$1:") : out;
-}
+// Bun's own conversion, the inverse of the fileURLToPath that reads a uri-list back: it encodes
+// what a URI cannot hold and takes a Windows drive letter or \\server\share path as Windows writes it.
+export const encodeUri = (path) => pathToFileURL(path).href;
 
 function decodeUris(lines) {
   const paths = [],

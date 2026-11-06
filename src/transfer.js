@@ -176,8 +176,9 @@ async function copyAny(src, dst, ctx, top = false) {
   const st = await fsp.lstat(src);
   if (st.isSymbolicLink()) {
     const text = await fsp.readlink(src);
-    let type;
-    if (process.platform === "win32") type = lstatOrNull(resolve(dirname(src), text))?.isDirectory() ? "dir" : "file";
+    // The type says whether the link names a folder; Windows needs it, every other system ignores it.
+    let type = "file";
+    try { if (statSync(resolve(dirname(src), text)).isDirectory()) type = "dir"; } catch {}
     return guarded(() => fsp.symlink(text, dst, type), dst, "link", ctx, top);
   }
   if (st.isDirectory()) {

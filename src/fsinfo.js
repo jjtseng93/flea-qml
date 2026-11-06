@@ -6,10 +6,10 @@ import { readFileSync, statSync, statfsSync } from "node:fs";
 const majorOf = (dev) => Number(((dev >> 8n) & 0xfffn) | ((dev >> 32n) & ~0xfffn));
 const minorOf = (dev) => Number((dev & 0xffn) | ((dev >> 12n) & ~0xffn));
 
-// The mount holding a device id, by its "major:minor" in /proc/self/mountinfo. Linux only:
-// elsewhere the name stays empty, which the status bar draws as no filesystem name.
+// The mount holding a device id, by its "major:minor" in /proc/self/mountinfo. Every system tries
+// the same read; where there is no mount table it fails and the name stays empty, which the status
+// bar draws as no filesystem name.
 export function fsTypeOf(dev) {
-  if (process.platform !== "linux") return "";
   let text = "";
   try {
     text = readFileSync("/proc/self/mountinfo", "utf8");

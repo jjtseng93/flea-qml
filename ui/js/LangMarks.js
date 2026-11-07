@@ -98,10 +98,10 @@ function slugForRow(row) {
     return slugForFile(row.n)
 }
 
-// Ordinary rows build on demand; search keeps its bounded warm chain through result reuse.
+// Build only when a language logo will actually be displayed, including during search.
 function syncMark(owner, glyph, url, readyStatus) {
     if (!glyph) return
-    if (owner.langWarm !== true && (owner.thumbDrawn || owner.langSlug === "")) {
+    if (owner.thumbDrawn || owner.langSlug === "") {
         if (owner.langLoader !== null) {
             owner.langLoader.active = false
             owner.langLoader.destroy()

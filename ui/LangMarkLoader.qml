@@ -2,13 +2,13 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 
-// A mapped row or a bounded search warm builds it; the original glyph supplies its geometry.
+// Only a row with a visible language logo builds it; the glyph supplies its geometry.
 Loader {
     id: root
 
     required property Item owner
     required property Item glyph
-    active: root.owner.langWarm === true || (!root.owner.thumbDrawn && root.owner.langSlug !== "")
+    active: !root.owner.thumbDrawn && root.owner.langSlug !== ""
     visible: !root.owner.thumbDrawn && root.owner.langSlug !== ""
     x: root.glyph.x
     y: root.glyph.y

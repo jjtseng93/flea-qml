@@ -390,29 +390,37 @@ Item {
                         border.width: Theme.spacing.hairline
                         border.color: Theme.color.accent
 
-                        Text {
+                        TextInput {
                             id: queryLine
+                            objectName: "keymapInput"
                             anchors.left: parent.left
-                            anchors.leftMargin: Theme.spacing.gap
+                            anchors.right: parent.right
+                            anchors.margins: Theme.spacing.gap
                             anchors.verticalCenter: parent.verticalCenter
-                            width: Math.min(implicitWidth, parent.width - 2 * Theme.spacing.gap - queryCaret.width)
                             text: root.query
                             color: Theme.color.foreground
+                            selectionColor: Theme.color.accent
+                            selectedTextColor: Theme.color.background
                             font.family: Theme.font.family
                             font.pixelSize: Theme.font.body
-                            textFormat: Text.PlainText
-                            elide: Text.ElideLeft
+                            selectByMouse: true
+                            clip: true
+                            onTextEdited: {
+                                root.query = text
+                                if (!text.length) keys.forceActiveFocus()
+                            }
+                            Keys.onPressed: function (event) {
+                                if (event.key === Qt.Key_Escape) root.close()
+                                else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down)
+                                    root.resultCursor = SheetKeys.stepCursor(root.resultCursor,
+                                        event.key === Qt.Key_Up ? -1 : 1, root.queryResults.length)
+                                else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                    root.activateResult()
+                                else return
+                                event.accepted = true
+                            }
                         }
 
-                        // The field always holds the caret while it shows, and a TextInput's caret takes its text ink.
-                        Rectangle {
-                            id: queryCaret
-                            anchors.left: queryLine.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Theme.spacing.hairline
-                            height: Theme.font.body + Theme.spacing.hairline
-                            color: Theme.color.foreground
-                        }
                     }
                 }
 
@@ -542,6 +550,8 @@ Item {
                 if (root.query.length === 0)
                     root.ensureRecent()
                 root.query += event.text
+                queryLine.forceActiveFocus()
+                queryLine.cursorPosition = queryLine.text.length
             }
             else if (decision === "ignore") { event.accepted = true; return }
             else { root.close() }

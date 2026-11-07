@@ -9,6 +9,7 @@ import "js/Kinds.js" as Kinds
 // Quick Look's Compare kind: the unified diff of two files, coloured by ink alone, or the sentence that says why there is none.
 Item {
     id: root
+    readonly property alias viewport: view
 
     // The backend asks and answers the diff; the opener holds the text copy route Copy as Path uses.
     property var backend: null

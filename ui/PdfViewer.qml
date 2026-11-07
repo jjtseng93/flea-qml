@@ -52,6 +52,7 @@ Item {
     onPathChanged: { root.zoom = root.minZoom; root.pdfControlIndex = -1 }
     function turn(delta) { pdf.turn(delta) }
     function turnPage(delta) { root.turn(delta) }
+    function pageBy(delta) { root.turn(delta) }
     function scrollPage(delta) {
         pageFlick.contentY = Math.max(0, Math.min(pageFlick.contentHeight - pageFlick.height,
             pageFlick.contentY + delta * Theme.rowHeight))

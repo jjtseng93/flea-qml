@@ -44,6 +44,7 @@ Flea.PreviewColumn {
             : root.rowState === Facts.VIDEO || root.rowState === Facts.AUDIO ? "media" : "preview"
         var action = Keymap.lookup(event.key, event.text, event.modifiers, context)
         if (action === "escape" || action === "focusPreview") root.pane.listArea.forceActiveFocus()
+        else if (PreviewKeys.pageDirection(action)) root.pageBy(PreviewKeys.pageDirection(action))
         else if (action === "loadPreview") root.loadSelection()
         else if (root.rowState === Facts.PDF) PreviewKeys.pdfAction(action, root)
         else if (action === "preview") {

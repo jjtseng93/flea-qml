@@ -24,6 +24,7 @@ Item {
 
     signal closeRequested
 
+    readonly property var viewport: doc.shownView === "source" ? doc.sourceItem : doc.viewport
     readonly property var bodyItem: doc.bodyItem
     readonly property var tableWheel: doc.tableWheel
     function tableScroller() { return doc.tableScroller() }

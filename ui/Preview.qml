@@ -9,6 +9,7 @@ import "js/ExtThumbs.js" as ExtThumbs
 import "js/MarkdownPrepared.js" as Prepared
 import "js/Motion.js" as Motion
 import "js/PreviewSettle.js" as PreviewSettle
+import "js/PreviewKeys.js" as PreviewKeys
 import "js/PreviewSwap.js" as PreviewSwap
 import "js/Swap.js" as Swap
 import "js/QuickLookRect.js" as QuickLookRect
@@ -70,6 +71,14 @@ Item {
         if (root.kind === "text") return root.isDocument
             ? (markdownLoader.item ? markdownLoader.item.bodyItem : null) : textPane.bodyItem
         return null
+    }
+    function pageBy(direction) {
+        if (root.isPdf) { root.turnPage(direction); return }
+        var view = null
+        if (root.isDocument) view = root.markdownShown ? root.markdownShown.viewport : null
+        else if (root.kind === "text") view = textPane.list
+        else if (root.isCompare && compareLoader.item) view = compareLoader.item.viewport
+        PreviewKeys.pageViewport(view, direction)
     }
     function mediaLoaded() { return mediaLoader.item !== null }
     function textShown() { return root.isDocument

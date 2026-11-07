@@ -19,6 +19,7 @@ Item {
     property bool wrap: false
     property bool closeFocused: false
     signal closeRequested
+    readonly property var viewport: doc.viewport
     readonly property var bodyItem: doc.bodyItem
     readonly property var document: doc
     readonly property string rawText: doc.sourceCode ? doc.sourceCode.lines.join("\n") : ""

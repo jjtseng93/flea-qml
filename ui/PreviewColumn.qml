@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import "." as Flea
 import "js/Facts.js" as Facts
+import "js/PreviewKeys.js" as PreviewKeys
 import "js/Format.js" as Format
 import "js/Icons.js" as Icons
 import "js/KeyName.js" as KeyName
@@ -422,7 +423,12 @@ Item {
         column: root
     }
 
-    function pageBy(direction) { scrolling.pageBy(direction) }
+    function pageBy(direction) {
+        if (root.rowState === Facts.PDF) {
+            if (!root.overlayOpen && !root.manualHold && !root.pending)
+                PreviewKeys.pageViewport(pdfFlick, direction)
+        } else scrolling.pageBy(direction)
+    }
     // The page under the frame's top, read back over IPC too, and the turn that scrolls to the next or previous one.
     function pdfPage() { return pdfLoader.item ? pdfLoader.item.page : 0 }
     function turnPage(delta) { if (pdfLoader.item) pdfLoader.item.turn(delta) }

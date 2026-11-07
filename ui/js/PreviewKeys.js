@@ -4,6 +4,7 @@
 .import "Marks.js" as Marks
 .import "Search.js" as Search
 .import "Thumbs.js" as Thumbs
+.import "Scroll.js" as Scroll
 
 // What the preview overlay does with a key, split out of Focus.js at its 300-line hard cap the
 // same way ui/js/Trash.js was: Focus.js decides which surface owns a key, and this is the surface.
@@ -20,8 +21,25 @@ function zoomStep(zoom, steps) {
     return Math.max(PDF_ZOOM_MIN, Math.min(PDF_ZOOM_MAX, zoom + steps * PDF_ZOOM_STEP))
 }
 
+// All advertised page keys share one route in Quick Look and the preview column.
+function pageDirection(action) {
+    if (action === "pageDown" || action === "previewPageForward") return 1
+    if (action === "pageUp" || action === "previewPageBack") return -1
+    return 0
+}
+
+function pageViewport(view, direction) {
+    if (!view || !direction) return
+    if (typeof view.cancelFlick === "function") view.cancelFlick()
+    Scroll.stopTail(view)
+    var bounds = Scroll.limitsY(view)
+    view.contentY = Math.max(bounds.min, Math.min(bounds.max, view.contentY + direction * view.height))
+    if (typeof view.forceLayout === "function") view.forceLayout()
+}
+
 // The column's PDF has no strip: pages scroll, and Space, Return or e opens Quick Look at the page in view.
 function columnPdfAction(action, viewer) {
+    if (pageDirection(action)) { viewer.pageBy(pageDirection(action)); return }
     if (action === "open" || action === "preview" || action === "expand") viewer.toggleExpand()
     else if (action === "seekBack" || action === "parent") viewer.turnPage(-1)
     else if (action === "seekForward" || action === "pageForward") viewer.turnPage(1)
@@ -29,6 +47,7 @@ function columnPdfAction(action, viewer) {
 }
 
 function pdfAction(action, viewer) {
+    if (pageDirection(action)) { viewer.pageBy(pageDirection(action)); return }
     var controls = viewer.pdfControls
     if (controls === undefined) return columnPdfAction(action, viewer)
     if (action === "focusNext" || action === "focusPrevious") {
@@ -70,6 +89,7 @@ function open(root) {
 // press anything" from the same ruling.
 function act(action, root) {
     root.preview.revealStrip()
+    if (pageDirection(action)) { root.preview.pageBy(pageDirection(action)); return }
     switch (action) {
     // A Compare overlay names two files, so the cursor moving under it opens no other file in its place.
     case "cursorDown":
@@ -85,6 +105,7 @@ function act(action, root) {
     case "playPause":
         if (root.preview.isMedia) root.preview.togglePlay()
         return
+    case "focusPreview":
     case "escape": root.preview.close(); return
     // Compare's y: the whole patch goes to the clipboard; the overlay guards on its own kind.
     case "copyPatch": root.preview.copyPatch(); return

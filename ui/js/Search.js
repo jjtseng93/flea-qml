@@ -4,11 +4,12 @@
 
 // The status bar's two search lines, each filled by Format.fill.
 var WORDS = {
-    searching: "%1 found · Searching, %2 scanned",
+    // flea-qml: find reports matches only, so there is no scanned count to show.
+    searching: "%1 found · Searching",
     landed: "%1 found in %2 s"
 }
 
-// Live subtree search: the strip opens a session, each keystroke sends its query, rows replace folder rows with no Enter.
+// Enter starts the subtree search; editing the real input alone does not run find.
 var OFF = ""
 var TYPING = "typing"
 var RESULTS = "results"
@@ -52,28 +53,40 @@ function openScope(root) {
     root.searchOpenedGen = root.searchGen
     if (root.swap) { root.swap.landedGen = 0; root.swap.answeredQuery = "" }
     root.searchQuery = ""
-    root.searchRunning = true
+    root.searchSent = ""
+    // flea-qml: nothing runs until Enter, so a fresh strip is not searching yet.
+    root.searchRunning = false
     root.searchCancelled = false
     root.searchScanned = 0
-    root.backend.searchOpen(scopeRoot(root.path, root.home || "", root.searchHere), root.path, root.showHidden)
+    root.backend.searchOpen(scopeRoot(root.path, root.home || "", root.searchStep), root.path, root.showHidden)
 }
 
-// Universal search: home when the pane stands inside it, else the pane's directory (backend has no home notion). Issue 30: here=true stays; abort()/reveal() leave it; nothing persists.
-function scopeRoot(path, home, here) {
-    if (here === true) {
-        return path
-    }
-    if (home.length === 0) {
-        return path
-    }
-    if (path === home || String(path).indexOf(home + "/") === 0) {
-        return home
-    }
+// flea-qml: Find's scopes, which Tab turns through in this order wherever the pane is: the folder
+// itself, home, and the root of the folder's own filesystem.
+var HERE = 0, HOME = 1, ROOT = 2
+var SCOPE_COUNT = 3
+var SCOPE_MARK = [".", "~", "/"]
+
+// The root a path stands on, read off the path's own start, so every system answers alike:
+// "/" for /home/a, "C:\" for C:\Users\a, and "\\server\share\" for a path under that share.
+function rootOf(path) {
+    var m = /^(\\\\[^\\/]+[\\/][^\\/]+[\\/]?|[A-Za-z]:[\\/]?|[\\/])/.exec(String(path))
+    return m ? m[0] : "/"
+}
+
+function scopeRoot(path, home, step) {
+    if (step === HOME && home) return home
+    if (step === ROOT) return rootOf(path)
     return path
 }
 
 // Keystrokes send rising gens with old rows held and the cursor standing for the landing to keep.
+// flea-qml: only Enter (and Tab over a query already run) sends one; searchSent is what it sent.
 function sendQuery(root) {
+    root.searchSent = root.searchQuery
+    // flea-qml: the find runs from here until its terminal line lands.
+    root.searchRunning = root.searchQuery.length > 0
+    root.searchCancelled = false
     root.searchGen += 1
     root.searchKeyAt = Date.now()
     root.searchFirstRowsAt = 0
@@ -81,9 +94,9 @@ function sendQuery(root) {
     root.backend.searchQuery(root.searchQuery, root.searchGen, root.windowSize, root.sizeWish)
 }
 
+// flea-qml: typing only edits the query line; Enter runs the find.
 function extend(root, character) {
     root.searchQuery += character
-    sendQuery(root)
 }
 
 // Backspace to empty sends "" and the folder rows come back, with the strip still open.
@@ -92,14 +105,20 @@ function shrink(root) {
         return
     }
     root.searchQuery = root.searchQuery.substring(0, root.searchQuery.length - 1)
-    sendQuery(root)
 }
 
-// Enter keeps the results and moves the keys to them, with no new request.
+// flea-qml: Enter runs the find every time, changed query or not, so the results are fresh; a press
+// within ENTER_DEBOUNCE_MS of the last run is the same press repeated and runs nothing more.
+var ENTER_DEBOUNCE_MS = 500
 function commit(root) {
     if ((root.searchQuery || "").length === 0) {
         abort(root)
         return
+    }
+    var now = Date.now()
+    if (now - (root.searchEnterAt || 0) >= ENTER_DEBOUNCE_MS) {
+        root.searchEnterAt = now
+        sendQuery(root)
     }
     root.searchMode = RESULTS
 }
@@ -116,16 +135,16 @@ function openQuery(root, query) {
         return
     }
     if ((root.searchMode || "").length === 0) {
-        root.searchHere = false
+        root.searchStep = HOME
         start(root)
     } else if (root.searchCancelled === true) {
         // A cancelled walk answers nothing more, so the place opens a fresh Home session with the drawn state of a new walk.
-        root.searchHere = false
+        root.searchStep = HOME
         openScope(root)
-    } else if (root.searchHere) {
-        // The old query is dropped first, so the rescope sends nothing and the new query is the one request.
-        root.searchQuery = ""
-        rescope(root)
+    } else if (root.searchStep !== HOME) {
+        // flea-qml: the place's query runs over home, whichever scope Tab had turned to.
+        root.searchStep = HOME
+        openScope(root)
     }
     root.searchQuery = query
     sendQuery(root)
@@ -134,12 +153,44 @@ function openQuery(root, query) {
 
 // Tab flips the scope, opens the new scope at once and re-sends the standing query.
 function rescope(root) {
-    root.searchHere = !root.searchHere
-    var scope = scopeRoot(root.path, root.home || "", root.searchHere)
+    root.searchStep = nextStep(root.searchStep, root.home || "")
+    var scope = scopeRoot(root.path, root.home || "", root.searchStep)
     root.backend.searchOpen(scope, root.path, root.showHidden)
-    if ((root.searchQuery || "").length > 0) {
+    // flea-qml: a query already run reruns in the new scope; an unrun one waits for Enter.
+    if ((root.searchSent || "").length > 0 && (root.searchQuery || "").length > 0) {
         sendQuery(root)
     }
+}
+
+// flea-qml: the command the empty query line stands for, after the scope it runs in.
+// The space after -iname is the one a shell command line holds before its argument.
+function placeholder(path, home, step) {
+    return "find " + SCOPE_MARK[step === HOME && !home ? HERE : step] + " -iname "
+}
+
+// flea-qml: where Tab moves the scope next, the same everywhere; home is skipped when none is known.
+function tabHint(path, home, step) {
+    return "tab: " + SCOPE_MARK[nextStep(step, home)]
+}
+
+function nextStep(step, home) {
+    var next = (step + 1) % SCOPE_COUNT
+    return next === HOME && !home ? (next + 1) % SCOPE_COUNT : next
+}
+
+// flea-qml: the manager's hidden setting changed under a standing Find: the scope reopens with it,
+// and a query already run runs again, walking hidden folders now or pruning them.
+function rehide(root) {
+    root.backend.searchOpen(scopeRoot(root.path, root.home || "", root.searchStep), root.path, root.showHidden)
+    if ((root.searchSent || "").length > 0 && (root.searchQuery || "").length > 0)
+        sendQuery(root)
+}
+
+// flea-qml: ✕ stops a running find and leaves at once, the two Escapes in one press.
+function dismiss(root) {
+    if (root.searchRunning && root.backend) root.backend.searchCancel()
+    root.searchRunning = false
+    abort(root)
 }
 
 // The first Esc while the walk runs stops it and keeps the results on screen.
@@ -155,7 +206,9 @@ function abort(root) {
     if (root.searchLeaving === true) {
         return
     }
-    if (root.searchRunning && (root.searchQuery || "").length > 0) {
+    // flea-qml: Esc has two meanings, decided only by whether a find runs: running, it stops the
+    // find and keeps what it found; not running, it closes Find. The query line plays no part.
+    if (root.searchRunning) {
         cancel(root)
         return
     }
@@ -167,7 +220,7 @@ function abort(root) {
     }
     // The backend closes at the request; the drawn state waits for the folder to land.
     leaveWalk(root)
-    root.openWithoutHistory(back, { holdWalk: true, relist: true })
+    root.openWithoutHistory(back, { holdWalk: true, relist: true, keptQuery: root.filterQuery })
 }
 
 // Any gen this session sent may have drawn rows the folder does not own, so leaving it re-lists the folder.
@@ -335,8 +388,10 @@ function live(root) {
 // What activating a row means right now. On a search result it takes
 // you to the file instead of opening it; the canvas keeps enter on open and o on reveal, so it is
 // only the pointer that asks this. ui/js/Tap.js is the one caller.
+// flea-qml: a tap on a result only selects it, so the pointer browses results the way the arrows
+// do and the search stays; two taps open, as anywhere else, and o or the menu reveals.
 function activateAction(root) {
-    return live(root) ? "reveal" : "open"
+    return "open"
 }
 
 // A walk with no matches yet is still working, so the list area keeps the crawl rather than

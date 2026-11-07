@@ -5,7 +5,8 @@
 // The chrome bar's and tab strip's keys while Tab holds the keyboard there, read raw so no preset shadows them (as ui/js/RailKeys.js).
 
 // The chrome's controls in the order Tab and the arrows walk them, named by glyph as ui/ChromeBar.qml names them.
-var ORDER = ["arrow-left", "arrow-up", "search", "filter", "sort", "list", "columns", "grid", "dual", "sliders"]
+// flea-qml: the funnel stands left of the magnifier, so it is reached first.
+var ORDER = ["arrow-left", "arrow-up", "filter", "search", "sort", "list", "columns", "grid", "dual", "sliders"]
 // A press on these hands the keyboard to the surface it opens, as the pointer's press does; the rest keep it on the mark.
 var HANDS_OFF = ["search", "filter", "sliders"]
 var BLOCKING = Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier

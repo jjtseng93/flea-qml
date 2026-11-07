@@ -113,8 +113,23 @@ FocusScope {
     // Search origin survives a home-wide walk.
     property string searchFrom: ""
     property string searchQuery: ""
+    // flea-qml: the query Find last ran, and when Enter last ran one (for the Enter debounce).
+    property string searchSent: ""
+    property real searchEnterAt: 0
     // Issue 30: which scope the next walk takes, flipped by tab on the query line; see ui/js/Search.js.
-    property bool searchHere: false
+    // flea-qml: the toolbar's two toggles. Off, each opens as its key does; on, Find stops its run and
+    // leaves, Filter clears and closes. Neither touches the other.
+    function toggleFind() {
+        if (root.searchMode.length > 0) Search.dismiss(root)
+        else root.act("search")
+    }
+    function toggleFilter() {
+        if (root.filterTyping || root.filterQuery.length > 0) Filter.close(root)
+        else root.act("filter")
+    }
+
+    // flea-qml: Find's scope, Search.HERE, HOME or ROOT; it starts in the folder and Tab turns it.
+    property int searchStep: 0
     property bool searchRunning: false
     property bool searchCancelled: false
     // Newest sent query generation, rising across sessions; answers for an older one are dropped.
@@ -392,7 +407,12 @@ FocusScope {
         }
     }
     onListInFlightChanged: if (!root.listInFlight) { preferences.restart(); Sort.applyPending(root); listingWait.stop() } else listingWait.restart()
-    onSearchModeChanged: preferences.restart()
+    onSearchModeChanged: { preferences.restart(); root.moveSearchFocus() }
+    // flea-qml: typing gives the Find field the keyboard; leaving it hands the keyboard back to the list.
+    function moveSearchFocus() {
+        if (root.searchMode === Search.TYPING) Qt.callLater(header.focusSearchField)
+        else if (header.searchFieldFocused && root.listArea) root.listArea.forceActiveFocus()
+    }
     onRecentModeChanged: if (root.recentMode.length === 0) preferences.restart()
     Timer {
         id: preferences
@@ -553,6 +573,8 @@ FocusScope {
         if (root.recentMode.length > 0) { root.message("Recent shows every item it lists, hidden ones included", false); return }
         root.showHidden = !root.showHidden
         ViewState.changeKey("hidden", root.showHidden)
+        // flea-qml: a standing Find takes the new setting and stays, rather than leaving for the folder.
+        if (root.searchMode.length > 0) { Search.rehide(root); return }
         root.open(root.path)
     }
 
@@ -898,9 +920,19 @@ FocusScope {
         onMenuRequested: function (pos) { menu.openForHeader(pos) }
         searchMode: root.searchMode
         searchQuery: root.searchQuery
-        searchScope: Search.scope(Search.scopeRoot(root.path, root.home, root.searchHere), root.home)
-        searchNote: Search.note(root.total, root.searchRunning, root.searchQuery.length === 0)
-        searchWayOut: Search.wayOut(root.searchRunning, root.searchQuery.length === 0)
+        searchScope: Search.scope(Search.scopeRoot(root.path, root.home, root.searchStep), root.home)
+        // flea-qml: the count is the last run's; an edited line waiting for Enter says so instead.
+        searchNote: Search.note(root.total, root.searchRunning, root.searchSent.length === 0)
+        // flea-qml: the keys the strip answers, named plainly.
+        searchWayOut: "Enter/Tab/Esc"
+        searchPlaceholder: Search.placeholder(root.path, root.home, root.searchStep)
+        searchTabHint: ""
+        searchRunning: root.searchRunning
+        onSearchCloseRequested: Search.dismiss(root)
+        // flea-qml: the field edits the query; Enter, Esc, Tab and the arrows take the pane's own route.
+        onSearchEdited: function (text) { root.searchQuery = text }
+        onSearchKeyOut: function (event) { Focus.handleKey(event, root, root.sidebar, "find") }
+        onSearchFieldEntered: if (root.searchMode === Search.RESULTS) root.searchMode = Search.TYPING
     }
 
     // The two views share the same slot, the same rows and the same cursor; only one is ever up, and

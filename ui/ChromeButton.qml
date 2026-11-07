@@ -9,6 +9,10 @@ Item {
 
     property string glyph: "file"
     property bool active: false
+    // flea-qml: a toggle that is on draws sunk into the bar, as a pressed key stays down; off is the
+    // ordinary raised mark. Filter and Find use it.
+    property bool checkable: false
+    property bool checked: false
     property bool keyboardFocused: false
     // False while something the chrome sits under takes the pointer; the handlers stop, the drawing does not.
     property bool inputLive: true
@@ -51,6 +55,8 @@ Item {
 
     Accessible.role: Accessible.Button
     Accessible.name: root.accessName
+    Accessible.checkable: root.checkable
+    Accessible.checked: root.checked
     Accessible.onPressAction: if (root.enabled) root.activated()
 
     Behavior on scale {
@@ -63,6 +69,18 @@ Item {
         id: ringBand
         width: root.width
         height: root.height - root.ruleRows
+        // flea-qml: the well a checked toggle sits in, darker than the bar with a frame round it.
+        Rectangle {
+            id: well
+            anchors.centerIn: parent
+            width: ring.width + 2 * Theme.spacing.hairline
+            height: width
+            radius: Theme.spacing.hairline * 3
+            visible: root.checkable && root.checked
+            color: Theme.color.background
+            border.width: Theme.spacing.hairline
+            border.color: Theme.color.mutedFrame
+        }
         Rectangle {
             id: ring
             readonly property int room: Math.min(Math.max(Theme.hitMin, root.glyphSize), ringBand.height - 2 * Theme.chromeControlInset)
@@ -79,11 +97,13 @@ Item {
     Flea.Glyph {
         id: mark
         anchors.centerIn: ringBand
+        // Pressed in by a hairline while its toggle is on.
+        anchors.verticalCenterOffset: root.checkable && root.checked ? Theme.spacing.hairline : 0
         width: root.glyphSize
         height: root.glyphSize
         name: root.glyph
         color: !root.enabled ? Theme.color.mutedFrame
-             : root.active ? Theme.color.accent
+             : root.active || (root.checkable && root.checked) ? Theme.color.accent
              : root.keyboardFocused ? Theme.color.foreground : root.restingColor
         // A control with nowhere to go keeps its slot so the bar never reflows, and says so by dimming.
         opacity: root.enabled ? 1 : Theme.disabledOpacity

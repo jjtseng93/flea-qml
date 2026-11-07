@@ -114,9 +114,8 @@ function lookup(event, root) {
     var action = Keymap.lookup(event.key, event.text, event.modifiers, context)
     // The share listing borrows the menu context for j/k/enter, but it has no submenu to step into.
     if (action === "menuRight" && shareBrowserHere(root)) return "open"
-    // Every view filters the held rows it draws; search owns the header while its results are active.
-    if (action === "filter")
-        return root.searchMode.length === 0 ? action : ""
+    // flea-qml: every view filters the held rows it draws, Find's results included; the two are
+    // independent, so a standing Find never takes the key away.
     // Left and Right seek inside a media preview and turn the page in a PDF one, which is the only
     // place the map binds either action now that the browsing pair is parent and browse-in; the grid
     // takes the bare arrows above, before the map is consulted.
@@ -198,9 +197,8 @@ function act(action, root, menuId, paths) {
     case "extendDown": root.extendSelection(1); return
     case "extendUp": root.extendSelection(-1); return
     case "selectAll": root.selectAll(); return
-    // A walk replaces the listing the filter was narrowing, so the filter goes before the query line
-    // does: leaving it up would hide every result that did not happen to match it.
-    case "search": Filter.close(root); Search.start(root); return
+    // flea-qml: Find and Filter are independent; a filter left up narrows the results by name too.
+    case "search": Search.start(root); return
     case "filter": Filter.start(root); return
     case "reveal": if (root.recentMode.length > 0) { if (root.listInFlight) root.message("A directory is already loading.", false); else RecentMode.reveal(root) } else Search.reveal(root); return
     // The write operations; every one of them is reversible with undo, so none of them confirms.
@@ -365,7 +363,7 @@ function sequenceAction(action, root) {
 }
 
 // Lifted whole from Pane.qml's Keys.onPressed, which had grown past its file's 400-line cap; returns whether the key was consumed.
-function handleKey(event, root, sidebar) {
+function handleKey(event, root, sidebar, field) {
     if (root.selectionBand) {
         if (event.key === Qt.Key_Escape)
             root.selectionBand.cancel()
@@ -375,10 +373,18 @@ function handleKey(event, root, sidebar) {
     if ((sidebar && sidebar.renameEditor() !== null) || root.renameEditor() !== null) {
         return true
     }
+    // A focused query owns Escape. Outside the inputs, unwind Filter first.
+    if (event.key === Qt.Key_Escape) {
+        if (field === "find") { Search.abort(root); return true }
+        if (field === "filter" || root.filterTyping || root.filterQuery.length > 0) {
+            Filter.close(root)
+            return true
+        }
+    }
     root.inputAt = Date.now()
     root.rowsAt = 0
     // The query line owns every key unless Quick Look or the share listing is over it; cursor motions act on the results through the one route.
-    if (root.searchMode === Search.TYPING && !(root.preview && root.preview.active) && !shareBrowserHere(root)) {
+    if (field !== "filter" && root.searchMode === Search.TYPING && !(root.preview && root.preview.active) && !shareBrowserHere(root)) {
         if (leavesLine(event)) {
             var action = Keymap.lookup(event.key, event.text, event.modifiers)
             // No key off the line moves rows a listing or the search's exit is about to replace, as below and in Search.typeKey.

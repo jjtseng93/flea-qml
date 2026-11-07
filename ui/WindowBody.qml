@@ -196,12 +196,16 @@ Rectangle {
         viewMode: view.dualMode ? "dual" : view.currentPane.viewMode
         showPath: !view.dualMode
         showHidden: view.currentPane.showHidden
-        canFilter: view.currentPane.searchMode.length === 0
+        // flea-qml: Filter stands over Find's results as over a folder's, so it is always available.
+        canFilter: true
         canSort: view.currentPane.searchMode.length === 0
         onBackRequested: view.currentPane.goBack()
         onUpRequested: view.currentPane.openParent()
-        onSearchRequested: view.currentPane.act("search")
-        onFilterRequested: view.currentPane.act("filter")
+        // flea-qml: each press flips its own toggle, leaving the other as it stands.
+        filterOn: view.currentPane.filterTyping || view.currentPane.filterQuery.length > 0
+        searchOn: view.currentPane.searchMode.length > 0
+        onSearchRequested: view.currentPane.toggleFind()
+        onFilterRequested: view.currentPane.toggleFilter()
         onSortRequested: view.currentPane.act("sortNext")
         // The primary pane is the one the window keeps after Dual, so every view choice, the secondary pane's keys included, lands there.
         onViewChosen: function (mode) { primaryPane.chooseView(mode) }

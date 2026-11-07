@@ -244,7 +244,8 @@ GridView {
         dropLinking: dragSession.dragLink
         thumb: !cell.live ? cell.thumb : Thumbs.allowed(row, ViewState.thumbnailMode) ? Thumbs.fileFor(root.pane.thumbState, listingIndex) : ""
         // List's own query and arming (ui/List.qml), so a tile marks what a row marks and builds its mark with the strip.
-        markQuery: root.pane.searchMode.length > 0 ? root.pane.swap.answeredQuery : root.pane.filterQuery
+        // flea-qml: a standing filter marks its own match, over Find's results too.
+        markQuery: root.pane.filterQuery.length > 0 ? root.pane.filterQuery : root.pane.searchMode.length > 0 ? root.pane.swap.answeredQuery : ""
         markArmed: root.pane.filterTyping || root.pane.filterQuery.length > 0 || root.pane.searchMode.length > 0
         renaming: listingIndex >= 0 && listingIndex === root.pane.renamingIndex
         renamePane: root.pane

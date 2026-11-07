@@ -84,6 +84,9 @@ function route(root, message) {
         root.paths(message.paths || [])
     } else if (message.t === "located") {
         root.located(message)
+    // flea-qml: the command Find spawns, named once at start; null when nothing can run it.
+    } else if (message.t === "findcommand") {
+        root.findArgv = Array.isArray(message.argv) && message.argv.length > 0 ? message.argv : null
     // flea-qml: the backend's Trash count, sent at start and whenever it changes.
     } else if (message.t === "trashcount") {
         root.trashCount = message.count

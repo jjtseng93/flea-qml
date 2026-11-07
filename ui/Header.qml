@@ -49,6 +49,16 @@ Item {
     property string searchScope: ""
     property string searchNote: ""
     property string searchWayOut: ""
+    property string searchPlaceholder: ""
+    property string searchTabHint: ""
+    property bool searchRunning: false
+    signal searchCloseRequested()
+    // flea-qml: the Find field's edits and the keys it hands back, and a way to give it the keyboard.
+    signal searchEdited(string text)
+    signal searchKeyOut(var event)
+    signal searchFieldEntered()
+    function focusSearchField() { searchStrip.focusField() }
+    readonly property bool searchFieldFocused: searchStrip.fieldFocused
 
     // A search takes the header's slot whole, but the strip's ground is a plain Rectangle and
     // accepts no input, so the titles under it stay hittable unless the handlers go down with them.
@@ -66,6 +76,7 @@ Item {
     implicitHeight: Theme.chromeHeight
 
     SearchStrip {
+        id: searchStrip
         anchors.fill: parent
         visible: root.searchMode.length > 0
         z: 1
@@ -73,6 +84,13 @@ Item {
         scope: root.searchScope
         note: root.searchNote
         wayOut: root.searchWayOut
+        placeholder: root.searchPlaceholder
+        tabHint: root.searchTabHint
+        running: root.searchRunning
+        onCloseRequested: root.searchCloseRequested()
+        onEdited: function (text) { root.searchEdited(text) }
+        onKeyOut: function (event) { root.searchKeyOut(event) }
+        onFieldEntered: root.searchFieldEntered()
         // The canvas draws the caret on both its search boards, so it stays up as long as the strip is.
         typing: true
     }

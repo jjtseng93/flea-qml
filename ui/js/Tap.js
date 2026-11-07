@@ -1,6 +1,16 @@
 .pragma library
 .import "Search.js" as Search
 .import "Tabs.js" as Tabs
+.import "Filter.js" as Filter
+
+// flea-qml: a pointer on the list takes the keys back from a query line, as the arrows already do
+// (ui/js/Focus.js leavesLine): the filter keeps its query standing and gives up its caret, and a Find
+// line hands the keys to the results without running. Otherwise the next Space or letter is typed
+// into the line the pointer has just left.
+function releaseLines(root) {
+    if (root.filterTyping) Filter.commit(root)
+    if (root.searchMode === Search.TYPING) root.searchMode = Search.RESULTS
+}
 
 // Hit the drawn label instead of the whole name slot, including centered grid captions.
 function onName(label, owner, point, centered) {
@@ -41,6 +51,7 @@ function gestureCount(index, tapCount, root) {
 // One tap selects, the second opens; a click carries context 0 so the list never moves under the pointer.
 function tapped(index, tapCount, modifiers, root) {
     if (index < 0) return
+    releaseLines(root)
     tapCount = gestureCount(index, tapCount, root)
     if (tapCount === 0) return
     // Single-click mode opens on the first tap alone, so later taps of one gesture add nothing.
@@ -55,11 +66,9 @@ function tapped(index, tapCount, modifiers, root) {
         if (tapCount === 1) root.extendSelectionTo(index)
         return
     }
-    // What a tap means is the search's to say, not this file's: on a result it is
-    // that it takes you to the file rather than launching it, and ui/js/Search.js activateAction
-    // answers "open" everywhere else. A result answers on the first tap (2026-09-11), so the reveal
-    // has already moved the pane by the time a second one arrives and that tap belongs to another
-    // directory's row: it selects nothing and reveals nothing, tappedColumn's rule for its own reveal.
+    // What a tap means is the search's to say, not this file's. flea-qml: on Find's results it is the
+    // same as anywhere, select on one tap and open on two, so the pointer browses results and the
+    // search stays; upstream revealed on the first tap. ui/js/Search.js activateAction answers it.
     var verb = Search.activateAction(root)
     if (verb === "reveal" && tapCount !== 1)
         return
@@ -80,10 +89,13 @@ function tapped(index, tapCount, modifiers, root) {
 // which is Finder's column view. A directory alone: everything else is an ordinary listing tap and
 // reads tapped() above, so a file still opens on the second tap and a modifier still only selects.
 function tappedMiddle(index, tapCount, modifiers, root) {
+    if (index >= 0) releaseLines(root)
     var row = index >= 0 ? root.rowFor(index) : null
     var plain = (modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) === 0
     // tapped() counts the gesture itself, so a tap is counted once on either path.
-    if (!row || !row.d || !plain) {
+    // flea-qml: a folder among Find's results is a result like any other: one tap selects it and the
+    // search stays; only a plain folder listing goes in on one tap.
+    if (!row || !row.d || !plain || Search.live(root)) {
         tapped(index, tapCount, modifiers, root)
         return
     }
@@ -108,6 +120,7 @@ function tappedMiddle(index, tapCount, modifiers, root) {
 // prefers the selection, so a right click that left a selection elsewhere standing trashed rows the
 // menu had never described.
 function tappedMenu(index, eventPoint, root, menu) {
+    releaseLines(root)
     var picked = root.selectedIndices()
     if (picked.length > 0 && picked.indexOf(index) < 0)
         root.clearSelection()

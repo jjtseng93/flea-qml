@@ -6,6 +6,7 @@ import "js/Messages.js" as Messages
 import "js/FolderSorts.js" as FolderSorts
 import "js/Swap.js" as Swap
 import "js/FleaBin.js" as FleaBin
+import "js/Find.js" as Find
 
 Item {
     id: root
@@ -263,22 +264,127 @@ Item {
                     hiddenLast: ViewState.state.hiddenLast === true })
     }
 
-    // searchopen starts the scope's walk with no rows touched; searchquery carries its gen and window count, searchclose drops the index.
+    // flea-qml: Find runs `find SCOPE -iname PATTERN` itself rather than asking the backend to walk.
+    // The backend only names the command (a `findcommand` line: bunmsh beside the repository, then
+    // bunmsh on PATH, then the system find) and turns the paths into rows through `listpaths`, so
+    // every per-row facility keeps working. The paths stream in, a batch every findFlush interval;
+    // SIGINT stops a run and keeps what it printed. The four functions keep upstream's names and
+    // meanings, so ui/js/Search.js is unchanged in what it asks.
+    property var findArgv: null
+    property string findScope: ""
+    property string findFolder: ""
+    property bool findHidden: false
+    property int findCount: 0
+    property real findGen: 0
+    property real findStarted: 0
+    property bool findCancelled: false
+    // The query waiting for the running find to stop: {query, gen}, or null.
+    property var findPending: null
+    property var findBatch: []
+    property bool findClosing: false
+
+    // Opens the scope; the next query walks it.
     function searchOpen(scope, folder, hidden) {
-        root.send({ c: "searchopen", path: scope, folder: folder, hidden: hidden })
+        root.findScope = scope
+        root.findFolder = folder
+        root.findHidden = hidden === true
+        root.findPending = null
+        root.stopFind(true)
     }
 
+    // Each query is one find; a newer one stops the older first and starts once it has exited.
     function searchQuery(query, gen, count, sizes) {
-        root.send({ c: "searchquery", query: query, gen: gen, count: count, sizes: sizes })
+        root.findCount = count
+        root.findPending = { query: String(query || ""), gen: gen }
+        if (finder.running) { root.findClosing = true; finder.signal(2); return }
+        root.startFind()
     }
 
     function searchClose() {
-        root.send({ c: "searchclose" })
+        root.findPending = null
+        root.stopFind(true)
     }
 
-    // Stops the session's walk and keeps its index; the standing query re-answers once.
+    // Esc while it runs: SIGINT, and the results found so far stay as the answer.
     function searchCancel() {
-        root.send({ c: "searchcancel" })
+        if (!finder.running) return
+        root.findCancelled = true
+        finder.signal(2)
+    }
+
+    function stopFind(closing) {
+        if (!finder.running) return
+        root.findClosing = closing
+        finder.signal(2)
+    }
+
+    function startFind() {
+        var next = root.findPending
+        root.findPending = null
+        if (!next) return
+        root.findGen = next.gen
+        root.findCancelled = false
+        root.findClosing = false
+        root.findBatch = []
+        root.findStarted = Date.now()
+        var done = { scanned: 0, ms: 0, cancelled: false, walking: false }
+        // An emptied query is the folder itself again.
+        if (next.query.length === 0) {
+            var listing = root.listRequest(root.findFolder, root.findCount, root.findHidden)
+            listing.gen = next.gen
+            listing.searched = done
+            root.send(listing)
+            return
+        }
+        if (!root.findArgv || root.findScope.length === 0) {
+            root.send({ c: "listpaths", base: root.findScope || "/", paths: [], first: root.findCount, gen: next.gen, searched: done })
+            return
+        }
+        // The old rows go at once; the first batch appends to this empty listing.
+        root.send({ c: "listpaths", base: root.findScope, paths: [], first: root.findCount, gen: next.gen })
+        // Hidden folders are pruned rather than filtered, so find never walks into .cache or .git.
+        var expression = Find.expression(next.query, root.findHidden)
+        finder.workingDirectory = root.findScope
+        finder.command = root.findArgv.concat(["."], expression)
+        finder.running = true
+    }
+
+    function flushFind(last) {
+        if (root.findBatch.length === 0 && !last) return
+        var request = { c: "listpaths", base: root.findScope, paths: root.findBatch, first: root.findCount, gen: root.findGen, append: true }
+        // Every batch ends with a terminal line, walking until the last, as upstream's live answers
+        // do: that is what moves the count and lands the rows while the find still runs.
+        request.searched = { scanned: 0, ms: Date.now() - root.findStarted, cancelled: last && root.findCancelled, walking: !last }
+        root.findBatch = []
+        root.send(request)
+    }
+
+    Process {
+        id: finder
+        stdout: SplitParser {
+            onRead: function (line) {
+                if (root.findClosing) return
+                var path = String(line)
+                if (path.length > 0 && path !== ".") root.findBatch.push(path)
+            }
+        }
+        stderr: StdioCollector {}
+        onExited: function (code, status) {
+            findFlush.stop()
+            // A run stopped for a newer query or a close answers nothing; one that ended or was cancelled lands.
+            if (!root.findClosing) root.flushFind(true)
+            root.findClosing = false
+            root.startFind()
+        }
+    }
+    Timer {
+        id: findFlush
+        // A batch re-lands the first window, which costs a slow renderer a full redraw; once a second
+        // keeps the stream moving without spending the run on redraws.
+        interval: 1000
+        repeat: true
+        running: finder.running
+        onTriggered: root.flushFind(false)
     }
 
     // rows, not paths: a client can only build a path for a row inside the window it holds, and a

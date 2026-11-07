@@ -11,13 +11,14 @@ import { collisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction } from "./menu.js";
 import { trash } from "./trash.js";
 import { trashbrowse, watchTrashCount } from "./trashbrowse.js";
+import { findCommand } from "./find.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
 import { Listing, directoryFacts } from "./listing.js";
 import { SORT_KEYS } from "./order.js";
 import { lstatSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 // FLEA_BACKEND_LOG=/some/file appends every request and answer there, for debugging.
 const trace = process.env.FLEA_BACKEND_LOG ? (await import("node:fs")).appendFileSync.bind(null, process.env.FLEA_BACKEND_LOG) : null;
@@ -42,7 +43,9 @@ const orderFrom = (request, previous) => ({
 });
 const listed = (read, sorted, extra = {}) =>
   send({ t: "listed", n: listing.rows.length, read, sort: sorted, ...directoryFacts(listing.path), path: listing.path, ...extra });
-const rows = (start, count) => send({ t: "rows", ...listing.window(start, count), listing: stamp });
+const rows = (start, count, extra = {}) => send({ t: "rows", ...listing.window(start, count), listing: stamp, ...extra });
+// A request's `gen` rides back on its listed and rows lines, so a Find answer lands on its own query.
+const genOf = (request) => (Number.isSafeInteger(request.gen) && request.gen > 0 ? { gen: request.gen } : {});
 
 function list(request) {
   const path = request.path ?? "",
@@ -78,14 +81,56 @@ function list(request) {
   listing = fresh;
   order = next;
   stamp++;
-  listed(scanned + read, sorted, changed === undefined ? {} : { changed });
+  listed(scanned + read, sorted, { ...(changed === undefined ? {} : { changed }), ...genOf(request) });
   // `select` moves the first window onto its row when that row lies past `first`.
   let start = 0;
   if (typeof request.select === "string" && resolve(dirname(request.select)) === resolve(path || ".")) {
     const index = listing.indexOfName(basename(request.select));
     if (index >= first) start = Math.max(0, Math.min(index - Math.floor(first / 2), listing.rows.length - first));
   }
-  rows(start, first);
+  rows(start, first, genOf(request));
+  // flea-qml: an emptied Find query lands back on the folder, and its terminal line follows the rows.
+  if (request.searched && typeof request.searched === "object")
+    send({ ...request.searched, t: "searched", n: listing.rows.length, ...genOf(request) });
+}
+
+// A listing of the paths the client names, in that order (docs/protocol.md "listpaths"). flea-qml
+// adds `base`, for Find: the paths are relative to it, as a `find .` run there prints them, and the
+// listing's own base is that folder. `append` adds to the listing the same base and gen built, so a
+// stream of results costs one lstat per new path; `searched` closes a Find answer with its terminal
+// line, sent after these rows so the two arrive in order.
+function listpaths(request) {
+  const started = performance.now(),
+    base = typeof request.base === "string" && request.base ? request.base : "/",
+    first = request.first ?? 0,
+    gen = genOf(request);
+  const fresh = [];
+  for (const path of Array.isArray(request.paths) ? request.paths : []) {
+    if (typeof path !== "string" || !path) continue;
+    let name;
+    if (request.base) name = path.replace(/^\.\//, "");
+    else if (path.startsWith("/") && path !== "/") name = path.slice(1);
+    if (!name || name === "." || name.split("/").includes("..")) continue;
+    let st;
+    try {
+      st = lstatSync(join(base, name));
+    } catch {
+      continue;
+    }
+    fresh.push({ name, dir: st.isDirectory(), link: st.isSymbolicLink() });
+  }
+  const appending = request.append === true && listing?.fromPaths && listing.path === base && listing.gen === request.gen;
+  if (appending) listing.rows.push(...fresh);
+  else {
+    listing = new Listing(base, fresh);
+    listing.fromPaths = true;
+    listing.gen = request.gen;
+    stamp++;
+  }
+  listed(performance.now() - started, 0, gen);
+  rows(0, first, gen);
+  if (request.searched && typeof request.searched === "object")
+    send({ ...request.searched, t: "searched", n: listing.rows.length, ...gen });
 }
 
 function sort(request) {
@@ -104,6 +149,7 @@ const codeJobs = new Map();
 const handlers = {
   list,
   sort,
+  listpaths,
   window: (request) => listing && rows(request.start ?? 0, request.count ?? 0),
   fsinfo: () => listing && send(fsinfo(listing.path)),
   peek: (request) => {
@@ -153,6 +199,8 @@ const handlers = {
 
 export function runBackend() {
   onChanged(send);
+  // The command the interface runs for Find, which it spawns and reads itself; null when none exists.
+  send({ t: "findcommand", argv: findCommand() });
   // The sidebar's Trash count, sent when it changes; upstream's UI ran `gio monitor` for it.
   let trashRevision = 0;
   watchTrashCount((count) => send({ t: "trashcount", count, revision: ++trashRevision }));

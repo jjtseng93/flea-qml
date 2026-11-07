@@ -22,6 +22,9 @@ Item {
     // Read by the path bar alone, so a Tab on a dotted leaf peeks the way the listing is set to look.
     property bool showHidden: false
     property bool canFilter: false
+    // flea-qml: whether each toggle stands on now, drawn sunk while it does.
+    property bool filterOn: false
+    property bool searchOn: false
     property bool canSort: false
     // False while Quick Look is open: Qt 6 still hands a press beneath an accepted shield, so only handlers stop, never Item.enabled.
     property bool inputLive: true
@@ -279,24 +282,29 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.spacing.gap
 
+        // flea-qml: Filter and Find side by side in every view, each a toggle of its own: the funnel
+        // narrows what is listed by name, the magnifier runs find; both may stand at once.
         Flea.ChromeButton {
             inputLive: root.inputLive
             ruleRows: Theme.spacing.hairline
-            visible: root.viewMode !== "grid"
-            glyph: "search"
+            enabled: root.canFilter
+            glyph: "filter"
+            checkable: true
+            checked: root.filterOn
             keyboardFocused: root.stopFocused && root.focusedGlyph === glyph
-            onActivated: root.searchRequested()
+            accessName: "Filter"
+            onActivated: root.filterRequested()
         }
 
         Flea.ChromeButton {
             inputLive: root.inputLive
             ruleRows: Theme.spacing.hairline
-            visible: root.viewMode === "grid"
-            enabled: root.canFilter
-            glyph: "filter"
+            glyph: "search"
+            checkable: true
+            checked: root.searchOn
             keyboardFocused: root.stopFocused && root.focusedGlyph === glyph
-            accessName: "Filter"
-            onActivated: root.filterRequested()
+            accessName: "Find"
+            onActivated: root.searchRequested()
         }
 
         Flea.ChromeButton {

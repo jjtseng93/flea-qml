@@ -1,5 +1,6 @@
 import QtQuick
 import "js/Filter.js" as Filter
+import "js/Focus.js" as Focus
 
 // The filter's query line: the funnel mark, the query with its caret, and the caveat when the pane
 // is not holding the whole listing. Presentation only, the way ui/SearchStrip.qml is; ui/Pane.qml
@@ -51,37 +52,50 @@ Item {
         color: Theme.color.accent
     }
 
-    // corner: a query is arbitrary typed text, so PlainText, the same rule every filename cell carries.
-    Text {
-        id: queryText
+    // flea-qml: a real text field, as Find's is: the caret moves, blinks and selects, and copy and paste
+    // work as in any input. Every edit narrows through Filter.apply, the one writer of the query; the
+    // keys that are not editing go to the pane's own route, so Enter still hands the keyboard to the
+    // list with the filter standing, and Esc and the arrows behave as before.
+    TextInput {
+        id: field
+        objectName: "filterInput"
         anchors.left: mark.right
         anchors.leftMargin: Theme.spacing.gap
         anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(Math.max(contentWidth, Theme.chromeMarkSize) + root.caretWidth * 2, Math.max(0, root.width / 2))
+        clip: true
         text: root.pane.filterQuery
         color: Theme.color.foreground
+        selectionColor: Theme.color.accent
+        selectedTextColor: Theme.color.background
         font.family: Theme.font.family
         font.pixelSize: Theme.font.body
-        textFormat: Text.PlainText
+        selectByMouse: true
+        onTextEdited: Filter.apply(root.pane, text)
+        // A click into the field takes the filter back to typing.
+        onActiveFocusChanged: if (activeFocus && !root.pane.filterTyping) root.pane.filterTyping = true
+        Keys.onPressed: function (event) {
+            switch (event.key) {
+            case Qt.Key_Return: case Qt.Key_Enter: case Qt.Key_Escape:
+            case Qt.Key_Up: case Qt.Key_Down: case Qt.Key_PageUp: case Qt.Key_PageDown:
+                event.accepted = Focus.handleKey(event, root.pane, root.pane.sidebar, "filter")
+            }
+        }
     }
-
-    // The caret stands only while the query line has the keyboard: once enter hands it back to the
-    // list, the filter is standing rather than being typed, and the strip has to read that way.
-    Rectangle {
-        id: caret
-        visible: root.pane.filterTyping
-        anchors.left: queryText.right
-        anchors.leftMargin: Theme.spacing.hairline
-        anchors.verticalCenter: parent.verticalCenter
-        width: root.caretWidth
-        height: Theme.font.bodySmall
-        color: Theme.color.accent
+    // Typing gives the field the keyboard; standing or closing hands it back to the list.
+    Connections {
+        target: root.pane
+        function onFilterTypingChanged() {
+            if (root.pane.filterTyping) Qt.callLater(field.forceActiveFocus)
+            else if (field.activeFocus && root.pane.listArea) root.pane.listArea.forceActiveFocus()
+        }
     }
 
     // SearchFilter rule 1: the strip owns what it created, so the count and its scope read here and
     // no sentence is left standing in the listing, where it would be a row that is not a file.
     Text {
         id: summaryText
-        anchors.left: caret.right
+        anchors.left: field.right
         anchors.leftMargin: Theme.spacing.gap
         anchors.right: wayOut.left
         anchors.rightMargin: Theme.spacing.gap
@@ -96,13 +110,24 @@ Item {
 
     Text {
         id: wayOut
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing.rowPaddingX
+        anchors.right: closeButton.left
+        anchors.rightMargin: Theme.spacing.gap
         anchors.verticalCenter: parent.verticalCenter
         text: "esc clears"
         color: Theme.color.muted
         font.family: Theme.font.family
         font.pixelSize: Theme.font.caption
         textFormat: Text.PlainText
+    }
+
+    // flea-qml: ✕ clears and closes the filter, what Esc does from the list.
+    ChromeButton {
+        id: closeButton
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacing.rowPaddingX
+        anchors.verticalCenter: parent.verticalCenter
+        glyph: "x"
+        accessName: "Close filter"
+        onActivated: Filter.close(root.pane)
     }
 }

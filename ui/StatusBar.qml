@@ -92,7 +92,9 @@ Item {
     property string searchLine: ""
     property string retryLine: ""
     property bool searchRunning: false
-    readonly property bool searching: root.searchLine.length > 0
+    // Completed Find results are a listing: keep their summary in the counts zone,
+    // leaving the filename lane available just like an ordinary folder.
+    readonly property bool searching: root.searchRunning && root.searchLine.length > 0
     readonly property int messageMs: 4000
     readonly property real ruleOpacity: 0.12
     // The hint a result carries: the primary drops it and the secondary draws it, so no sentence on
@@ -265,6 +267,7 @@ Item {
         if (root.pane && root.shownTotal !== root.total) {
             return Filter.summary(root.pane.shown, root.pane.rows.length, root.total)
         }
+        if (!root.searchRunning && root.searchLine.length > 0) return root.searchLine
         return root.itemText()
     }
 

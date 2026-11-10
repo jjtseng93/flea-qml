@@ -3,6 +3,7 @@
 .import "DirSizes.js" as DirSizes
 .import "Format.js" as Format
 .import "Keymap.js" as Keymap
+.import "Match.js" as Match
 
 // A finished operation names its own reversal and the clipboard names the key that spends it. The
 // strip draws either in its secondary, so no sentence it shows ends in advice of its own.
@@ -224,4 +225,14 @@ function cancelActivity(activities) {
     var next = activities.slice()
     next[0] = Object.assign({}, next[0], { cancelling: true })
     return next
+}
+
+// One marked item wins; otherwise name the visible cursor row, including in a
+// multi-selection. Reuse display names so Trash never leaks collision-safe names.
+function fileName(pane) {
+    if (!pane || pane.listInFlight) return ""
+    var indices = pane.selection.indices()
+    var index = indices.length === 1 ? indices[0] : pane.cursorIndex
+    if (indices.length !== 1 && pane.shown !== null && pane.shown.indexOf(index) < 0) return ""
+    return Match.rowName(pane.rowFor(index), true)
 }

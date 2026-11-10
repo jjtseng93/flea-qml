@@ -18,6 +18,20 @@ Item {
     property string listingState: "loading"
     // The pane whose listing this strip is counting, or null while the trash view owns the pane.
     property var pane: null
+    // Separate from the legacy counts owner: Trash also supplies its shared pane.
+    property var filePane: root.pane
+    readonly property string selectedName: root.filePane && root.filePane.selectionVersion >= 0
+        ? Status.fileName(root.filePane) : ""
+    // Cursor-only focus has no selection total; show its already-known file size
+    // here without starting directory-size scans or changing count semantics.
+    readonly property string fileLabel: (root.selectionCount === 0 && root.filePane
+        && root.filePane.cursorRow && !root.filePane.cursorRow.d
+        && typeof root.filePane.cursorRow.s === "number" && root.filePane.cursorRow.s >= 0
+        ? Format.size(root.filePane.cursorRow.s) + " · " : "") + root.selectedName
+    property var fileNameItem: null
+    readonly property bool showFileName: root.selectedName.length > 0 && root.listingState === "ready"
+        && root.flashCount.length === 0 && !root.busy && root.centreText().length === 0
+        && root.restText.length === 0 && !root.undoSplit
     readonly property int shownTotal: root.pane ? root.pane.shownTotal : root.total
     // selectionVersion is read here so a selection mutated in place still re-runs this binding.
     readonly property real selectionBytes: root.pane && root.pane.selectionVersion >= 0
@@ -302,7 +316,7 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing.rowPaddingX
         anchors.verticalCenter: strip.verticalCenter
-        width: root.zoneWidth
+        width: root.showFileName ? Math.min(implicitWidth, root.zoneWidth) : root.zoneWidth
         text: root.countText()
         color: Theme.color.foreground
         font.family: Theme.font.family
@@ -310,6 +324,24 @@ Item {
         elide: Text.ElideRight
         textFormat: Text.PlainText
     }
+
+    // Like TagSlot, build this optional surface only on first use. Parent ownership
+    // destroys it with the status bar; ordinary cursor moves reuse the same instance.
+    function syncFileName() {
+        if (root.fileNameItem !== null || !root.showFileName) return
+        root.fileNameItem = Qt.createComponent("StatusFileName.qml").createObject(root, {
+            name: Qt.binding(function () { return root.fileLabel }),
+            visible: Qt.binding(function () { return root.showFileName }),
+            x: Qt.binding(function () { return counts.x + counts.width + Theme.spacing.gap }),
+            width: Qt.binding(function () {
+                return Math.max(0, strip.width - Theme.spacing.rowPaddingX - root.diskTextWidth
+                    - Theme.spacing.gap - (counts.x + counts.width + Theme.spacing.gap))
+            }),
+            height: Qt.binding(function () { return strip.height })
+        })
+    }
+    onShowFileNameChanged: root.syncFileName()
+    Component.onCompleted: root.syncFileName()
 
     // Right: the disk, which no result and no error may take the space of.
     Text {

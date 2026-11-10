@@ -496,6 +496,7 @@ Rectangle {
         flashCount: view.currentPane.flashActive && view.flashHost ? view.flashHost.countText : ""
         listingState: view.currentPane.listingState
         pane: (view.currentPane.trash.opened || view.currentPane.flashActive) ? null : view.currentPane
+        filePane: view.currentPane.flashActive ? null : view.currentPane
         armOwner: view.currentPane.trash.opened ? view.currentPane.trash.item : view.currentPane
         selectionCount: view.currentPane.flashActive ? 0
             : view.currentPane.trash.opened ? view.currentPane.trash.selectedCount : view.currentPane.selectionCount()

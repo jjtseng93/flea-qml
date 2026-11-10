@@ -224,3 +224,8 @@ The Trash address bar displays `trash:///`. Enter `trash:/`, `trash://`, or
 `trash:///` to open the same collection as the sidebar. These root addresses are
 UI aliases only: stored paths, preview readers, restore and deletion are unchanged.
 Trash item URIs and remote authorities are not supported by these aliases.
+
+The bottom status bar shows the selected item's full name after the count/size.
+With multiple marked items it shows the current cursor item; Trash uses its
+original name. Long names scroll horizontally instead of being elided. Notices
+and errors temporarily take priority over the name.

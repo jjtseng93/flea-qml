@@ -39,6 +39,20 @@ try {
  if(paths.length!==3 || paths.some(p=>!p.startsWith(dir+'/')))throw Error('External trash detected; refusing mutation');
  console.log('trash',await run('({text:document.body.innerText,mode:testBody.currentPane.recentMode,rows:testBody.currentPane.total,cursor:testBody.currentPane.cursorRow})'));
  await run('testBody.currentPane.setCursor(testBody.currentPane.rows.findIndex(r=>r.n.endsWith("preview.txt")))');
+ if(await run('testBody.currentPane.statusBar.selectedName')!=='preview.txt')throw Error('Trash status filename is not the original name');
+ if(!await run('testBody.currentPane.statusBar.fileNameItem.visible && testBody.currentPane.statusBar.fileNameItem.width > 0'))throw Error('Status filename has no visible space');
+ console.log('PASS status filename uses the original Trash name');
+ // Exercise only the presentation component with a name wider than the window;
+ // keep the actual fixture paths and operation identities untouched.
+ await run('testBody.currentPane.statusBar.fileNameItem.name="完整檔案名稱-".repeat(40)+".txt"');
+ await Bun.sleep(100);
+ if(!await run('testBody.currentPane.statusBar.fileNameItem.contentWidth > testBody.currentPane.statusBar.fileNameItem.width'))throw Error('Long status filename cannot scroll');
+ await run('testBody.currentPane.statusBar.fileNameItem.contentX=testBody.currentPane.statusBar.fileNameItem.contentWidth-testBody.currentPane.statusBar.fileNameItem.width');
+ if(!await run('testBody.currentPane.statusBar.fileNameItem.contentX > 0'))throw Error('Long status filename did not scroll');
+ if(process.env.FLEA_STATUS_SCREENSHOT)await Bun.write(process.env.FLEA_STATUS_SCREENSHOT,Buffer.from(await browser.context.screenshot({format:'png'}),'base64'));
+ await run('testBody.currentPane.statusBar.fileNameItem.name=testBody.currentPane.statusBar.fileLabel');
+ if(await run('testBody.currentPane.statusBar.fileNameItem.contentX')!==0)throw Error('New filename did not reset scrolling');
+ console.log('PASS long status filename scrolling and reset');
  await run('testBody.currentPane.act("preview")');await Bun.sleep(2000);
  if(!await run('testBody.quickLookActive && document.body.innerText.includes("HELLO TRASH PREVIEW")'))throw Error('preview missing');
  if(process.env.FLEA_TRASH_SCREENSHOT)await Bun.write(process.env.FLEA_TRASH_SCREENSHOT,Buffer.from(await browser.context.screenshot({format:'png'}),'base64'));

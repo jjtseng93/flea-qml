@@ -211,7 +211,9 @@ Item {
             Column {
                 anchors.centerIn: parent
                 spacing: Theme.spacing.gap
-                visible: !root.thumbShown && root.glyphState()
+                // Match the thumbnail: the video surface owns the frame once opened,
+                // including pause/seek, so a missing poster must not cover its pixels.
+                visible: !root.thumbShown && !playerLoader.visible && root.glyphState()
 
                 Flea.Glyph {
                     anchors.horizontalCenter: parent.horizontalCenter

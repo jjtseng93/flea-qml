@@ -23,18 +23,18 @@ Item {
     // mode that cannot use the location does not offer it.
     property bool offerRecent: true
 
-    readonly property string dirsText: Flea.UserDirs.body
     // Recent is a location and not a path, so its row carries the token ui/js/Picker.js names; the
     // rail's own cursor and activation then work on it exactly as they do on a favourite.
     readonly property var recentRow: [{
         path: Picker.RECENT, label: Picker.RECENT_LABEL, group: "favorite", kind: "favorite", glyph: "history"
     }]
     readonly property var placeEntries: (root.offerRecent ? root.recentRow : [])
-        .concat(Places.storedEntries(Flea.Favourites.records, root.home), Places.homeEntries(root.home, root.dirsText, Icons.sidebarGlyphFor))
+        .concat(Places.storedEntries(Flea.Favourites.records, root.home), Places.homeEntries(root.home, Flea.RailPlaces.probed, Icons.sidebarGlyphFor))
     // Directive 55, from a user's report: a dialog that cannot reach a disk or a share is a
     // dialog that makes you type the path, so the chooser draws the window's own NETWORK and DEVICES
     // groups from the same listings. Rows only: nothing here trashes, ejects or renames.
-    readonly property var entries: root.placeEntries.concat(network.entries, devices.entries, phones.entries)
+    // flea-qml: the drives found by looking close the list as plain folders, as they close the window's DEVICES group.
+    readonly property var entries: root.placeEntries.concat(network.entries, devices.entries, phones.entries, Places.volumeEntries(Flea.RailPlaces.probedVolumes, devices.entries))
 
     implicitWidth: Math.min(parent.width / 3, Theme.space(172))
     readonly property alias focusItem: rail

@@ -3388,3 +3388,33 @@ on Windows), with `trash: {original, deleted, identity}` display metadata.
 `trashbrowse` restore/prepare may use `rows` plus `listing`; a stale listing
 is rejected before row indices are translated to captured Trash identities.
 The existing review token still protects permanent deletion.
+
+### flea-qml probed places
+
+The sidebar's folders and drives are found by looking at the filesystem; no
+outside program runs. The backend sends one line at start, one for every
+`{"c":"places"}` request, and one whenever a watched answer changes:
+
+`{"t":"places","places":[{"path":"/sdcard","label":"Internal storage","glyph":"smartphone"}],"volumes":[{"path":"/","label":"/","glyph":"drive","size":1002836697088}]}`
+
+`places` are drawn under PLACES after Home, `volumes` under DEVICES; a volume's
+`size` is its filesystem's byte size or `null`. `{"c":"places","watch":true}`
+also looks again every five seconds until `{"c":"places","watch":false}`,
+which is not answered. A rail sends the first while it is shown and the second
+when it is parked or unloaded, so nothing looks while no rail asks. One look
+at a path is awaited for two seconds; a path that has not answered by then is
+left out of that line and joins a later one.
+
+Rows, in order: the folders under home (`user-dirs.dirs`' path for a role
+first, then Desktop, Downloads or Download, Documents, Pictures, DCIM/Camera
+or DCIM or Pictures/Camera Roll, Pictures/Screenshots or DCIM/Screenshots,
+Music, Videos or Movies), each only when it directly holds a regular file;
+on Android, told by `/system/bin/linker64` being there, `/sdcard` and
+`/sdcard/Download` always, the same folders under `/sdcard` by the same rule,
+and, when the temporary directory lies in `/data/data/PACKAGE` or
+`/data/user/N/PACKAGE`, `/sdcard/Android/media/PACKAGE` (made once per run when
+missing) and that private folder; then each of `os.tmpdir()`, `$TMPDIR` and
+`/tmp` that is a folder. Volumes: every root that can be listed (`/`, or the
+drive letters where paths have them), then what is mounted under `/Volumes`,
+`/media`, `/run/media` and, on Android, `/storage` beside `emulated` and
+`self`. One folder is one row however many names reach it.

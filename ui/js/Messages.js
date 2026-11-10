@@ -91,6 +91,10 @@ function route(root, message) {
     } else if (message.t === "trashcount") {
         root.trashCount = message.count
         root.trashRevision = message.revision || 0
+    // flea-qml: the folders and drives the backend found by looking, sent at start, when a rail
+    // asks and whenever they change.
+    } else if (message.t === "places") {
+        root.placesFound(Array.isArray(message.places) ? message.places : [], Array.isArray(message.volumes) ? message.volumes : [])
     } else if (message.t === "trashbrowse") {
         root.trashResult(message)
     } else if (message.t === "permissions") {

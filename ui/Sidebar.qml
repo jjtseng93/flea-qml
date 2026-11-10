@@ -103,7 +103,10 @@ Item {
     // The poll rebinds its delegates in place, so a rename left standing would edit a different share.
     onNetworkEntriesChanged: root.cancelRename()
     // Phones ride the DEVICES group behind the block devices: a plugged phone is a device to the person holding it, whatever transport gvfs reaches it over.
-    readonly property var deviceEntries: root.placesState.showDevices === false || !root.railGate.showDevices ? [] : devices.entries.concat(phones.entries)
+    readonly property var deviceEntries: root.placesState.showDevices === false || !root.railGate.showDevices ? [] : devices.entries.concat(phones.entries, root.volumeEntries)
+    // flea-qml: the drives the backend found by looking close the group: every root a path can
+    // start from and what is mounted where drives are mounted, on systems lsblk says nothing about.
+    readonly property var volumeEntries: Places.volumeEntries(RailPlaces.probedVolumes, devices.entries)
     // The eject chain's guard state, read fresh at ipc time, so a failed eject names its guard.
     function ejectChainState() { return devices.ejectState() }
     // A release in flight, which PaneRail holds the rail open for.
@@ -111,6 +114,18 @@ Item {
     // False parks the DEVICES poll; PaneRail drops it while an auto-hide rail is withdrawn, and a reveal polls at once.
     property bool polling: true
     function pollDevices() { devices.poll() }
+    // flea-qml: the backend looks for places again every five seconds only while a rail asks it
+    // to (src/places.js), so a parked or unloaded rail takes its request back.
+    property var placesWatcher: null
+    function watchPlaces(shown) {
+        var want = shown && root.polling ? root.backend : null
+        if (want === root.placesWatcher) return
+        if (root.placesWatcher) root.placesWatcher.send({ c: "places", watch: false })
+        root.placesWatcher = want
+        if (want) want.send({ c: "places", watch: true })
+    }
+    onPollingChanged: root.watchPlaces(true)
+    onBackendChanged: root.watchPlaces(true)
     readonly property var entries: root.placesEntries.concat(root.networkEntries, root.deviceEntries)
 
     // The rail lands in one step by gating the entries themselves, so cursor, IPC and menus match only drawn rows.
@@ -189,14 +204,14 @@ Item {
     }
 
     // The window-long poll runs while a rail is loaded; arrival waits until the pane's overlay parent is bound.
-    Component.onCompleted: Qt.callLater(root.meetHost)
+    Component.onCompleted: { Qt.callLater(root.meetHost); root.watchPlaces(true) }
     function meetHost() { root.arrive() } // never builds the host: ui/WindowBody.qml orders it after the first rows
     // Arrival counts whenever the service appears, so a host built after this rail still starts the poll.
     property bool arrived: false
     function arrive() { if (root.arrived || !root.service) return; root.arrived = true; root.service.railArrived() }
     onServiceChanged: { root.arrive(); root.pushBookmarks() }
     // Departure hands the timer back to a flight, if any, and the last listing stands while it is off.
-    Component.onDestruction: { if (root.service && root.arrived) root.service.railLeft() }
+    Component.onDestruction: { if (root.service && root.arrived) root.service.railLeft(); root.watchPlaces(false) }
 
     // The desktop's own history, read and never written, kept across opens.
     property var recentPaths: []
@@ -641,7 +656,7 @@ Item {
                 height: Style.spacing.panelGap
             }
 
-            // Self-hides with its list where lsblk reports no disk, and carries no add mark: nothing here is bookmarked.
+            // Self-hides with its list where lsblk reports no disk and no drive was found by looking, and carries no add mark: nothing here is bookmarked.
             RailHeading {
                 id: devHeading
                 visible: root.deviceEntries.length > 0

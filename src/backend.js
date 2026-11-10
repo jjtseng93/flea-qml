@@ -1,7 +1,7 @@
 // flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
 // line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
 // So far: list, window, sort, fsinfo, peek, meta, code, the four clip requests,
-// paths, menuaction (snapshot, activate, validate, close), collisions, transfer, transfercancel and quit, and `changed` lines for watched folders. Any other request is noted on stderr and
+// paths, menuaction (snapshot, activate, validate, close), collisions, transfer, transfercancel, places and quit, and `changed` lines for watched folders. Any other request is noted on stderr and
 // left unanswered, which ui/ already survives for an operation that never reports back.
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
@@ -14,6 +14,7 @@ import {renameWithTrashRecord} from './trash-record.js';
 import { trash } from "./trash.js";
 import { trashbrowse, readTrash, watchTrashCount } from "./trashbrowse.js";
 import { findCommand } from "./find.js";
+import { places } from "./places.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
 import { peek } from "./peek.js";
@@ -242,6 +243,7 @@ const handlers = {
   transfer: (request) => transfer(request, send, listing, stamp),
   transfercancel: (request) => transferCancel(request),
   // The sidebar's folders and drives, found by looking; `watch` keeps looking while a rail shows.
+  places: (request) => places(request, send),
   quit: () => process.exit(0),
 };
 
@@ -252,6 +254,8 @@ export function runBackend() {
   // The sidebar's Trash count, sent when it changes; upstream's UI ran `gio monitor` for it.
   let trashRevision = 0;
   watchTrashCount((count) => send({ t: "trashcount", count, revision: ++trashRevision }));
+  // The sidebar's probed places, named once at start; a rail asks for them again while it shows.
+  places({}, send);
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   lines.on("line", (line) => {
     if (!line.trim()) return;

@@ -151,11 +151,40 @@ function storedEntries(records, home) {
     return out
 }
 
-function homeEntries(home, dirsText, glyphFor) {
-    var entries = [{ label: "Home", path: home }].concat(userDirs(dirsText, home))
-    return entries.map(function (entry) {
-        return { label: entry.label, path: entry.path, group: "home", kind: "home", glyph: glyphFor(entry.label) }
-    })
+// flea-qml: Home, then the folders the backend found by looking (src/places.js), each
+// { path, label, glyph }. Upstream drew the folders user-dirs.dirs names, there or not; here a
+// row is a folder that answered, and until the backend's first line the list is Home alone.
+function homeEntries(home, probed, glyphFor) {
+    var entries = [{ label: "Home", path: home, group: "home", kind: "home", glyph: glyphFor("Home") }]
+    var rows = Array.isArray(probed) ? probed : []
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i]
+        if (!row || typeof row.path !== "string" || row.path.length === 0 || row.path === home)
+            continue
+        entries.push({ label: String(row.label || row.path), path: row.path, group: "home", kind: "home", glyph: String(row.glyph || "folder") })
+    }
+    return entries
+}
+
+// flea-qml: the drives the backend found by looking, drawn under DEVICES as plain folders: a row
+// opens its path and offers a place's menu, and nothing here mounts or ejects. A drive lsblk
+// already lists, by the mount point of one of `listed`'s rows, is that row and not a second one.
+function volumeEntries(volumes, listed) {
+    var out = []
+    var rows = Array.isArray(volumes) ? volumes : []
+    var held = {}
+    for (var d = 0; Array.isArray(listed) && d < listed.length; d++) {
+        if (listed[d] && typeof listed[d].path === "string" && listed[d].path.length > 0)
+            held[listed[d].path] = true
+    }
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i]
+        if (!row || typeof row.path !== "string" || row.path.length === 0 || held[row.path])
+            continue
+        out.push({ label: String(row.label || row.path), path: row.path, group: "home", kind: "home", volume: true,
+            glyph: String(row.glyph || "drive"), size: typeof row.size === "number" ? row.size : null })
+    }
+    return out
 }
 
 // The rail and query use the same validation, URI decoding and mount-first open.

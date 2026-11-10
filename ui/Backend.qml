@@ -94,6 +94,9 @@ Item {
     // flea-qml: the Trash's item count as the backend last reported it; -1 until it has.
     property int trashCount: -1
     property int trashRevision: 0
+    // flea-qml: a `places` line lands in the one store every rail reads, so the second pane's
+    // backend and the chooser's own name the same rows the first did.
+    function placesFound(places, volumes) { RailPlaces.found(places, volumes) }
     signal permissionsResult(var message)
     signal pickerResult(var message)
     signal menuResult(var message)

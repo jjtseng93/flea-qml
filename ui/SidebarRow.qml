@@ -51,7 +51,7 @@ Item {
     readonly property var ejectWords: ({ eject: "Eject %1", unmount: "Unmount %1" })
     readonly property string detail: root.modelData.kind === "trash"
         ? (root.placesState.trashCount === true && root.modelData.count > 0 ? String(root.modelData.count) : "")
-        : root.modelData.group === "device" && root.placesState.driveSize === true && root.modelData.size !== null
+        : (root.modelData.group === "device" || root.modelData.volume === true) && root.placesState.driveSize === true && root.modelData.size !== null
             ? Format.size(root.modelData.size) : ""
     // PhoneMark: a phone is a volume, so its row carries the same mount-state square a removable
     // disk and a share carry, in the same fixed slot.

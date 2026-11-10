@@ -73,6 +73,10 @@ function actionWithSub(action, leafId) {
 // The group name the rail shows: Favorites, Places, or the network/device group.
 function placeWhere(entry) {
     var group = String((entry && entry.group) || "")
+    // flea-qml: a drive found by looking is a plain folder row drawn under DEVICES.
+    if (entry && entry.volume === true) {
+        return "Devices"
+    }
     if (group === "favourite" || group === "favorite") {
         return "Favorites"
     }

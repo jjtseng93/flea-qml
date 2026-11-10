@@ -88,6 +88,19 @@ metadata records over 1 MiB and malformed or truncated archives are rejected.
 Keyboard hints are enabled by default; an explicitly saved disabled setting is
 preserved.
 
+## Sidebar places
+
+Sidebar places are found by looking, not read from `user-dirs.dirs` alone or
+asked of `lsblk`: a standard folder (Desktop, Downloads, Documents, Pictures,
+Camera, Screenshots, Music, Videos) is listed once it directly holds a file,
+every system lists its temporary folder, and DEVICES adds each root that can be
+listed (`/`, or the drive letters on Windows) and what is mounted under
+`/Volumes`, `/media` and `/run/media`. Android, recognised by
+`/system/bin/linker64`, always lists `/sdcard` and `/sdcard/Download`, and an
+app whose `$TMPDIR` lies in its private folder also gets that folder and
+`/sdcard/Android/media/PACKAGE`. The backend looks again every five seconds
+only while a sidebar is shown; see `docs/protocol.md` "flea-qml probed places".
+
 ## Deleting files
 
 Trash uses the ordinary file pane: Space opens Quick Look, `/` filters,

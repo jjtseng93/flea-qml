@@ -87,11 +87,15 @@ export function runsOf(line) {
  * The coloured lines of `path` as run lists, or null when jsmdcui is missing, fails or is
  * cancelled through `signal`. Every line of the file is returned; the caller takes its window.
  */
-export async function highlightFile(path, signal) {
+export async function highlightFile(path, signal, filetype = null) {
   const command = jsmdcui();
   if (!command) return null;
   try {
-    const child = Bun.spawn([...command, "--cat", "--edit", path], { stdout: "pipe", stderr: "ignore", stdin: "ignore", signal });
+    const args = [...command, "--cat", "--edit"];
+    // jsmdcui settings use one dash: --filetype would name a different setting.
+    if (filetype) args.push("-filetype", filetype);
+    args.push(path);
+    const child = Bun.spawn(args, { stdout: "pipe", stderr: "ignore", stdin: "ignore", signal });
     const [text, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
     if (code !== 0 || signal?.aborted) return null;
     return text.split("\n").map(runsOf);

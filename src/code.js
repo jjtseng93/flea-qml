@@ -6,6 +6,7 @@ import { closeSync, fstatSync, mkdtempSync, openSync, readSync, rmSync, statSync
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { highlightFile } from "./highlight.js";
+import { previewLanguage } from "./preview-language.js";
 
 // Bound IO and layout work: large files show their prefix, never a refusal.
 const BYTE_LIMIT = 1 << 20;
@@ -41,14 +42,14 @@ async function coloured(request, bytes, signal) {
   if (request.raw === true) return null;
   if (typeof request.text !== "string") {
     if (RENDERED.test(request.path ?? "")) return null;
-    return highlightFile(request.path, signal);
+    return highlightFile(request.path, signal, previewLanguage(request.path, bytes));
   }
   const name = request.lang ? `text.${request.lang}` : basename(request.name || "text.txt");
   if (RENDERED.test(name)) return null;
   const dir = mkdtempSync(join(tmpdir(), "flea-qml-code-"));
   try {
     writeFileSync(join(dir, name), bytes);
-    return await highlightFile(join(dir, name), signal);
+    return await highlightFile(join(dir, name), signal, previewLanguage(name, bytes));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -203,3 +203,19 @@ config detector requires a directory although jsmdcui matches the basename.
 These are detection limitations, not missing colour rules. The lexical samples
 prove colour reaches the preview backend, not exhaustive syntax correctness or a
 visual check of every language.
+
+Flea additionally recognizes V function declarations in the first 64 KiB of `.v`
+files and requests `-filetype v`. Comments and strings are ignored; a Verilog
+`endmodule` keeps the normal detector. Ambiguous files without such evidence keep
+jsmdcui's existing detection. This hint is implemented in Flea, not jsmdcui.
+To explicitly request a language from jsmdcui yourself, use **one dash**:
+
+```sh
+bun ../jsmdcui/src/index.js --cat --edit -filetype v /path/to/main.v
+# Or, with the installed launcher:
+jmi --cat --edit -filetype v /path/to/main.v
+```
+
+The value is the YAML definition's `filetype`, not necessarily its filename or
+extension. Flea's internal `highlightFile(path, signal, filetype)` forwards this
+setting as separate arguments; failures still fall back to plain text.

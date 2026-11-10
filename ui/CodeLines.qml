@@ -18,6 +18,11 @@ Item {
     property bool wrap: false
     // Enables wheel and drag scrolling in the line viewport.
     property bool scrolls: false
+    // Grow from measured delegates only; never scan the entire file to size a lane.
+    property real widestLine: 0
+    function measureLine(width) {
+        if (!root.wrap && isFinite(width) && width > root.widestLine) root.widestLine = width
+    }
     readonly property alias viewport: view
     // A Component the list draws above its first line and scrolls with the rows; null for none.
     property Component header: null
@@ -64,6 +69,9 @@ Item {
     }
 
     function reset() {
+        root.widestLine = 0
+        view.contentX = 0
+        view.contentY = 0
         root.held = {}
         root.stamp += 1
         root.total = 0
@@ -177,6 +185,7 @@ Item {
     Component.onDestruction: root.retiring = true
     onEngineChanged: root.fresh()
     onLimitChanged: root.schedule()
+    onWrapChanged: { view.contentX = 0; root.schedule() }
 
     Timer { id: askTimer; interval: 0; onTriggered: root.ask() }
 
@@ -197,6 +206,8 @@ Item {
         anchors.fill: parent
         clip: true
         interactive: root.scrolls
+        flickableDirection: root.wrap ? Flickable.VerticalFlick : Flickable.HorizontalAndVerticalFlick
+        contentWidth: root.wrap ? width : Math.max(width, root.widestLine + (root.numbered ? root.gutterWidth : 0))
         cacheBuffer: 0
         boundsBehavior: Flickable.StopAtBounds
         model: root.shown
@@ -208,7 +219,7 @@ Item {
             id: line
             required property int index
             readonly property var runs: root.rowAt(line.index + 1)
-            width: view.width
+            width: view.contentWidth
             height: Math.max(body.implicitHeight, root.rowHeight)
 
             Text {
@@ -235,8 +246,10 @@ Item {
                 font.pixelSize: root.pixelSize
                 textFormat: Text.StyledText
                 wrapMode: root.wrap ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
-                // One line per row unless wrapped, ending in an ellipsis at the view's edge.
-                elide: root.wrap ? Text.ElideNone : Text.ElideRight
+                // Keep the complete line; the viewport clips and pans it instead of eliding.
+                elide: Text.ElideNone
+                onImplicitWidthChanged: root.measureLine(implicitWidth)
+                Component.onCompleted: root.measureLine(implicitWidth)
             }
         }
     }

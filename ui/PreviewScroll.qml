@@ -181,7 +181,14 @@ Item {
         flickable: root.html ? root.viewport : root.column.linesItem.viewport
         visible: (root.html !== null || root.column.linesItem.visible) && flickable !== null
         onWheel: function (event) {
-            if (root.scrollPending) event.accepted = true
+            if (root.scrollPending) {
+                event.accepted = true
+                return
+            }
+            // This handler replaces FastScrollHandler.onWheel; explicitly run
+            // its shared scrolling logic once the preview handoff is complete.
+            wheel.wheeled()
+            wheel.handleWheel(event)
         }
     }
     Loader {

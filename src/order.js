@@ -1,5 +1,7 @@
 // Row ordering (docs/protocol.md "sort"). Upstream: src/backend/sort.rs, ordering.rs.
 
+import { basename } from "node:path";
+
 const isDigit = (c) => c >= 48 && c <= 57;
 const lower = (c) => (c >= 65 && c <= 90 ? c + 32 : c);
 const encoder = new TextEncoder();
@@ -41,7 +43,7 @@ function compareBytes(a, b) {
   return a.length - b.length;
 }
 
-const bytesOf = (row) => (row.bytes ??= encoder.encode(row.name));
+const bytesOf = (row) => (row.bytes ??= encoder.encode(row.trash ? basename(row.trash.original || row.name) : row.name));
 
 /** Finder order, then byte order, so two names never compare equal unless they are. */
 export function nameOrder(a, b) {
@@ -53,8 +55,8 @@ export function extensionOf(name) {
   return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1) : null;
 }
 function extensionOrder(a, b) {
-  const ea = extensionOf(a.name),
-    eb = extensionOf(b.name);
+  const ea = extensionOf(a.trash?.original || a.name),
+    eb = extensionOf(b.trash?.original || b.name);
   if (ea === null || eb === null) return (ea === null ? 0 : 1) - (eb === null ? 0 : 1);
   return finderCompare(encoder.encode(ea), encoder.encode(eb));
 }
@@ -73,7 +75,7 @@ export function sortRows(rows, { by = "name", desc = false, foldersFirst = true,
     by === "size"
       ? (a, b) => (a.st?.size ?? 0) - (b.st?.size ?? 0)
       : by === "mtime" || by === "date"
-        ? (a, b) => (a.st?.mtimeMs ?? 0) - (b.st?.mtimeMs ?? 0)
+        ? (a, b) => (a.trash ? Date.parse(a.trash.deleted)||0 : a.st?.mtimeMs ?? 0) - (b.trash ? Date.parse(b.trash.deleted)||0 : b.st?.mtimeMs ?? 0)
         : by === "kind"
           ? (a, b) => (a.dir || b.dir ? 0 : (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) || extensionOrder(a, b))
           : by === "extension"

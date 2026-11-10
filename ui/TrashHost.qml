@@ -1,22 +1,36 @@
 import QtQuick
+import "." as Flea
 import "js/Focus.js" as Focus
 import "js/Menu.js" as Menu
-import "js/Trash.js" as TrashKeys
+import "js/Ops.js" as Ops
+import "js/RecentMode.js" as RecentMode
 import "js/TrashDates.js" as TrashDates
 
-Loader {
+// Only Trash-specific operations live here. Pane owns the visible listing,
+// keyboard, filtering, thumbnails and Quick Look, just as for any other location.
+Item {
     id: root
     required property var pane
     property Item overlayParent: null
-    active: false
-    visible: opened
-    source: "TrashView.qml"
-    readonly property bool opened: item !== null && item.opened
-    readonly property bool confirming: item !== null && item.confirming
-    readonly property int total: item ? item.total : 0
-    readonly property int selectedCount: item ? item.selectedCount : 0
-    readonly property alias sheetPane: root.pane
-
+    readonly property bool browsing: pane.recentMode === "trash"
+    // Compatibility with callers checking for the old full-pane overlay.
+    readonly property bool opened: false
+    readonly property bool confirming: (confirmation !== null && confirmation.opened) || pendingReview !== null || pendingOp === "prepare"
+    readonly property var item: root
+    readonly property var sheetPane: pane
+    readonly property int total: browsing ? pane.total : 0
+    readonly property int selectedCount: browsing ? pane.selectionCount() : 0
+    readonly property bool active: browsing
+    property int requestId: 1000000
+    property string pendingOp: ""
+    property bool pendingAll: false
+    property int pendingToken: 0
+    property var pendingReview: null
+    property var pendingRows: []
+    property int pendingListing: 0
+    readonly property bool busy: pendingOp.length > 0
+    readonly property var confirmationItem: confirmation
+    readonly property bool confirmationOpen: confirmation !== null && confirmation.opened
     // The 30 day sweep, decided 2026-09-11. It runs the same three requests the window runs,
     // in the same order, so prepare still reviews every item against the identity the listing
     // reported and delete still refuses a token the trash has moved under. This host drives it
@@ -32,7 +46,7 @@ Loader {
     readonly property bool sweeping: root.sweepStage.length > 0
 
     function sweep() {
-        if (root.sweeping || root.active || !ViewState.trashAutoEmpty)
+        if (root.sweeping || root.browsing || !ViewState.trashAutoEmpty)
             return
         if (TrashDates.dayNumber(Date.now()) === ViewState.trashSweptOn)
             return
@@ -97,88 +111,92 @@ Loader {
         ViewState.recordTrashSweep(TrashDates.dayNumber(Date.now()))
     }
 
+
     function open(action) {
-        if (confirming) return
-        root.sweepStop()
-        if (opened) { root.action(action || "openTrash"); return }
-        if (pane.preview) pane.preview.close()
-        pane.shareBrowser.close()
-        pane.clearSelection()
-        pane.focusView = Focus.LIST
-        active = true
-        item.open(action || "")
+        if (confirming || busy) return
+        sweepStop()
+        if (!browsing) {
+            if (pane.preview) pane.preview.close()
+            pane.shareBrowser.close()
+            pane.clearSelection()
+            pane.focusView = Focus.LIST
+            RecentMode.run(pane, [], {}, "trash")
+        }
+        if (action === "emptyTrash" || action === "restoreAll") root.action(action)
+        else pane.listArea.forceActiveFocus()
     }
-    function close() { if (opened && !confirming) item.close() }
+    // Navigation already owns the next listing; do not issue a second list here.
+    function close() { if (browsing && !confirming) RecentMode.leave(pane) }
+    function send(op, fields) {
+        pendingOp = op
+        pane.backend.send(Object.assign({c:"trashbrowse",id:++requestId,op:op},fields || {}))
+    }
+    function action(name, menuId) {
+        if (busy || confirming) return
+        if (name === "openTrash") { open(); return }
+        var all = name === "emptyTrash" || name === "restoreAll"
+        if (!all && !browsing) return
+        if (!all && pane.listInFlight) { pane.message("A directory is already loading.", false); return }
+        pendingAll = all
+        pendingRows = all ? [] : Ops.targetIndices(pane)
+        pendingListing = pane.backend.heldListing
+        if (!all && !menuId && pendingRows.length === 0) return
+        var fields = all ? {all:true,emptyTrash:name === "emptyTrash"}
+                         : {all:false,rows:pendingRows,listing:pendingListing}
+        if (menuId && !all) fields.menuId = menuId
+        send(name === "restoreAll" || name === "restoreTrashSelection" ? "restore" : "prepare", fields)
+    }
+    function refresh() { if (browsing && !pane.listInFlight) RecentMode.refresh(pane, "") }
     function menuEntries(selection, hidden) {
         return selection ? Menu.applyHidden([
-            {label: "Restore", action: "restoreTrashSelection", glyph: "undo", disabled: item.busy},
-            {separator: true},
-            {id: "delete", label: "Delete permanently", action: "deletePermanently", glyph: "trash", danger: true, disabled: item.busy}
-        ], hidden) : Menu.trashEntries(total, item.busy)
+            {label:"Restore",action:"restoreTrashSelection",glyph:"undo",disabled:busy},
+            {separator:true},
+            {label:"Delete permanently",action:"deletePermanently",glyph:"trash",danger:true,disabled:busy}
+        ],hidden) : Menu.trashEntries(total,busy)
     }
-    function menuAt(point, selection) {
-        pane.contextMenu().openForRail("trash", root.menuEntries(selection, ViewState.menuHidden), point)
-        pane.contextMenu().focusHolder = item
-    }
-    function sheetActionRows(rows) { return rows.filter(function (row) { return TrashKeys.route(row.action) !== "trash" || row.action === "quit" }) }
-    function sheetMenuModel() {
-        var rows = root.menuEntries(true, [])
-        if (root.selectedCount === 0) rows.forEach(function (row) { if (!row.separator) row.disabled = true })
-        return rows.concat(root.menuEntries(false, []))
-    }
-    function sheetMenuAction(action) { root.action(action) }
-    function sheetFocus() { if (root.item) root.item.forceActiveFocus() }
-    // The sheet keeps the Trash host; all other window actions share the key dispatcher.
-    function sheetAction(action) {
-        if (action === "keymapSheet") root.pane.keymapSheet.open(root)
-        else Focus.dispatchAction(action, root.pane)
-    }
-    function action(name) {
-        if (confirming) return
-        if (!opened) { open(name); return }
-        if (name === "restoreTrashSelection") item.restore(false)
-        else if (name === "deletePermanently") item.prepare(false)
-        else if (name === "restoreAll") item.restore(true)
-        else if (name === "emptyTrash") item.prepare(true)
-        else item.forceActiveFocus()
-    }
-    onLoaded: {
-        item.overlayParent = root.overlayParent
-        item.statusBar = root.pane.statusBar
-        item.railKeyHandler = function(event) {
-            if (pane.focusView !== Focus.RAIL) return false
-            Focus.handleKey(event, pane, pane.sidebar)
-            return true
-        }
-    }
+    function sheetFocus() { pane.listArea.forceActiveFocus() }
+    function sheetActionRows(rows) { return rows }
+    function sheetMenuModel() { return menuEntries(true,[]).concat(menuEntries(false,[])) }
+    function sheetMenuAction(name) { action(name) }
+    function sheetAction(name) { Focus.dispatchAction(name,pane) }
+    readonly property var confirmation: confirmationLoader.item
+    Loader { id:confirmationLoader; active:false; source:"TrashConfirm.qml"; onLoaded:{item.parent=root.overlayParent || root;item.z=5;if(root.pendingReview){item.open(root.pendingReview);root.pendingReview=null}} }
     Connections {
-        target: root.item
-        function onRequested(message) { root.pane.backend.send(message) }
-        function onBackRequested() { root.pane.focusView = Focus.LIST; root.pane.listArea.forceActiveFocus() }
-        function onFocusRailRequested() { root.pane.focusView = Focus.RAIL }
-        function onActionRequested(action) {
-            if (root.confirming) return
-            if (TrashKeys.route(action) === "direct") { root.sheetAction(action); return }
-            root.pane.act(action)
-        }
-        function onStatusReported(message, error) { root.pane.message(message, error) }
-        function onArmReported(text) { root.pane.armPrompted(text) }
-        function onOperationResult(headline, detail, error) { root.pane.operationResult(headline, detail, error); if (root.pane.sidebar) root.pane.sidebar.refreshTrash() }
-        function onContextRequested(x, y, selection) { root.menuAt(root.item.mapToItem(null, x, y), selection) }
+        target:root.confirmation
+        function onConfirmed(token) { root.send("delete",{token:token}) }
+        function onCancelled() { root.send("cancel");root.pane.listArea.forceActiveFocus() }
     }
     Connections {
         target: root.pane.backend
         function onTrashResult(message) {
             if (root.sweeping) { root.sweepReceive(message); return }
-            if (root.item) root.item.receive(message)
+            if (message.id !== root.requestId || message.op !== root.pendingOp) return
+            root.pendingOp = ""
+            if (!message.ok) {
+                if (confirmation) confirmation.close()
+                root.pane.message(message.error || "Trash operation failed",true)
+                root.pane.listArea.forceActiveFocus()
+                root.refresh()
+                return
+            }
+            if (message.op === "prepare") { root.pendingToken=message.token; if(confirmation)confirmation.open(message);else{root.pendingReview=message;confirmationLoader.active=true;} return }
+            if (message.op === "check" && !message.valid) { if (confirmation) confirmation.close(); root.pane.message("The Trash changed; review it again.",true) }
+            if (message.op === "restore" || message.op === "delete") {
+                root.pane.operationResult((message.op === "restore" ? "Restored " : "Deleted ")+message.done+" items",
+                    (message.failures || []).map(function(f){return f.error}).join("\n"),message.failed > 0)
+                if(root.pane.sidebar)root.pane.sidebar.refreshTrash()
+                root.refresh()
+            }
+            if (message.op !== "check") root.pane.listArea.forceActiveFocus()
         }
     }
+    Timer { interval:2500; repeat:true; running:root.confirmationOpen && !root.busy; onTriggered:root.send("check",{token:root.pendingToken}) }
     Connections {
         target: root.pane.sidebar
-        function onTrashChanged() { if (root.opened) root.item.sourceChanged() }
+        function onTrashChanged() { if(root.browsing && !root.busy && !root.confirming)root.refresh() }
     }
     Connections {
         target: root.pane.contextMenu()
-        function onRailChosen(action, key) { if (key === "trash") root.action(action) }
+        function onRailChosen(action,key) { if(key === "trash")root.action(action) }
     }
 }

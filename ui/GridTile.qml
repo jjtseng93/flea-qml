@@ -5,6 +5,7 @@ import "js/Density.js" as Density
 import "js/Drag.js" as DragOps
 import "js/Format.js" as Format
 import "js/GridNames.js" as GridNames
+import "js/Match.js" as Match
 import "js/Icons.js" as Icons
 import "js/LangMarks.js" as LangMarks
 
@@ -77,7 +78,7 @@ Item {
     readonly property Item captionItem: nameLabel
 
     Accessible.role: Accessible.ListItem
-    Accessible.name: root.row ? root.row.n : ""
+    Accessible.name: Match.rowName(root.row, false)
 
     Rectangle {
         anchors.fill: parent
@@ -196,7 +197,7 @@ Item {
         // The slot fits the laid-out text, keeping the token reserve as its minimum.
         height: Math.max(root.dropTarget ? Theme.grid.captionLineHeight : Theme.grid.captionHeight, Math.ceil(contentHeight))
         horizontalAlignment: Text.AlignHCenter
-        text: root.row ? GridNames.gridCaption(root.row.n, root.captionPerLine, root.captionLines) : ""
+        text: root.row ? GridNames.gridCaption(Match.rowName(root.row, false), root.captionPerLine, root.captionLines) : ""
         color: Theme.color.foreground
         font.family: Theme.font.family
         font.pixelSize: Theme.font.bodySmall
@@ -274,7 +275,7 @@ Item {
 
     // Flea elides the caption itself, so Qt reports truncated only when it had to cut a caption Flea handed over whole.
     function captionElided() {
-        return nameLabel.truncated || (root.row ? nameLabel.text.split("\n").join("") !== String(root.row.n) : false)
+        return nameLabel.truncated || (root.row ? nameLabel.text.split("\n").join("") !== String(Match.rowName(root.row, false)) : false)
     }
 
     // Built only while the host's hover rests on a truncated caption: its size reads the wrapped name's layout, which every tile paid at rest.
@@ -296,7 +297,7 @@ Item {
                 id: tip
                 anchors.centerIn: parent
                 width: parent.width - 2 * Theme.spacing.gap
-                text: root.row ? root.row.n : ""
+                text: Match.rowName(root.row, false)
                 color: Theme.color.foreground
                 font.family: Theme.font.family
                 font.pixelSize: Theme.font.caption

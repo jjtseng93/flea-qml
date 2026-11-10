@@ -9,9 +9,10 @@ import { code } from "./code.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
-import { menuaction } from "./menu.js";
+import { menuaction, capturedPaths } from "./menu.js";
+import {renameWithTrashRecord} from './trash-record.js';
 import { trash } from "./trash.js";
-import { trashbrowse, watchTrashCount } from "./trashbrowse.js";
+import { trashbrowse, readTrash, watchTrashCount } from "./trashbrowse.js";
 import { findCommand } from "./find.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
@@ -19,7 +20,7 @@ import { peek } from "./peek.js";
 import { Listing, directoryFacts } from "./listing.js";
 import { SORT_KEYS } from "./order.js";
 import { lstatSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, isAbsolute } from "node:path";
 
 // FLEA_BACKEND_LOG=/some/file appends every request and answer there, for debugging.
 const trace = process.env.FLEA_BACKEND_LOG ? (await import("node:fs")).appendFileSync.bind(null, process.env.FLEA_BACKEND_LOG) : null;
@@ -134,6 +135,39 @@ function listpaths(request) {
     send({ ...request.searched, t: "searched", n: listing.rows.length, ...gen });
 }
 
+// Trash is a collection of real paths, presented through the ordinary listing.
+// Relative names retain each mount's identity; display metadata never becomes an IO path.
+function listtrash(request) {
+  const started = performance.now();
+  const items = readTrash();
+  listing = new Listing("/", items.map(item => ({
+    name: process.platform === "win32" ? item.file.replaceAll("\\", "/") : item.file.slice(1), dir: item.directory, trash: item,
+  })));
+  listing.fromPaths = true;
+  listing.trash = true;
+  stamp++;
+  listed(performance.now() - started, 0);
+  rows(0, request.first ?? 100);
+}
+function trashRequest(request) {
+  if (request.menuId) {
+    const paths = capturedPaths(request.menuId);
+    const picked = paths?.map(path => listing?.trash ? listing.rows.find(row => row.trash && resolve(row.trash.file) === resolve(path))?.trash : null);
+    if (!picked?.length || picked.some(item => !item))
+      return send({t:"trashbrowse",op:request.op,id:request.id,ok:false,stale:true,error:"Selected items changed; reopen the menu."});
+    request = {...request, rows:undefined, all:false, uris:picked.map(item=>item.uri), identities:picked.map(item=>item.identity)};
+  }
+  if (Array.isArray(request.rows)) {
+    if (!listing?.trash || request.listing !== stamp)
+      return send({t:"trashbrowse",op:request.op,id:request.id,ok:false,stale:true,error:"The listing changed; select the Trash items again."});
+    const picked = [...new Set(request.rows)].map(i => Number.isInteger(i) ? listing.rows[i]?.trash : null);
+    if (!picked.length || picked.some(item => !item))
+      return send({t:"trashbrowse",op:request.op,id:request.id,ok:false,error:"No Trash items selected."});
+    request = {...request,uris:picked.map(item=>item.uri),identities:picked.map(item=>item.identity)};
+  }
+  trashbrowse(request, send);
+}
+
 function sort(request) {
   const next = orderFrom(request, order);
   if (!SORT_KEYS.has(next.by)) return error("sort", String(request.by), `no order is named ${request.by}`);
@@ -151,6 +185,17 @@ const handlers = {
   list,
   sort,
   listpaths,
+  listtrash,
+  rename: request => {
+    try {
+      const source=request.path,name=request.to;
+      if(typeof source!=="string" || !isAbsolute(source) || typeof name!=="string" || !name || name==='.' || name==='..' || /[\\/\0]/.test(name))throw Error('Invalid file name');
+      if(request.menuId && !capturedPaths(request.menuId)?.some(path=>resolve(path)===resolve(source)))throw Error('Selected item changed; reopen Rename');
+      const target=join(dirname(source),name);
+      if(resolve(target)!==resolve(source))renameWithTrashRecord(source,target);
+      send({t:'renamed',ok:true,path:process.platform==='win32'?target.replaceAll('\\','/'):target});send({t:'changed',path:process.platform==='win32'?dirname(source).replaceAll('\\','/'):dirname(source)});
+    }catch(e){send({t:'renamed',ok:false,path:request.path});error('rename',request.path,e.message)}
+  },
   window: (request) => listing && rows(request.start ?? 0, request.count ?? 0),
   fsinfo: () => listing && send(fsinfo(listing.path)),
   peek: (request) => {
@@ -187,7 +232,7 @@ const handlers = {
     send(named.stale ?? { t: "paths", paths: named.paths });
   },
   menuaction: (request) => menuaction(request, send, listing, stamp),
-  trashbrowse: (request) => trashbrowse(request, send),
+  trashbrowse: trashRequest,
   trash: (request) => {
     const named = sources(request, listing, stamp, "trash");
     if (named.stale) return send(named.stale);
@@ -196,6 +241,7 @@ const handlers = {
   collisions: (request) => collisions(request, send, listing, stamp),
   transfer: (request) => transfer(request, send, listing, stamp),
   transfercancel: (request) => transferCancel(request),
+  // The sidebar's folders and drives, found by looking; `watch` keeps looking while a rail shows.
   quit: () => process.exit(0),
 };
 

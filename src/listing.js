@@ -1,7 +1,7 @@
 // One directory's rows: scanned for names first, stat'd only for the windows a client reads
 // (docs/protocol.md "list", "window", "rows"). Upstream: src/backend/listing.rs.
 import { accessSync, constants, lstatSync, readdirSync, readlinkSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { describeKind } from "./kinds.js";
 import { NEEDS_STAT, sortRows } from "./order.js";
 
@@ -31,7 +31,7 @@ export class Listing {
     if (NEEDS_STAT.has(order.by)) for (const row of this.rows) this.stat(row);
     // Kind ordering compares the name's class alone, so it reads no file and pays no stat.
     if (order.by === "kind" || order.groupByKind)
-      for (const row of this.rows) row.group ??= describeKind(row.name, row.dir, 0, undefined).group;
+      for (const row of this.rows) row.group ??= describeKind(row.trash ? basename(row.trash.original || row.name) : row.name, row.dir, 0, undefined).group;
     const sorting = performance.now();
     sortRows(this.rows, order);
     return [sorting - started, performance.now() - sorting];
@@ -40,7 +40,7 @@ export class Listing {
   stat(row) {
     if (row.st === undefined) {
       try {
-        row.st = lstatSync(join(this.path, row.name));
+        row.st = lstatSync((row.trash?.file ?? join(this.path, row.name)));
       } catch {
         row.st = null;
       }
@@ -67,16 +67,16 @@ export class Listing {
     let link, target;
     if ((mode & S_IFMT) === S_IFLNK) {
       try {
-        link = readlinkSync(join(this.path, row.name));
+        link = readlinkSync((row.trash?.file ?? join(this.path, row.name)));
       } catch {}
       // Only a link pays the second stat: it tells a working link from a broken one.
       try {
-        target = statSync(join(this.path, row.name));
+        target = statSync((row.trash?.file ?? join(this.path, row.name)));
       } catch {
         target = null;
       }
     }
-    const { icon, kind } = describeKind(row.name, row.dir, mode, target);
+    const { icon, kind } = describeKind(row.trash ? basename(row.trash.original || row.name) : row.name, row.dir, mode, target);
     if (!kindIndex.has(kind)) {
       kindIndex.set(kind, kinds.length);
       kinds.push(kind);
@@ -91,6 +91,7 @@ export class Listing {
       t: false,
       k: kindIndex.get(kind),
     };
+    if (row.trash) out.trash = {name: basename(row.trash.original || row.name), original: row.trash.original, deleted: row.trash.deleted, identity: row.trash.identity};
     if (link !== undefined) out.l = link;
     if (row.dir) out.v = st ? st.dev : 0;
     return out;

@@ -41,7 +41,9 @@ function pushedOnto(pane) {
 function drawn(pane) {
     var walk = pane.searchMode === "results" || (pane.searchFrom || "").length > 0
     var row = !walk && pane.rowFor ? pane.rowFor(pane.cursorIndex) : null
-    return makeEntry(pane.path, row ? row.n : "", walk ? 0 : pane.cursorIndex)
+    var entry = makeEntry(pane.path, row ? row.n : "", walk ? 0 : pane.cursorIndex)
+    if (pane.recentMode === "trash") { entry.collection = "trash"; entry.collectionFrom = pane.recentFrom }
+    return entry
 }
 
 // The departing cursor, or the pending place while a listing is out.
@@ -55,6 +57,12 @@ function travel(pane, from, to) {
     var target = asEntry(stack[stack.length - 1])
     pane[to] = (pane[to] || []).concat([capture(pane)])
     pane[from] = stack.slice(0, -1)
+    if (target.collection === "trash") {
+        pane.trash.open()
+        if (target.collectionFrom) pane.recentFrom = target.collectionFrom
+        pane.pendingSelect = target.name ? pane.join(target.path, target.name) : ""
+        return
+    }
     pane.openWithoutHistory(pathOf(target), { restore: Object.assign({}, target, { pushedOnto: to }), supersede: true })
 }
 

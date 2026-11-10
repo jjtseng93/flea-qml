@@ -146,7 +146,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         visible: root.cols.date && !root.underStrip
         width: root.cols.date ? (root.dragKey === "date" ? root.dragPreview : root.dateWidth) : 0
-        text: root.title(root.recent ? "Used" : "Modified", "mtime")
+        text: root.title(root.pane && root.pane.recentMode === "trash" ? "Deleted" : root.recent ? "Used" : "Modified", "mtime")
         horizontalAlignment: Text.AlignRight
         elide: Text.ElideRight
 

@@ -6,6 +6,7 @@
 // permanently's prepareDelete, checkDelete, refreshDelete and delete, which remove only what the
 // confirmation reviewed. Every other operation answers ok:false, so the menu says so instead of
 // waiting.
+import {trashRecord,forgetTrashRecord} from './trash-record.js';
 import { constants, lstatSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve, isAbsolute } from "node:path";
 
@@ -59,7 +60,7 @@ export function menuaction(request, send, listing, stamp) {
       cursor = typeof request.cursorPath === "string" ? request.cursorPath : (paths[0] ?? "");
     } else {
       if (request.listing !== undefined && request.listing !== stamp) return answer({ ok: false, error: CHANGED });
-      const at = (index) => (listing?.rows[index] ? join(listing.path || ".", listing.rows[index].name) : null);
+      const at = (index) => (listing?.rows[index] ? (listing.rows[index].trash?.file ?? join(listing.path || ".", listing.rows[index].name)) : null);
       paths = (request.rows ?? []).map(at);
       if (paths.some((p) => p === null)) return answer({ ok: false, error: CHANGED });
       cursor = at(request.cursor) ?? paths[0] ?? "";
@@ -131,7 +132,9 @@ export function menuaction(request, send, listing, stamp) {
         // Checked again just before the removal, so a name swapped since the review is left alone.
         if (identity(lstatSync(path)) !== held.identities[index]) throw new Error(CHANGED);
         // A link is removed as a link; rm never follows one into its target.
+        const record=trashRecord(path);
         rmSync(path, { recursive: true, force: false });
+        forgetTrashRecord(record);
         deleted++;
         folders.add(dirname(path));
       } catch (e) {

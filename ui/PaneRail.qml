@@ -149,7 +149,7 @@ Item {
             service: root.service
             polling: !root.overlay || root.revealed
             focused: root.pane.railPane.focusView === Focus.RAIL
-            trashActive: root.pane.railPane.trash.opened
+            trashActive: root.pane.railPane.trash.browsing
             onOpened: function(path) { RailKeys.openFrom(root.pane.railPane, path, sidebar) }
             // Sidebar040: the rail's Recent row answers with the history's own paths, which the
             // pane lists with listpaths; focus follows into the folder the way a mount's open does.

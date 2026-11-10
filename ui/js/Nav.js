@@ -47,6 +47,7 @@ function forward(pane) {
 
 // The mouse back button follows history, or climbs when no history exists.
 function mouseBack(pane) {
+    if (pane.recentMode === "trash") { pane.closeRecent(); return }
     if (MouseNav.refused(pane)) {
         return
     }

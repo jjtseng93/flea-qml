@@ -395,6 +395,7 @@ function commitRename(pane, newName) {
 
 // Indices, not paths: trash acts on the listing that is up right now, so the backend resolves them.
 function trash(pane, menuId) {
+    if (pane.recentMode === "trash") { pane.trash.action("deletePermanently", menuId); return }
     var idx = targetIndices(pane)
     if (idx.length === 0) return sayNoTarget(pane)
     // Sorted ascending, so this is the block's own first row and not wherever the cursor sat in it.

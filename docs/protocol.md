@@ -3379,3 +3379,12 @@ the contents close receipt; late names completion events then publish nothing.
 Sorting a snapshot reorders match metadata with its listing and advances the
 listing identity. Name and kind sorts work for every snapshot; size and date
 sorts refuse snapshots containing non-operable paths to avoid statting aliases.
+
+### flea-qml shared Trash listing
+
+`{"c":"listtrash","first":100}` responds with ordinary `listed` and `rows`
+messages. Rows name actual stored files relative to `/` (absolute drive paths
+on Windows), with `trash: {original, deleted, identity}` display metadata.
+`trashbrowse` restore/prepare may use `rows` plus `listing`; a stale listing
+is rejected before row indices are translated to captured Trash identities.
+The existing review token still protects permanent deletion.

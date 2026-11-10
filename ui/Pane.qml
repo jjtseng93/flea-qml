@@ -520,14 +520,13 @@ FocusScope {
     function refresh(selectPath, keepSelection) {
         // Recent re-reads the history rather than re-listing its base, which is the root: see
         // ui/js/RecentMode.js refresh, and Nav.refresh for every other listing.
-        if (root.recentMode.length > 0 && keepSelection !== true) RecentMode.refresh(root, selectPath)
+        if (root.recentMode === "trash" || (root.recentMode.length > 0 && keepSelection !== true)) RecentMode.refresh(root, selectPath)
         else Nav.refresh(root, selectPath, keepSelection)
     }
 
     function open(newPath) {
         if (trashHost.confirming) return
         if (root.flashActive) root.overlayParent.closeFlash()
-        trashHost.close()
         Nav.open(root, newPath)
     }
 
@@ -570,7 +569,7 @@ FocusScope {
     // Re-listing also clears the cursor and selection, the same as opening any other directory.
     // Recent lists what the history names, dotfiles among them, so the toggle has nothing to hide there.
     function toggleHidden() {
-        if (root.recentMode.length > 0) { root.message("Recent shows every item it lists, hidden ones included", false); return }
+        if (root.recentMode.length > 0) { root.message("This collection includes hidden items", false); return }
         root.showHidden = !root.showHidden
         ViewState.changeKey("hidden", root.showHidden)
         // flea-qml: a standing Find takes the new setting and stays, rather than leaving for the folder.
@@ -615,12 +614,13 @@ FocusScope {
         cancelSlowClick()
         if (trashHost.confirming) return
         if (action === "openTrash" || action === "emptyTrash" || action === "restoreAll") { trashHost.action(action); return }
+        if (trashHost.browsing && ["restoreTrashSelection", "deletePermanently", "trash"].indexOf(action) >= 0) { trashHost.action(action, menuId); return }
         if (action === "settings") { root.settingsPanel.open(root); return }
         if (action === "toggleLangMarks") { ViewState.toggleLangMarks(); return }
         if (action === "permissions") { root.openPermissions(); return }
         if (action === "rename" && root.openBulkRename(paths)) return  // several rows open the bulk card
         // Recent is a history, not a directory: a new file there would land in the root it stands on.
-        if (action === "newFile" && root.recentMode.length > 0) { root.message("Recent cannot hold a new file. Open a folder first", false); return }
+        if (action === "newFile" && root.recentMode.length > 0) { root.message((root.recentMode === "trash" ? "Trash" : "Recent") + " is a collection. Open a folder first", false); return }
         if (["newFile", "rename", "openWith", "moveTo", "copyTo", "properties", "deletePermanently"].indexOf(action) >= 0) {
             menuActions.open(action, menuId || 0, context)
             return
@@ -852,6 +852,7 @@ FocusScope {
     function closeRecent() { RecentMode.close(root) }
 
     function join(base, name) {
+        if (base === "/" && (/^[A-Za-z]:[\\/]/.test(name) || name.indexOf("//") === 0)) return name
         return base === "/" ? "/" + name : base + "/" + name
     }
 
@@ -882,7 +883,7 @@ FocusScope {
         height: root.dualMode && !trashHost.opened ? Theme.chromeHeight : 0
         visible: height > 0
         // A history is a location and not a directory, so the strip says its own name.
-        path: root.recentMode.length > 0 ? "Recent" : root.path
+        path: root.recentMode === "trash" ? "Trash" : root.recentMode.length > 0 ? "Recent" : root.path
         home: root.home
         pathAlias: root.pathAlias
         focused: root.paneFocused
@@ -898,6 +899,16 @@ FocusScope {
         onActiveChanged: if (active) railHost.focusPress(focusPointer.point.position)
     }
 
+    Loader {
+        id: trashStrip
+        anchors { top: panePath.bottom; left: railHost.right; right: parent.right }
+        active: trashHost.browsing
+        height: active ? Theme.chromeHeight : 0
+        visible: active
+        source: "TrashToolbar.qml"
+        onLoaded: item.trash = trashHost
+    }
+
     Flea.Header {
         id: header
         // Only the list view has columns to head, and neither the grid board nor the columns board
@@ -905,7 +916,7 @@ FocusScope {
         // the pane instead of a gap. A search takes the strip whole, in any view.
         visible: !trashHost.opened && !root.flashActive && (root.viewMode === "list" || root.searchMode.length > 0)
         height: visible ? implicitHeight : 0
-        anchors.top: panePath.bottom
+        anchors.top: trashStrip.bottom
         anchors.left: railHost.right
         anchors.right: parent.right
         // The held rows a double click fits and F4 fits whole; ListColumns040 never scans the directory.

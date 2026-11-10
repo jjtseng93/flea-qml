@@ -1,6 +1,6 @@
 import {test, expect, beforeEach, afterEach} from 'bun:test';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,renameSync,symlinkSync,existsSync,rmSync} from 'node:fs';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {trashOne,homeTrash,trashInfoPath,trashInfoOriginal} from '../src/trash.js';
 import {trashbrowse,readTrash,watchTrashCount} from '../src/trashbrowse.js';
@@ -58,4 +58,78 @@ test('backend routes Trash requests and exits cleanly',()=>{
  const messages=result.stdout.toString().trim().split('\n').map(line=>JSON.parse(line));
  expect(messages.some(m=>m.t==='trashcount' && typeof m.revision==='number')).toBe(true);
  expect(messages.some(m=>m.t==='trashbrowse' && m.id===27 && m.ok===true)).toBe(true);
+});
+
+test('Trash collection uses ordinary rows, real paths and metadata; stale row actions are refused',()=>{
+ const a=item('preview 中文.txt');
+ const input=[{c:'listtrash',first:10000},{c:'trashbrowse',op:'restore',id:31,rows:[0],listing:-1},{c:'quit'}].map(x=>JSON.stringify(x)).join('\n')+'\n';
+ const result=Bun.spawnSync([process.execPath,new URL('../src/flea.js',import.meta.url).pathname,'--backend'],{env:{...process.env},stdin:Buffer.from(input),stdout:'pipe',stderr:'pipe'});
+ expect(result.exitCode).toBe(0);expect(result.stderr.toString()).toBe('');
+ const messages=result.stdout.toString().trim().split('\n').map(JSON.parse);
+ const rows=messages.find(x=>x.t==='rows');const row=rows.rows.find(x=>x.trash?.original===a.original);
+ expect(join('/',row.n)).toBe(a.file);expect(row.s).toBe(7);expect(row.d).toBe(false);
+ expect(messages.find(x=>x.id===31).stale).toBe(true);expect(existsSync(a.file)).toBe(true);
+});
+
+test('renaming a Trash entry preserves restore metadata and refuses destination collisions',async()=>{
+ const {renameWithTrashRecord}=await import('../src/trash-record.js');
+ const a=item('original.txt'),dst=join(dirname(a.file),'renamed.txt');
+ renameWithTrashRecord(a.file,dst);
+ expect(existsSync(a.file)).toBe(false);expect(existsSync(a.info)).toBe(false);
+ const moved=readTrash().find(x=>x.file===dst);expect(moved.original).toBe(join(root,'renamed.txt'));
+ writeFileSync(join(dirname(dst),'occupied'),'keep');
+ expect(()=>renameWithTrashRecord(dst,join(dirname(dst),'occupied'))).toThrow('already exists');
+ expect(readFileSync(dst,'utf8')).toBe('payload');
+ expect(call('restore',{uris:[moved.uri],identities:[moved.identity]}).done).toBe(1);
+ expect(readFileSync(join(root,'renamed.txt'),'utf8')).toBe('payload');
+});
+
+test('moving out cleans only the captured Trash record; copy keeps its source metadata',async()=>{
+ const {transfer}=await import('../src/transfer.js');
+ const a=item('move-me.txt');const dest=join(root,'destination');mkdirSync(dest);
+ const run=moving=>new Promise(resolve=>transfer({id:40,paths:[a.file],dest,op:moving?'move':'copy'},m=>{if(m.t==='transferdone')resolve(m)},null,0));
+ const copied=await run(false);expect(copied.ok).toBe(1);expect(existsSync(a.info)).toBe(true);
+ rmSync(join(dest,'move-me.txt'));
+ const moved=await run(true);expect(moved.ok).toBe(1);expect(existsSync(a.info)).toBe(false);
+ expect(readFileSync(join(dest,'move-me.txt'),'utf8')).toBe('payload');
+});
+
+test('Trash rename preserves literal replacement tokens in file names',async()=>{
+ const {renameWithTrashRecord}=await import('../src/trash-record.js');
+ for (const name of ['$&.txt', '$$.txt', "$'.txt", '$`.txt']) {
+  const a=item('old-'+name),dst=join(dirname(a.file),name);
+  renameWithTrashRecord(a.file,dst);
+  const moved=readTrash().find(x=>x.file===dst);
+  expect(moved.original).toBe(join(root,name));
+  expect(call('restore',{uris:[moved.uri],identities:[moved.identity]}).done).toBe(1);
+  expect(readFileSync(join(root,name),'utf8')).toBe('payload');
+ }
+});
+
+test('Trash menu restores its captured item after sort, not the replacement cursor',()=>{
+ const a=item('menu-a.txt'),b=item('menu-b.txt');
+ const commands=[{c:'listtrash',first:10000},
+  {c:'menuaction',op:'snapshot',id:93,paths:[a.file],cursorPath:a.file},
+  {c:'sort',by:'name',desc:true},
+  {c:'trashbrowse',op:'restore',id:94,menuId:93,rows:[0],listing:-1},
+  {c:'trashbrowse',op:'restore',id:95,menuId:999,rows:[0]},
+  {c:'quit'}];
+ const result=Bun.spawnSync([process.execPath,new URL('../src/flea.js',import.meta.url).pathname,'--backend'],{
+  env:{...process.env},stdin:Buffer.from(commands.map(JSON.stringify).join('\n')+'\n'),stdout:'pipe',stderr:'pipe'});
+ expect(result.exitCode).toBe(0);
+ const messages=result.stdout.toString().trim().split('\n').map(JSON.parse);
+ expect(messages.find(x=>x.id===94).done).toBe(1);
+ expect(messages.find(x=>x.id===95).stale).toBe(true);
+ expect(existsSync(a.original)).toBe(true);expect(existsSync(b.file)).toBe(true);
+});
+
+test('Trash collision suffixes do not change visible names or media classification',async()=>{
+ const {Listing}=await import('../src/listing.js');
+ for(const name of ['image.png','music.mp3','video.mp4','source.js','Dockerfile']) {
+  item(name);item(name);const a=readTrash().find(x=>x.original===join(root,name) && x.file.endsWith('.2'));
+  expect(a.file.endsWith('.2')).toBe(true);
+  const row=new Listing('/',[{name:a.file.slice(1),dir:false,trash:a}]).window(0,1).rows[0];
+  const original=new Listing(root,[{name,dir:false}]).window(0,1).rows[0];
+  expect(row.i).toBe(original.i);expect(row.trash.name).toBe(name);
+ }
 });

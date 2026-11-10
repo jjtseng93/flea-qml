@@ -7,6 +7,13 @@ function base(path) {
     return i < 0 ? String(path) : String(path).substring(i + 1)
 }
 
+// A Trash row's storage name is an IO identity, never its visible caption.
+function rowName(row, locating) {
+    if (!row) return ""
+    if (row.trash) return row.trash.name !== undefined ? String(row.trash.name) : base(row.trash.original || row.n)
+    return locating ? base(row.n) : row.n
+}
+
 // The location column: the parent path relative to the scope, empty for a match in the root itself.
 function location(path) {
     var i = String(path).lastIndexOf("/")

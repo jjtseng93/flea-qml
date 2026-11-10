@@ -35,7 +35,7 @@ function shown(rows, held, query) {
     for (var i = 0; i < rows.length; i++) {
         // The same run ui/js/Match.js paints in the name, so a row can never match without showing why.
         // flea-qml: a Find result's row is a relative path, and the filter reads only its name.
-        if (Match.run(Match.base(rows[i].n), query).start >= 0) {
+        if (Match.run(Match.rowName(rows[i], true), query).start >= 0) {
             out.push(held + i)
         }
     }

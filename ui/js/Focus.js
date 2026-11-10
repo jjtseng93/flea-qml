@@ -138,10 +138,10 @@ function lookup(event, root) {
         return row && (row.d || (Format.isSymlink(row.p) && row.i === "folder")) ? "open" : (row ? "preview" : "")
     }
     // The key follows the row: where gio has no Trash the refusal names trashRefused, never arming a d that can only fail.
-    if ((action === "trashArm" || action === "trash") && !Mounts.trashable(root.path, !root.backend || root.backend.dirWritable !== false))
+    if ((action === "trashArm" || action === "trash") && root.recentMode !== "trash" && !Mounts.trashable(root.path, !root.backend || root.backend.dirWritable !== false))
         return "trashRefused"
     // reveal only means something on a search result or a recent row, so o is discarded everywhere else.
-    if (action === "reveal" && root.searchMode !== Search.RESULTS && root.recentMode !== RecentMode.RESULTS)
+    if (action === "reveal" && root.searchMode !== Search.RESULTS && root.recentMode.length === 0)
         return ""
     // A sort ends the running walk in the backend and the search strip hides the mark that would
     // show it happening, so both sort keys go quiet for as long as a search owns the header.
@@ -212,7 +212,7 @@ function act(action, root, menuId, paths) {
     // MenuAdditions040: c copies as, P pastes as, V flips the selection.
     case "copyAs": root.openCopyAs(); return
     case "pasteAs":
-        if (root.recentMode.length > 0) { root.message("Recent cannot take a paste. Open a folder first", false); return }
+        if (root.recentMode.length > 0) { root.message((root.recentMode === "trash" ? "Trash" : "Recent") + " is a collection. Open a folder before pasting", false); return }
         root.openPasteAs(); return
     case "invertSelection": root.invertSelection(); return
     case "showOriginal": root.showOriginal(); return
@@ -230,9 +230,9 @@ function act(action, root, menuId, paths) {
         root.pasteLink(action === "pasteAbsoluteLink" ? "absolute" : action === "pasteHardLink" ? "hard" : "relative"); return
     case "cut": Ops.clip(root, true, paths); return
     // Recent is a history, not a directory: pasting or creating there would land in the root it stands on.
-    case "paste": if (root.recentMode.length > 0) { root.message("Recent cannot take a paste. Open a folder first", false); return } Ops.paste(root); return
+    case "paste": if (root.recentMode.length > 0) { root.message((root.recentMode === "trash" ? "Trash" : "Recent") + " is a collection. Open a folder before pasting", false); return } Ops.paste(root); return
     case "movePaste":
-        if (root.recentMode.length > 0) { root.message("Recent cannot take a paste. Open a folder first", false); return }
+        if (root.recentMode.length > 0) { root.message((root.recentMode === "trash" ? "Trash" : "Recent") + " is a collection. Open a folder before pasting", false); return }
         Ops.paste(root, true)
         return
     case "undo": Ops.undo(root); return
@@ -266,7 +266,7 @@ function act(action, root, menuId, paths) {
     case "viewColumns": root.chooseView("columns"); return
     case "viewGrid": root.chooseView("grid"); return
     case "viewDual": root.chooseView("dual"); return
-    case "newFolder": if (root.recentMode.length > 0) { root.message("Recent cannot hold a new folder. Open a folder first", false); return } Ops.newFolder(root); return
+    case "newFolder": if (root.recentMode.length > 0) { root.message((root.recentMode === "trash" ? "Trash" : "Recent") + " is a collection. Open a folder first", false); return } Ops.newFolder(root); return
     // The directory being shown, not the row: the menu row and the chord both land here.
     case "openTerminal": root.openTerminal(); return
     // The background menu's Update Flea row, drawn only while an update is known, opens Omarchy's updater through the pane's opener.

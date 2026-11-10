@@ -13,7 +13,7 @@ Item {
     id: root
 
     property var row: null
-    function dateStamp() { return root.row ? (root.row.used === undefined ? root.row.m : root.row.used) : null }
+    function dateStamp() { if (root.row && root.row.trash) { var n=Date.parse(root.row.trash.deleted); return isFinite(n) ? n/1000 : null }; return root.row ? (root.row.used === undefined ? root.row.m : root.row.used) : null }
     property bool cursor: false
     property bool paneFocused: true
     property bool dualMode: false
@@ -58,12 +58,12 @@ Item {
     property bool recenting: false
     readonly property bool searching: !root.filtering && root.searchQuery.length > 0 && root.row !== null && root.row.n.length > 0
     readonly property bool locating: root.searching || root.recenting
-    readonly property string displayName: root.row ? (root.locating ? Match.base(root.row.n) : root.row.n) : ""
+    readonly property string displayName: Match.rowName(root.row, root.locating)
     // FleaWindow.html and ThemeRoles.html both spell it "shell -> /usr/share/omarchy".
     readonly property string linkMark: root.row && root.row.l ? " -> " + root.row.l : ""
     // The name, then a link's target; a folder carries no slash, its glyph and the folders-first order already say it.
     readonly property string decoratedName: root.displayName + root.linkMark
-    readonly property string locationText: root.locating && root.row ? (root.recenting ? Recent.locationUnder(root.row.n, Quickshell.env("HOME") || "") : Match.location(root.row.n)) : ""
+    readonly property string locationText: root.locating && root.row ? (root.recenting ? Recent.locationUnder(root.row.trash ? root.row.trash.original.replace(/^\//, "") : root.row.n, Quickshell.env("HOME") || "") : Match.location(root.row.n)) : ""
     readonly property var nameRun: Match.run(root.displayName, root.searchQuery)
     // Assigned by List.qml's shared budgets; -2 keeps the local geometry default for PickerList and drop-target rows.
     property int assignedNameBudget: -2

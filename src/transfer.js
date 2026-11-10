@@ -7,6 +7,7 @@
 // fsync onto FAT-family drives. Not yet: undo's journal, `replace` (it needs the Trash),
 // `merge` (the question answers mergeable:false, so the card never offers it), `fatnames`, and
 // fifos, sockets and device nodes, which are refused rather than opened.
+import {trashRecord,forgetTrashRecord} from './trash-record.js';
 import { constants, promises as fsp, lstatSync, statSync, accessSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import { fsTypeOf } from "./fsinfo.js";
@@ -40,7 +41,7 @@ export function sources(request, listing, stamp, command) {
     const paths = [];
     for (const index of request.rows) {
       const row = listing?.rows[index];
-      if (row) paths.push(join(listing.path || ".", row.name));
+      if (row) paths.push(row.trash?.file ?? join(listing.path || ".", row.name));
     }
     return { paths };
   }
@@ -397,9 +398,11 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
       continue;
     }
     const ctx = { job, index, name, root: dest, made: new Set(), refused: [], refusedCount: 0, durable, fat: FAT.has(fstype), unconfirmed: false };
+    const trashMetadata = moving ? trashRecord(src) : null;
     try {
       if (moving) await move(src, target, ctx);
       else await copyAny(src, target, ctx, true);
+      if (moving) forgetTrashRecord(trashMetadata);
       if (ctx.durable) await fsyncPath(dirname(target), ctx);
       unconfirmed ||= ctx.unconfirmed;
       if (moving) touched.add(dirname(src));

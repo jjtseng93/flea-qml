@@ -50,7 +50,7 @@ function column(pane, key) {
         // Forgetting re-lists, so it holds like any other sort request.
         if (holdForRename(pane, { forget: true })) return
         if ((pane.recentMode || "").length > 0) {
-            RecentMode.run(pane, pane.recentPaths || [])
+            RecentMode.run(pane, pane.recentPaths || [], pane.recentVisits, pane.recentMode)
             return
         }
         if (pane.backend && pane.backend.forgetFolderSort)

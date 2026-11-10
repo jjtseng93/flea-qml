@@ -13,14 +13,14 @@ var RESULTS = "results"
 // One refusal for both paste routes: the menu reaches past key dispatch, so it shares this.
 function refusePaste(pane) {
     if (pane.recentMode.length > 0) {
-        pane.message("Recent cannot take a paste. Open a folder first", false)
+        pane.message((pane.recentMode === "trash" ? "Trash" : "Recent") + " is a collection. Open a folder before pasting", false)
         return true
     }
     return false
 }
 
 // Open keeps where the pane stood and asks the history's paths after the bounded jump; spanning mounts leaves fsinfo unknown.
-function run(pane, paths, visits) {
+function run(pane, paths, visits, mode) {
     // The history takes the place of a listing out; its answer is dropped by the folder it names, see ui/js/Swap.js onListed.
     if (pane.listInFlight) {
         pane.swap.stopWaiting()
@@ -42,7 +42,7 @@ function run(pane, paths, visits) {
     pane.listInFlight = true
     pane.listedSeen = false
     pane.path = "/"
-    pane.recentMode = RESULTS
+    pane.recentMode = mode || RESULTS
     pane.listingPath = "/"
     pane.storageClass = ""
     // Recent rows span filesystems, so the Tags row stays and the backend refuses each filesystem that cannot hold tags by name.
@@ -56,7 +56,8 @@ function run(pane, paths, visits) {
     if (pane.searchLeaving === true) ask.holdWalk = true
     Nav.holdOrForget(pane, ask)
     pane.appliedListingPreferences = pane.listingPreferences
-    pane.backend.listPaths(pane.recentPaths, pane.windowSize)
+    if (pane.recentMode === "trash") pane.backend.send({c:"listtrash",first:pane.windowSize})
+    else pane.backend.listPaths(pane.recentPaths, pane.windowSize)
     // A deep anchored refresh asks its window only after the history's listpaths request.
     var anchor = pane.wire ? pane.wire.anchor : null
     if (anchor && anchor.path === pane.path && anchor.start > 0)
@@ -102,6 +103,7 @@ function refresh(pane, selectPath) {
     }
     pane.pendingSelect = selectPath ? selectPath : ""
     pane.pendingMenu = false
+    if (pane.recentMode === "trash") { run(pane, [], {}, "trash"); return }
     if (pane.sidebar) {
         pane.sidebar.readRecent(pane)
         return
@@ -120,7 +122,7 @@ function stampRows(pane, rows) {
 
 // The folder a tab records on a history, "" elsewhere, so it lands where it stood.
 function restingPath(pane) {
-    return pane.recentMode === RESULTS && pane.recentFrom.length > 0 ? pane.recentFrom : ""
+    return pane.recentMode.length > 0 && pane.recentFrom.length > 0 ? pane.recentFrom : ""
 }
 
 // A tab switch drops the mode and says whether it dropped one.

@@ -16,6 +16,12 @@ var RESULTS = "results"
 
 // f opens the session with no rows touched; from Recent it leaves first, so the scope and rows are the real folder.
 function start(root) {
+    // A virtual collection has no single recursive filesystem scope. Never search
+    // the unrelated directory that was visible before opening Trash.
+    if (root.recentMode === "trash") {
+        root.message("Open a Trash folder to Find inside it; / filters this collection", false)
+        return
+    }
     if (root.searchMode === RESULTS) {
         root.searchMode = TYPING
         return

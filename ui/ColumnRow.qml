@@ -162,7 +162,7 @@ Item {
         anchors.rightMargin: (root.row && root.row.shown ? Theme.tagSlotWidth + Theme.spacing.gap : 0) + (root.showSize ? Theme.spacing.gap : 0) + (root.clipMark.length > 0 ? Theme.spacing.gap + root.clipPx : 0)
         anchors.verticalCenter: line.verticalCenter
         visible: !root.renaming && !root.marking
-        text: root.row && root.nameBudget >= 0 ? Format.middleElide(root.row.n, Math.max(0, root.nameBudget - (root.clipMark.length > 0 ? Math.ceil((Theme.spacing.gap + root.clipPx) / Theme.bodyAdvance) : 0))) : (root.row ? root.row.n : "")
+        text: root.row && root.nameBudget >= 0 ? Format.middleElide(Match.rowName(root.row, false), Math.max(0, root.nameBudget - (root.clipMark.length > 0 ? Math.ceil((Theme.spacing.gap + root.clipPx) / Theme.bodyAdvance) : 0))) : Match.rowName(root.row, false)
         color: root.ink
         font.family: Theme.font.family
         font.pixelSize: Theme.font.body
@@ -220,7 +220,7 @@ Item {
                     // A search row draws its folder beside the name, as List's locating rows do; a "/" filter row keeps the plain name.
                     readonly property bool locating: root.pane !== null && root.pane.searchMode.length > 0
                     readonly property string path: root.row ? root.row.n : ""
-                    readonly property string shownName: markParts.locating ? Match.base(path) : path
+                    readonly property string shownName: Match.rowName(root.row, markParts.locating)
                     readonly property var run: Match.run(shownName, root.markQuery)
                     Flea.MatchText {
                         id: matchName

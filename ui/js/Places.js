@@ -228,7 +228,7 @@ function heldBy(entries, dir, view) {
 
 // pathAlias is the pane's remembered gvfs share (or null); its key is the share's normalized address.
 function litView(trashOpened, recentMode, searchMode, answeredQuery, pathAlias) {
-    if (trashOpened) return { kind: "trash" }
+    if (trashOpened || recentMode === "trash") return { kind: "trash" }
     if (String(recentMode || "").length > 0) return { kind: "recent" }
     var query = String(answeredQuery || "")
     if (String(searchMode || "").length > 0 && query.indexOf("tag:") === 0) return { kind: "tag", tag: query.substring(4) }

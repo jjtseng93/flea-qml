@@ -90,6 +90,24 @@ preserved.
 
 ## Deleting files
 
+Trash uses the ordinary file pane: Space opens Quick Look, `/` filters,
+and the existing selection, sorting, copy/cut and folder navigation work on
+its real files. The toolbar adds Restore, Restore all and Empty Trash; deletion
+still requires confirmation. Original locations and deletion dates are shown.
+Returning from a trashed folder restores the Trash collection. Moving a file
+out removes its `.trashinfo`; copying leaves it intact. Renaming updates its
+restoration name and refuses collisions.
+
+Trash is a virtual collection across volumes, not a writable directory: open
+a real folder before pasting, creating files or using recursive Find (`f`).
+Filter works directly on the collection. This does not add backend features
+that are otherwise unimplemented (for example bulk rename or undo).
+
+`bun test/manual-trash-ui.mjs` exercises the shared pane with the sibling
+buninu-browser, isolated HOME/XDG fixtures, preview, filtering, folder Back,
+selected restore, and deletion review/cancellation. It never activates Empty
+Trash, since mounted-volume trash can exist outside those isolated directories.
+
 Move to Trash uses freedesktop-style `Trash/files` and `Trash/info`, without
 invoking `gio`. Windows also uses this private Trash folder, not the Windows
 Recycle Bin. Cross-filesystem copies are not attempted: an unusable Trash leaves

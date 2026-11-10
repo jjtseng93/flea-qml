@@ -46,7 +46,7 @@ Item {
         root.jumpBuilt = true
         root.editing = true
         // The trailing slash makes a child the next keystroke, and the line opens selected so a typed name replaces it.
-        field.text = root.path === "/" ? "/" : root.path + "/"
+        field.text = PathBar.editLine(root.path)
         field.forceActiveFocus()
         field.selectAll()
     }
@@ -65,7 +65,9 @@ Item {
 
     // Tab completes from the backend's peek, the read the columns view already makes, so it costs no new request type.
     function completeEdit() {
-        var dir = PathBar.completionDir(field.text, root.path, root.home)
+        // A virtual root has no filesystem completion; never send it to peek.
+        if (PathBar.isTrashRoot(field.text)) return
+        var dir = PathBar.completionDir(field.text, PathBar.isTrashRoot(root.path) ? "/" : root.path, root.home)
         var hidden = PathBar.wantsHidden(field.text, root.showHidden)
         var key = PathBar.requestKey(dir, hidden)
         if (key === root.cachedKey) {
@@ -90,7 +92,7 @@ Item {
         root.cachedKey = root.pendingKey
         root.cachedNames = names
         root.pendingKey = ""
-        if (root.editing && PathBar.completionDir(field.text, root.path, root.home) === dir) {
+        if (root.editing && PathBar.completionDir(field.text, PathBar.isTrashRoot(root.path) ? "/" : root.path, root.home) === dir) {
             root.applyCompletion(dir, names)
         }
     }

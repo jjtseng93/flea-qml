@@ -219,3 +219,8 @@ jmi --cat --edit -filetype v /path/to/main.v
 The value is the YAML definition's `filetype`, not necessarily its filename or
 extension. Flea's internal `highlightFile(path, signal, filetype)` forwards this
 setting as separate arguments; failures still fall back to plain text.
+
+The Trash address bar displays `trash:///`. Enter `trash:/`, `trash://`, or
+`trash:///` to open the same collection as the sidebar. These root addresses are
+UI aliases only: stored paths, preview readers, restore and deletion are unchanged.
+Trash item URIs and remote authorities are not supported by these aliases.

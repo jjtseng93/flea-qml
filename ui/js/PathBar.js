@@ -74,6 +74,21 @@ function unwrap(text) {
     }
 }
 
+// Display/input alias only. The Trash collection keeps its existing filesystem paths.
+function isTrashRoot(text) {
+    return /^trash:\/{1,3}$/i.test(String(text).trim())
+}
+
+function addressTarget(text, current, home) {
+    if (isTrashRoot(text)) return "trash:///"
+    return resolve(text, isTrashRoot(current) ? "/" : current, home)
+}
+
+function editLine(path) {
+    if (isTrashRoot(path)) return "trash:///"
+    return path === "/" ? "/" : path + "/"
+}
+
 // A typed smb:// (or sftp://, davs://, ...) address is a network location, not a name
 // relative to the pane: resolving it against the directory would list one nobody named.
 // The bar hands it back untouched, and the window routes it to the rail's own open.

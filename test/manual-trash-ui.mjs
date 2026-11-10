@@ -22,8 +22,19 @@ try {
  for(let i=0;i<30;i++){if(await run('!!globalThis.testBody && !testBody.currentPane.listInFlight'))break;await Bun.sleep(100)}
  if(!await run('!!globalThis.testBody'))throw Error('testBody missing '+JSON.stringify(await run('({status:globalThis.testLoader?.status,source:globalThis.testLoader?.source,text:document.body.innerText,errors:globalThis.compileErrors})'))) ;
  console.log('initial',await run('({text:document.body.innerText.slice(0,150),mode:testBody.currentPane.recentMode})'));
- await run('testBody.currentPane.trash.open()');
- for(let i=0;i<150;i++){if(await run('!testBody.currentPane.listInFlight'))break;await Bun.sleep(100)}
+ for(const address of ['trash:/','trash://','trash:///']) {
+  if(await run('testBody.currentPane.recentMode === "trash"')) {
+   await run('testBody.currentPane.closeRecent()');
+   for(let i=0;i<150;i++){if(await run('!testBody.currentPane.listInFlight'))break;await Bun.sleep(100)}
+  }
+  await run(`testBody.currentPane.chromeBar.startEdit();testBody.currentPane.chromeBar.pathField.text=${JSON.stringify(address)};testBody.currentPane.chromeBar.commitEdit()`);
+  for(let i=0;i<150;i++){if(await run('!testBody.currentPane.listInFlight'))break;await Bun.sleep(100)}
+  if(!await run('testBody.currentPane.recentMode === "trash" && testBody.currentPane.path === "/" && testBody.currentPane.chromeBar.path === "trash:///"'))throw Error('Trash address failed: '+address);
+ }
+ await run('testBody.currentPane.chromeBar.startEdit()');
+ if(await run('testBody.currentPane.chromeBar.editText')!=='trash:///')throw Error('Trash edit address acquired an extra slash');
+ await run('testBody.currentPane.chromeBar.closeEdit()');
+ console.log('PASS all Trash address aliases, display and unchanged backing path');
  const paths=await run('testBody.currentPane.rows.map(r=>r.trash.original)');
  if(paths.length!==3 || paths.some(p=>!p.startsWith(dir+'/')))throw Error('External trash detected; refusing mutation');
  console.log('trash',await run('({text:document.body.innerText,mode:testBody.currentPane.recentMode,rows:testBody.currentPane.total,cursor:testBody.currentPane.cursorRow})'));

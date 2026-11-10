@@ -182,8 +182,8 @@ Rectangle {
         anchors.top: parent.top
         // A history is a location and not a directory, so the chrome says its own name.
         path: view.currentPane.flashActive ? "Flash image"
-            : view.currentPane.trash.opened ? "Trash"
-            : view.currentPane.recentMode === "trash" ? "Trash" : view.currentPane.recentMode.length > 0 ? "Recent"
+            : view.currentPane.trash.opened ? "trash:///"
+            : view.currentPane.recentMode === "trash" ? "trash:///" : view.currentPane.recentMode.length > 0 ? "Recent"
             : view.currentPane.path
         // True only when the drawn path's listing failed, so the bar retries it and nothing else.
         pathFailed: Nav.pathFailed(view.currentPane)
@@ -216,6 +216,7 @@ Rectangle {
         // local path. A network address is never listed as a folder: with no host it is refused
         // with a sentence, the way 0.3.5 refused the line.
         onPathEntered: function (path) {
+            if (path === "trash:///") { view.currentPane.trash.open(); return }
             if (/^(smb|sftp|ftp|ftps|dav|davs|nfs|afp):\/\//i.test(path)) {
                 var target = view.currentPane
                 var service = target ? target.ensureNetworkService() : null
@@ -487,7 +488,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        path: view.currentPane.trash.opened ? "Trash"
+        path: view.currentPane.trash.opened ? "trash:///"
             : view.currentPane.path
         total: view.currentPane.flashActive && view.flashHost ? view.flashHost.count
             : view.currentPane.trash.opened ? view.currentPane.trash.total : view.currentPane.total

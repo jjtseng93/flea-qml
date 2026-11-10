@@ -10,6 +10,7 @@
 // tilde and ui/js/Search.js scopeRoot now both make too: a sibling like /home/gmx is not inside home.
 function crumbs(path, home, rootAlias) {
     var text = String(path)
+    if (text === "trash:///") return [{ text: text, path: text, last: true }]
     var aliasRoot = rootAlias ? cleanRoot(rootAlias.path) : ""
     var aliasLabel = rootAlias ? String(rootAlias.label || "") : ""
     var aliased = aliasRoot.length > 0 && aliasLabel.length > 0 && inside(text, aliasRoot)

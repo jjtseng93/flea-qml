@@ -83,7 +83,7 @@ Item {
 
     function commitEdit() {
         var typed = root.editText
-        var target = PathBar.resolve(typed, root.path, root.home)
+        var target = PathBar.addressTarget(typed, root.path, root.home)
         root.closeEdit()
         // An empty line closes the bar, and a settled path stays a no-op to keep the selection, while a failed or locked one retries.
         if (PathBar.shouldNavigate(target, root.path, root.pathFailed)) {

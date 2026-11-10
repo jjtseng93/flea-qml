@@ -883,13 +883,13 @@ FocusScope {
         height: root.dualMode && !trashHost.opened ? Theme.chromeHeight : 0
         visible: height > 0
         // A history is a location and not a directory, so the strip says its own name.
-        path: root.recentMode === "trash" ? "Trash" : root.recentMode.length > 0 ? "Recent" : root.path
+        path: root.recentMode === "trash" ? "trash:///" : root.recentMode.length > 0 ? "Recent" : root.path
         home: root.home
         pathAlias: root.pathAlias
         focused: root.paneFocused
         inputLive: !(root.preview && root.preview.active)
         pane: root
-        onChosen: function (path) { root.open(path) }
+        onChosen: function (path) { if (path === "trash:///") root.trash.open(); else root.open(path) }
         onEditRequested: root.pathBarRequested()
     }
 

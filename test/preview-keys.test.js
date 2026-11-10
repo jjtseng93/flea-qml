@@ -39,3 +39,22 @@ test('Ctrl-Tab returns from Quick Look like Escape', () => {
     keys.act('focusPreview', { preview: { revealStrip() {}, close() { closed++; } } });
     expect(closed).toBe(1);
 });
+test('HTML Quick Look arrows follow adjacent files, including media, rather than scrolling HTML', async () => {
+    const followed = [], moved = [];
+    const rows = [{n:'1.html',i:1,s:110,k:0},{n:'1.mp3',i:2,s:200,k:1}];
+    const root = {cursorIndex:0,kindNames:['HTML','Audio'],join:(base,name)=>base+'/'+name,
+        rowFor:i=>rows[i],preview:{isHtml:true,isCompare:false,
+            markdownShown:{shownView:'rendered',scrollBy(){throw Error('Arrow must change file');}},
+            revealStrip(){},follow:(...args)=>followed.push(args)}};
+    const actions=await load('PreviewKeys','act',{
+        Filter:{moveCursor(r,n){r.cursorIndex+=n;moved.push(n);},cursorShown:()=>true},
+        Marks:{follow(){}},Search:{baseOf:()=>'/test'},Scroll,
+    });
+    actions.act('cursorDown',root);
+    expect(followed[0].slice(0,4)).toEqual(['/test/1.mp3',2,200,'Audio']);
+    actions.act('cursorUp',root);
+    expect(followed[1][0]).toBe('/test/1.html');
+    root.preview.isCompare=true;
+    actions.act('cursorDown',root);
+    expect(moved).toEqual([1,-1]);
+});

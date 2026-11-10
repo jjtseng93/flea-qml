@@ -95,9 +95,7 @@ function act(action, root) {
     case "cursorDown":
     case "cursorUp":
         var direction = action === "cursorDown" ? 1 : -1
-        if (root.preview.isHtml && root.preview.markdownShown && root.preview.markdownShown.shownView === "rendered")
-            root.preview.markdownShown.scrollBy(direction)
-        else if (!root.preview.isCompare) { Filter.moveCursor(root, direction); Marks.follow(root); follow(root) }
+        if (!root.preview.isCompare) { Filter.moveCursor(root, direction); Marks.follow(root); follow(root) }
         return
     case "preview": root.preview.close(); return
     // Space closes every kind now, so playback has its own key; it self-guards, because p reaches

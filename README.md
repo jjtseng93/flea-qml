@@ -229,3 +229,19 @@ The bottom status bar shows the selected item's full name after the count/size.
 With multiple marked items it shows the current cursor item; Trash uses its
 original name. Long names scroll horizontally instead of being elided. Notices
 and errors temporarily take priority over the name.
+
+HTML previews rebuild a passive fragment with Bun's HTMLRewriter: only fixed
+structural/text tags (including nested `div`) are emitted, never source attributes.
+Text's literal angle brackets are escaped; scripts, styles, embedded documents,
+SVG and MathML subtrees are omitted. No source CSS, images or links are loaded.
+The result uses QML RichText with the current theme and local text reflow, rather
+than an external browser screenshot. Source view remains available. HTML reads
+are limited to 1 MiB; larger documents keep the existing plain-text preview path.
+
+`bun test test/html-preview.test.js` tests rebuilding and bounded reads.
+With sibling buninu-browser available,
+`bun test/manual-html-security.mjs` checks adversarial fragments in a live page
+using a harmless script counter, and `bun test/manual-html-ui.mjs` checks the real
+backend/QML preview and scrolling. These are regression checks, not a proof
+against every possible parser discrepancy. Never decode the rebuilt fragment's
+entities before parsing it as HTML.

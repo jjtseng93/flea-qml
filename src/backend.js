@@ -6,6 +6,7 @@
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
+import { html } from "./html.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
@@ -182,7 +183,22 @@ function sort(request) {
 // The `code` job running for each slot.
 const codeJobs = new Map();
 
+const htmlJobs = new Map();
 const handlers = {
+  html: request => {
+    const slot = request.slot ?? "";
+    const job = {};
+    htmlJobs.set(slot, job);
+    html(request).then(reply => {
+      if (htmlJobs.get(slot) !== job) return;
+      htmlJobs.delete(slot);
+      if (reply) send(reply);
+    }).catch(() => {
+      if (htmlJobs.get(slot) !== job) return;
+      htmlJobs.delete(slot);
+      send({t:"html",slot,token:request.token,state:"failed",html:"",total:0});
+    });
+  },
   list,
   sort,
   listpaths,

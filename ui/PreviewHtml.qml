@@ -7,7 +7,8 @@ import "js/Format.js" as Format
 import "js/PreviewKeys.js" as PreviewKeys
 import "js/Scroll.js" as Scroll
 
-// The helper's still image and the shipped code renderer share the frame and its scroll lane.
+// Rebuilt passive HTML and source code share the frame and its scroll lane.
+// The backend supplies only fixed whitelist tags and escaped text; never raw HTML.
 Item {
     id: root
     property bool active: false
@@ -38,6 +39,7 @@ Item {
     property int imageToken: -1
     property int total: 0
     property string imageFile: ""
+    property string safeHtml: ""
     property string pageTitle: ""
     property int renderedWidth: 0
     property real zoom: 1
@@ -46,9 +48,9 @@ Item {
     readonly property var viewport: root.sourceView ? (root.sourceCode ? root.sourceCode.viewport : null) : page
     readonly property Item bodyItem: root.sourceView ? root.sourceCode : page
     readonly property bool failed: root.sourceView ? root.readFailed || (!!root.sourceCode && root.sourceCode.answer === "failed")
-        : root.readFailed || picture.status === Image.Error
+        : root.readFailed
     readonly property bool contentReady: root.sourceView ? !!root.sourceCode && root.sourceCode.settled
-        : !root.pending && picture.status === Image.Ready
+        : !root.pending && root.hasDrawn
     readonly property bool firstScreen: root.failed || root.tooLarge || root.binary
         || (root.sourceView ? !!root.sourceCode && root.sourceCode.firstScreen : root.contentReady)
     readonly property bool loading: root.active && !root.firstScreen && (root.sourceView || !root.hasDrawn)
@@ -114,6 +116,7 @@ Item {
         root.cancel()
         root.hasDrawn = false
         root.imageFile = ""
+        root.safeHtml = ""
         root.total = 0
         root.readFailed = false
         root.zoom = 1
@@ -127,15 +130,14 @@ Item {
         root.schedule()
     }
     onBackendChanged: root.schedule()
-    onDeviceWidthChanged: root.schedule()
-    onDeviceHeightChanged: root.schedule()
+    // Inline text reflows locally; resizing does not reread or rebuild the file.
     onTooLargeChanged: root.schedule()
     Component.onCompleted: { root.sourceBuilt = root.sourceView; root.schedule() }
     Component.onDestruction: {
         root.cancel()
         if (root.sourceCode) root.sourceCode.active = false
     }
-    // Repeated width changes only restart this settle; no helper runs while the frame is being resized.
+    // Settle path/view changes before requesting a bounded read.
     Timer { id: settle; interval: root.settleMs; onTriggered: root.ask() }
     Connections {
         target: root.backend
@@ -145,9 +147,10 @@ Item {
             root.readFailed = message.state !== "ready"
             if (!root.readFailed) {
                 root.total = message.total
-                root.renderedWidth = message.width
+                root.renderedWidth = root.deviceWidth
                 root.pageTitle = message.title || ""
-                root.imageFile = message.file
+                root.safeHtml = message.html || ""
+                root.hasDrawn = true
                 root.imageToken = message.token
             }
         }
@@ -159,23 +162,28 @@ Item {
         clip: true
         visible: !root.sourceView && !root.tooLarge && !root.failed
         contentWidth: Math.max(width, picture.width)
-        contentHeight: picture.height
+        contentHeight: picture.y + picture.height + Theme.spacing.gap
         boundsBehavior: Flickable.StopAtBounds
         property int currentIndex: -1
         function forceLayout() {}
-        Image {
+        Text {
             id: picture
-            width: page.width * root.zoom
-            height: implicitWidth > 0 ? implicitHeight * width / implicitWidth : 0
-            // The helper bounds the whole scrollable page; decoding only the viewport would discard its lower pixels.
-            source: root.imageFile.length > 0 ? Format.fileUri(root.imageFile) + "#t" + root.imageToken : ""
-            fillMode: Image.Stretch
-            asynchronous: true
-            cache: false
-            retainWhileLoading: true
-            onStatusChanged: if (status === Image.Ready) root.hasDrawn = true
+            x: Theme.spacing.gap
+            y: Theme.spacing.gap
+            width: Math.max(0, page.width - 2 * Theme.spacing.gap)
+            height: implicitHeight
+            // Only add our fixed presentation rules to the already sanitized tags.
+            // No source attributes, style sheets or resources are accepted.
+            text: root.safeHtml.replace(/<(h[1-6]|p|pre|blockquote|ul|ol)>/g,
+                '<$1 style="margin-top:0.6em;margin-bottom:0.6em">')
+            textFormat: Text.RichText
+            wrapMode: Text.Wrap
+            color: Theme.color.foreground
+            font.family: Theme.font.family
+            font.pixelSize: (root.compact ? Theme.font.bodySmall : Theme.font.body) * root.zoom
         }
     }
+
     Loader {
         anchors.fill: page
         active: root.active && page.visible && root.cornerRadius > 0 && GraphicsInfo.api !== GraphicsInfo.Software

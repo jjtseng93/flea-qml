@@ -7,6 +7,7 @@ import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
+import { clipHostReply } from "./clip-host.js";
 import { collisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction } from "./menu.js";
 import { trash } from "./trash.js";
@@ -179,6 +180,7 @@ const handlers = {
   clipGet: (request) => clipGet(request, send),
   clipClear: (request) => clipClear(request, send),
   clipWatch: (request) => clipWatch(request, send),
+  clipHostReply,
   // Rows read as paths, the way copy, cut and drag name a selection wider than the client's window.
   paths: (request) => {
     const named = sources(request, listing, stamp, "paths");

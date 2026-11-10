@@ -18,7 +18,12 @@ The repository aims to be self-contained, needing only buninu-browser to run.
 The backend reads no system database; the one system file it reads is Linux's
 mount table, for a folder's filesystem name. For the clipboard it speaks
 Wayland data-control itself, loading only libc (kernel32 on Windows) to pass
-file descriptors. The one program it runs is
+file descriptors. Without a usable Wayland data-control connection, the QML
+frontend uses Quickshell's text clipboard instead (buninu-browser prefers xclip,
+then its existing platform fallbacks). Paste reads it on demand, with no polling.
+File paths keep their POSIX single-quoted form on every platform, including
+Windows; a cut adds `""` at both ends. This is a text representation of the file
+selection, not Android's native file clipboard. The one program it runs is
 [jsmdcui](https://github.com/jjtseng93/jsmdcui), for syntax colours in previews,
 found beside this repository as `../jsmdcui` or on PATH as `jmi` or `jsmdcui`;
 without it previews are plain text. Some interface

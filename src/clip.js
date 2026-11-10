@@ -14,6 +14,7 @@ import { randomBytes } from "node:crypto";
 import { lstatSync } from "node:fs";
 import { isAbsolute, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { HostClipboard } from "./clip-host.js";
 
 export const FLEA = "application/x-flea-clip",
   GNOME = "x-special/gnome-copied-files",
@@ -147,6 +148,8 @@ export function payloads(op, paths, token) {
 // ---- the data-control connection ----
 
 let control = null;
+let connecting = null;
+let hostSend = null;
 
 class DataControl {
   constructor() {
@@ -285,11 +288,19 @@ class DataControl {
 }
 
 async function connect() {
-  if (control && !control.client.closed) return control;
-  const fresh = new DataControl();
-  await fresh.open();
-  control = fresh;
-  return fresh;
+  if (control && (control.hostText || !control.client.closed)) return control;
+  if (connecting) return connecting;
+  connecting = (async () => {
+    const fresh = new DataControl();
+    try { await fresh.open(); control = fresh; }
+    catch (error) {
+      fresh.client?.close();
+      if (!hostSend) throw error;
+      control = new HostClipboard(hostSend, { clipText, parseClipText, none: NONE });
+    }
+    return control;
+  })();
+  try { return await connecting; } finally { connecting = null; }
 }
 
 const NONE = { clip: "none", paths: [], token: "", skipped: 0 };
@@ -297,6 +308,7 @@ const NONE = { clip: "none", paths: [], token: "", skipped: 0 };
 // The selection as files, in upstream's order: Flea's own token, GNOME's list, the uri-list with
 // KDE's cut marker, then the quoted text, which is all that is left once a Flea owner has exited.
 async function snapshot(dc) {
+  if (dc.hostText) return dc.snapshot();
   const selection = dc.selection,
     mimes = selection?.mimes;
   if (!mimes) return NONE;
@@ -369,6 +381,7 @@ export async function clipClear(request, send) {
   const answer = (cleared) => send({ t: "clip", op: "clear", ok: true, cleared });
   try {
     const dc = await connect();
+    if (dc.hostText) return answer(await dc.clearIf(request));
     if (typeof request.token === "string" && request.token) {
       if (dc.owned?.token === request.token) {
         await dc.clear();
@@ -402,6 +415,9 @@ let watching = false;
 // Reports every selection as files; two identical ones in a row report once. A dropped connection
 // reconnects at most once a second, at most 5 times.
 export function clipWatch(_request, send) {
+  // Explicit frontend capability: older/non-QML callers still get ordinary
+  // Wayland errors instead of a request they cannot answer.
+  if (_request.hostText === true) hostSend = send;
   if (watching) return;
   watching = true;
   let last = null,
@@ -425,6 +441,8 @@ export function clipWatch(_request, send) {
       return first ? fail(e.message) : retry(e.message);
     }
     retries = 0;
+    // There is no host watcher or polling. Tell the UI to read on each Paste.
+    if (dc.hostText) return fail("Quickshell clipboard is read on demand");
     const read = async () => {
       const mine = ++sequence;
       try {

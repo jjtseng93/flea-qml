@@ -7,6 +7,7 @@ import "js/FolderSorts.js" as FolderSorts
 import "js/Swap.js" as Swap
 import "js/FleaBin.js" as FleaBin
 import "js/Find.js" as Find
+import "js/HostClipboard.js" as HostClipboard
 
 Item {
     id: root
@@ -656,6 +657,7 @@ Item {
             root.failed("parse", "", "the backend sent a line this build cannot read", 0)
             return
         }
+        if (message.t === "clipHost") { HostClipboard.handle(root, Quickshell, message); return }
         Messages.route(root, message)
     }
 
@@ -684,7 +686,7 @@ Item {
             root.queueing = false
             // Asked once per process: which formats exist cannot change while the backend runs.
             root.askFormats()
-            if (!root.pickerOnly) root.send({ c: "clipWatch" })
+            if (!root.pickerOnly) root.send({ c: "clipWatch", hostText: true })
             for (var i = 0; i < root.pending.length; i++) {
                 child.write(root.pending[i])
             }

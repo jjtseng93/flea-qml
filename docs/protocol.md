@@ -1934,6 +1934,33 @@ cleared; see `clip` below.
 
 ### clipWatch
 
+In flea-qml, the QML frontend sends `{"c":"clipWatch","hostText":true}` to
+advertise its Quickshell clipboard fallback. If Wayland connection/data-control
+initialization fails, the backend uses this bridge for the lifetime of that
+backend. Older callers without the capability keep the ordinary Wayland error.
+The changed/error notification switches Paste to on-demand reads; no host polling
+is introduced. A working Wayland connection keeps its existing MIME offers.
+
+Bridge requests are `{"t":"clipHost","id":N,"op":"read"|"write"|"clear","text":S}`
+(`text` is absent for read). The frontend answers
+`{"c":"clipHostReply","id":N,"ok":true,"text":S}` for reads, an empty success
+for writes, or `cleared:true|false` for compare-and-clear. Failures use `ok:false`
+and `error`. Replies time out after 15 seconds and late/unknown IDs are ignored.
+The frontend serializes operations across panes, with fresh reads on Paste.
+Clear compares the expected text before writing an empty value; external OS
+writers can still race this check because the OS has no atomic compare-and-clear.
+
+The text format remains POSIX-quoted paths separated by spaces; cut adds two
+literal double quotes at **each** end: `""'/path/a' '/path/b'""`. This format is
+unchanged on Windows and is never PowerShell-escaped. Parsing and path validation
+remain in the backend. Non-file text returns `none`; the fallback does not add
+image clipboard support. Browser QS uses awaitable read/write results; native QS
+uses its standard synchronous `clipboardText` property. Browser QS always tries
+the host first, but falls back to its last local text on denied or empty reads,
+matching Land. An external clear is indistinguishable from an Android denied
+empty read; explicitly writing empty text clears the local cache. Host write
+failures still report an error even though the local text remains available.
+
 `{"c":"clipWatch"}`
 
 Starts the clipboard watcher: one thread holding one data-control connection, reporting

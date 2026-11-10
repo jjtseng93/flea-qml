@@ -235,6 +235,13 @@ function menuKinds(pane) {
         && snapshot.selectedKinds.length === picked.length ? snapshot.selectedKinds : kinds(picked)
 }
 
+// QML has no node:path; accept POSIX, drive-rooted and UNC paths. The backend
+// still validates using its own platform's path.isAbsolute and opens the file.
+function absoluteFilePath(path) {
+    return typeof path === "string" && (path.charAt(0) === "/"
+        || /^[A-Za-z]:[\\/]/.test(path) || /^\\\\[^\\]+\\[^\\]+/.test(path))
+}
+
 // The choice uses the menu's validated paths, reordered like the marked indices; unvalidated choices can only use held rows.
 function open(pane, paths) {
     var indices = markedIndices(pane)
@@ -246,7 +253,7 @@ function open(pane, paths) {
     } else {
         paths = targetPaths(pane, indices)
     }
-    if (paths.length !== 2 || paths.some(function (path) { return typeof path !== "string" || path.charAt(0) !== "/" })) return
+    if (paths.length !== 2 || paths.some(function (path) { return !absoluteFilePath(path) })) return
     pane.quickLook().openCompare(paths[0], paths[1], picked[0] ? picked[0].i : "text-x-generic")
 }
 

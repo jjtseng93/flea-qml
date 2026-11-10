@@ -6,6 +6,7 @@
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
+import { compare } from "./compare.js";
 import { html } from "./html.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
@@ -184,7 +185,21 @@ function sort(request) {
 const codeJobs = new Map();
 
 const htmlJobs = new Map();
+let compareJob;
 const handlers = {
+  compare: request => {
+    compareJob?.abort();
+    const job = compareJob = new AbortController();
+    compare(request, {signal:job.signal}).then(reply => {
+      if(compareJob !== job)return;
+      compareJob = null;
+      if(reply)send(reply);
+    }).catch(() => {
+      if(compareJob !== job)return;
+      compareJob = null;
+      send({t:'compare',token:request.token,state:'failed',patch:''});
+    });
+  },
   html: request => {
     const slot = request.slot ?? "";
     const job = {};

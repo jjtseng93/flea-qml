@@ -23,10 +23,11 @@ frontend uses Quickshell's text clipboard instead (buninu-browser prefers xclip,
 then its existing platform fallbacks). Paste reads it on demand, with no polling.
 File paths keep their POSIX single-quoted form on every platform, including
 Windows; a cut adds `""` at both ends. This is a text representation of the file
-selection, not Android's native file clipboard. The one program it runs is
+selection, not Android's native file clipboard. Syntax highlighting runs
 [jsmdcui](https://github.com/jjtseng93/jsmdcui), for syntax colours in previews,
 found beside this repository as `../jsmdcui` or on PATH as `jmi` or `jsmdcui`;
-without it previews are plain text. Some interface
+without it previews are plain text. Compare also runs `diff` through bunmsh or
+a system provider, as described below. Some interface
 code carried over from upstream and Omarchy still asks Linux tools such as
 `hyprctl`, `lsblk` and `fc-match`, and does without them where they are missing.
 
@@ -245,3 +246,18 @@ using a harmless script counter, and `bun test/manual-html-ui.mjs` checks the re
 backend/QML preview and scrolling. These are regression checks, not a proof
 against every possible parser discrepancy. Never decode the rebuilt fragment's
 entities before parsing it as HTML.
+
+
+Compare two marked regular files with **m → Compare**. The backend searches
+for the sibling `../bunmsh/index.js` first, then `bunmsh` on PATH, invoking
+`bunmsh -cc builtin diff` (with Bun before the sibling entry). Finally it tries
+`Bun.which("diff")`. All providers receive `-u --label A --label B -- A B`
+as separate arguments, without shell interpolation. Providers that cannot run
+or lack unified support fall back to the next candidate.
+
+Comparison retains upstream's 1 MiB per-file limit and binary screening, caps
+patch output at 8 MiB, and terminates a diff after 10 seconds. A superseded
+comparison is cancelled and its reply discarded. Requires a bunmsh version
+with unified diff support or a compatible system diff. Test with
+`bun test test/compare.test.js`; with sibling buninu-browser available,
+`bun test/manual-compare-ui.mjs` checks the real backend and Compare view.

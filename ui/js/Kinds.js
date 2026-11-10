@@ -125,8 +125,8 @@ function kindState(icon) {
     if (name.indexOf("audio-") === 0) return AUDIO
     if (name.indexOf("text-") === 0) return TEXT
     // A .doc or .odt shares the office icon with a PDF, and a PDF was already told apart by its
-    // extension. What is left is binary, so it is Unsupported rather than a newline count over a blob.
-    return UNSUPPORTED
+    // extension. Unknown files remain viewable as bounded plain text, including binary bytes.
+    return TEXT
 }
 
 // A directory is not a preview subject: the column shows what is inside it instead.
@@ -152,6 +152,6 @@ function quickLookKind(icon, name, thumbnailed) {
     if (Archive.isArchive(name)) return ARCHIVE
     var byIcon = kindState(icon)
     // A model no thumbnailer serves has nothing to draw, so it takes the generic file pane.
-    if (byIcon === IMAGE && isModel(name) && !thumbnailed) return UNSUPPORTED
+    if (byIcon === IMAGE && isModel(name) && !thumbnailed) return TEXT
     return byIcon === CODE ? TEXT : byIcon
 }

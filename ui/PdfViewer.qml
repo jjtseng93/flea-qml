@@ -273,7 +273,7 @@ Item {
         anchors.centerIn: pageFlick
         width: pageFlick.width - 2 * Theme.spacing.rowPaddingX
         spacing: Theme.spacing.gap
-        visible: root.failed
+        visible: false // Failed previews remain blank.
 
         Flea.Glyph {
             anchors.horizontalCenter: parent.horizontalCenter

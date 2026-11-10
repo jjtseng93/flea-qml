@@ -42,7 +42,7 @@ Item {
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
         y: root.topInset + Math.round((parent.height - root.topInset - height) / 2)
-        visible: root.failed
+        visible: false // A failed preview remains blank.
         text: root.status
         color: Theme.color.muted
         font.family: Theme.font.family

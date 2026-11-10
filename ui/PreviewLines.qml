@@ -9,7 +9,7 @@ Item {
 
     property string path: ""
     property bool active: false
-    property int size: 0
+    property real size: 0
     // Code gets the muted number gutter; plain text does not.
     property bool numbered: false
     // The backend that colours the lines; a bare stub leaves the file's own text drawn plain.
@@ -20,7 +20,7 @@ Item {
     property int maxBytes: 1048576
     // True on network and phone storage, where the backend is never given the path.
     property bool truncate: false
-    readonly property bool overSize: root.size > root.maxBytes
+    readonly property bool overSize: root.fromFile && root.size > root.maxBytes
     // Over the gate by the listing's size, or by the backend's own count when the file grew since.
     readonly property bool tooLarge: root.overSize || root.answer === "large"
     // More than the frame can show is wasted work, so only as many lines as its height holds are ever built into rows.
@@ -29,7 +29,7 @@ Item {
     // The caller reads the file when the backend must not open it, or when it cannot colour it.
     readonly property bool engine: root.backend !== null && typeof root.backend.askCode === "function"
     // A .csv or .tsv draws as a table; every other text or code file keeps the line view.
-    readonly property bool csv: Csv.delimiter(root.path) !== ""
+    readonly property bool csv: root.size <= root.maxBytes && Csv.delimiter(root.path) !== ""
     readonly property bool fromFile: root.truncate || !root.engine
     readonly property string fileText: file.text()
     // The line view, built the first time a text or code file is previewed so a launch that never previews one loads none of it.

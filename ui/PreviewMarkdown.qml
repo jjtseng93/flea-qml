@@ -12,7 +12,7 @@ Item {
 
     property bool active: false
     property string path: ""
-    property int size: 0
+    property real size: 0
     readonly property alias viewport: body
     property bool externalScrollBars: false
     // "rendered" or "source"; anything else reads as rendered. Only the Quick Look's r asks for source.
@@ -666,7 +666,7 @@ Item {
 
     Text {
         anchors.centerIn: parent
-        visible: !root.sourceRefused && (root.tooLarge || root.readFailed || root.parseError !== "")
+        visible: false // Failed previews remain blank.
         text: root.status
         color: Theme.color.muted
         font.family: Theme.font.family

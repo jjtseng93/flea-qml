@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { highlightFile } from "./highlight.js";
 
-// Only this much of a file is ever read; a bigger one answers "large".
+// Bound IO and layout work: large files show their prefix, never a refusal.
 const BYTE_LIMIT = 1 << 20;
 // One reply carries at most this many lines; ui/CodeLines.qml asks a longer window in parts.
 const LINE_CAP = 400;
@@ -22,10 +22,9 @@ function readFile(path) {
     fd = openSync(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     const st = fstatSync(fd);
     if (!st.isFile()) return { state: "failed" };
-    if (st.size > BYTE_LIMIT) return { state: "large" };
-    const bytes = Buffer.alloc(st.size);
+    const bytes = Buffer.alloc(Math.min(st.size, BYTE_LIMIT));
     const read = readSync(fd, bytes, 0, bytes.length, 0);
-    return { bytes: bytes.subarray(0, read) };
+    return { bytes: bytes.subarray(0, read), truncated: st.size > BYTE_LIMIT };
   } catch {
     return { state: "failed" };
   } finally {
@@ -58,18 +57,29 @@ async function coloured(request, bytes, signal) {
 /** The reply to one `code` request; `signal` ends it when a newer request takes its slot. */
 export async function code(request, signal) {
   const head = { t: "code", token: request.token ?? 0, slot: request.slot ?? "" };
-  const source = typeof request.text === "string" ? { bytes: Buffer.from(request.text) } : readFile(request.path ?? "");
+  const source = typeof request.text === "string" ? { bytes: Buffer.from(request.text.slice(0,BYTE_LIMIT)).subarray(0,BYTE_LIMIT), truncated: Buffer.byteLength(request.text) > BYTE_LIMIT } : readFile(request.path ?? "");
   if (!source.bytes) return { ...head, state: source.state, first: request.first ?? 1, total: 0, lines: [] };
   const bytes = source.bytes;
-  // A NUL in the first 1 KiB makes it binary, which is shown as such rather than as text.
-  if (bytes.subarray(0, 1024).includes(0)) return { ...head, state: "binary", first: request.first ?? 1, total: 0, lines: [] };
-  const all = bytes.toString("utf8").split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
+  // Binary bytes remain viewable. Visible control pictures cannot execute terminal
+  // escapes, and splitting pathological lines bounds each QML text layout.
+  const decoded = bytes.toString("utf8");
+  const binary = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(decoded);
+  const safe = decoded.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, ch => ch === "\x7f" ? "␡" : String.fromCharCode(0x2400 + ch.charCodeAt(0)));
+  let split = false;
+  const all = [];
+  for (let line of safe.split("\n")) {
+    if (line.endsWith("\r")) line = line.slice(0,-1);
+    while (line.length > 4096) { all.push(line.slice(0,4096));line=line.slice(4096);split=true; }
+    all.push(line);
+  }
   // A final newline ends the last line rather than starting another.
   if (all.length > 1 && all.at(-1) === "") all.pop();
+  if (source.truncated) all.push("[Preview truncated: first 1 MiB]");
+  if (split) all.push("[Long lines split for preview]");
   const total = bytes.length === 0 ? 0 : all.length;
   const first = Math.max(1, request.first ?? 1),
     count = Math.min(LINE_CAP, Math.max(0, request.count ?? LINE_CAP));
-  const colours = await coloured(request, bytes, signal);
+  const colours = source.truncated || binary || split ? null : await coloured(request, bytes, signal);
   if (signal?.aborted) return null;
   let styled = false;
   const lines = all.slice(first - 1, first - 1 + count).map((line, i) => {

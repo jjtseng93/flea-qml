@@ -28,7 +28,7 @@ Item {
     property string path: ""
     property string iconName: ""
     property string kindName: ""
-    property int size: 0
+    property real size: 0
     property string kind: ""
     readonly property bool isMedia: root.kind === "audio" || root.kind === "video"
     readonly property bool isPdf: root.kind === "pdf"
@@ -37,8 +37,8 @@ Item {
     readonly property bool isFont: root.kind === "font"
     readonly property bool fontFailed: root.isFont && fontLoader.item !== null && fontLoader.item.failed
     // RenderedPreviews: a Markdown file keeps the text kind and draws its own bar and pane.
-    readonly property bool isMarkdown: root.kind === "text" && Kinds.isMarkdown(root.path)
-    readonly property bool isHtml: root.kind === "text" && Kinds.isHtml(root.path)
+    readonly property bool isMarkdown: root.kind === "text" && root.size <= ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "") && Kinds.isMarkdown(root.path)
+    readonly property bool isHtml: root.kind === "text" && root.size <= ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "") && Kinds.isHtml(root.path)
     readonly property bool isDocument: root.isMarkdown || root.isHtml
     // Code and plain text share ui/PreviewText.qml; every text kind draws the Quick Look bar.
     readonly property bool isCodeText: root.kind === "text" && !root.isDocument
@@ -920,7 +920,7 @@ Item {
                 anchors.centerIn: parent
                 width: parent.width - 2 * Theme.spacing.rowPaddingX
                 spacing: Theme.spacing.gap
-                visible: root.kind === "unsupported" || root.archiveFailed || root.fontFailed
+                visible: false // Unavailable non-text previews remain blank.
 
                 Flea.Glyph {
                     anchors.horizontalCenter: parent.horizontalCenter

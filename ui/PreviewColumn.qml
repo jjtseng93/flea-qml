@@ -85,8 +85,8 @@ Item {
     readonly property bool tallRow: root.previewState !== Facts.MULTI && Facts.tall(root.rowState)
     // Document rows always render in the tall column frame, independently of Quick Look.
     readonly property bool isMarkdownRow: root.rowState === Facts.TEXT && root.row !== null
-        && Kinds.isMarkdown(root.row.n)
-    readonly property bool isHtmlRow: root.rowState === Facts.CODE && root.row !== null && Kinds.isHtml(root.row.n)
+        && root.row.s <= root.textLimit && Kinds.isMarkdown(root.row.n)
+    readonly property bool isHtmlRow: root.rowState === Facts.CODE && root.row !== null && root.row.s <= root.textLimit && Kinds.isHtml(root.row.n)
     readonly property bool isDocumentRow: root.isMarkdownRow || root.isHtmlRow
     // The document pane stays null without a document row, so every reader guards the loader item.
     readonly property var markdown: markdownLoader.item
@@ -334,7 +334,7 @@ Item {
             // embedded thumbnail is the frame's own picture, so Unsupported says "no preview" only when there is none.
             Column {
                 anchors.centerIn: parent
-                visible: root.previewState === Facts.ERROR || (root.previewState === Facts.UNSUPPORTED && !root.thumbShown)
+                visible: false // Unavailable previews must not cover the content.
                 spacing: Theme.spacing.gap
 
                 Flea.Glyph {
@@ -533,26 +533,7 @@ Item {
     // Why the frame is showing a mark instead of the thing it meant to draw. Empty for every state
     // whose mark is simply what it draws, so the line only ever appears when something went wrong.
     function frameNote() {
-        if (root.isHtmlRow && root.markdown) {
-            if (root.markdown.binary) return "binary file"
-            if (root.markdown.tooLarge) return "too large to preview"
-        }
-        if (lines.note.length > 0) return lines.note
-        if (root.manualHold) {
-            return KeyName.hinted("%1 loads it", "loadPreview")
-        }
-        if (root.wantsThumb && root.thumb.length > 0 && !root.thumbDrawn) {
-            return "thumbnail unavailable"
-        }
-        // A mark with no line reads as a finished preview, which is how a whole network mount looked
-        // like it held no pictures while its audio, whose mark is its finished state, looked fine.
-        if (root.wantsThumb && root.noThumbComing && root.picturesFromThumb && !root.thumbDrawn) {
-            return "no preview could be made"
-        }
-        if ((root.previewState === Facts.TEXT || root.previewState === Facts.CODE) && lines.tooLarge) {
-            return "too large to preview"
-        }
-        return ""
+        return root.manualHold ? KeyName.hinted("%1 loads it", "loadPreview") : ""
     }
 
     function frameGlyph() {

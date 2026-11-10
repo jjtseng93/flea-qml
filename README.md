@@ -174,3 +174,32 @@ kept, followed by Dr. John's (醫者小智) for this fork.
 The tree also carries Omarchy's QML modules, Lucide icon geometry, MathJax,
 Pele, and simple-icons and markdown-mark logos, each under its own licence;
 see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+### Preview fallback and syntax audit
+
+Unknown file types are previewed as text. Local text previews read at most the
+first 1 MiB, replace binary control bytes with visible control pictures, and split
+lines longer than 4096 characters to bound text layout work. Large files and binary
+content use plain text; a notice in the preview indicates truncation or line splitting.
+Failed image, media, or document previews leave the content area blank.
+
+To audit syntax colours using a jsmdcui checkout (HTML is excluded):
+
+```sh
+bun test/manual-syntax-preview.mjs ../jsmdcui
+```
+
+The script discovers `runtime/syntax/*.yaml`, uses that checkout's
+`tests/syntax-parity/samples`, and runs four jobs at a time. It checks explicit
+language highlighting separately from Flea's automatic file preview. The detailed
+report is `flea-syntax-results.json` in the system temporary directory.
+
+The current 158 definitions contain three HTML variants, which are skipped.
+All remaining 155 produce colour with an explicit filetype; 149 have verified
+automatically selected, coloured Flea text previews. Markdown normally uses a
+rendered document instead of source colouring. `default`, V and Jinja2 have no
+filename detector; Objective-C shares extensions with other languages; Privoxy's
+config detector requires a directory although jsmdcui matches the basename.
+These are detection limitations, not missing colour rules. The lexical samples
+prove colour reaches the preview backend, not exhaustive syntax correctness or a
+visual check of every language.

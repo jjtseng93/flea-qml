@@ -11,7 +11,7 @@ Item {
 
     property bool active: false
     property string path: ""
-    property int size: 0
+    property real size: 0
 
     // Past this size the pane draws the too-large frame; remote storage sets 256 KiB, the most FileView reads whole into memory here.
     property int maxBytes: 1048576
@@ -36,10 +36,10 @@ Item {
     readonly property bool engine: root.backend !== null && typeof root.backend.askCode === "function"
     readonly property bool fromFile: root.truncate || !root.engine
     // A .csv or .tsv is drawn as a table in place of the line view.
-    readonly property bool csv: Csv.delimiter(root.path) !== ""
+    readonly property bool csv: root.size <= root.maxBytes && Csv.delimiter(root.path) !== ""
     readonly property var body: root.csv ? csvLoader.item : lines
     // Over the gate by the listing's size, or by the backend's own count when the file grew since.
-    readonly property bool tooLarge: root.size > root.maxBytes || (root.body !== null && root.body.answer === "large")
+    readonly property bool tooLarge: (root.fromFile && root.size > root.maxBytes) || (root.body !== null && root.body.answer === "large")
     property bool readFailed: false
     readonly property bool failed: root.readFailed || (root.body !== null && root.body.answer === "failed")
     readonly property bool binary: root.body !== null && root.body.answer === "binary"
@@ -102,7 +102,7 @@ Item {
         path: root.path
         fromText: root.fromFile
         text: root.fromFile && file.loaded ? file.text() : null
-        active: root.active && root.size <= root.maxBytes && !root.csv
+        active: root.active && !root.tooLarge && !root.csv
         numbered: root.numbered
         wrap: root.wrap
         scrolls: true
@@ -138,6 +138,7 @@ Item {
     }
 
     Flea.CodeRefusal {
+        visible: false // Failed previews remain blank.
         anchors.fill: parent
         topInset: bar.height
         binary: root.binary

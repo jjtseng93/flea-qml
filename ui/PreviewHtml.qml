@@ -12,7 +12,7 @@ Item {
     id: root
     property bool active: false
     property string path: ""
-    property int size: 0
+    property real size: 0
     readonly property int byteCeiling: 1048576
     readonly property int settleMs: 160
     property int maxBytes: byteCeiling
@@ -221,5 +221,5 @@ Item {
         sourceComponent: Flea.ViewportScrollBars { flickable: parent.targetView }
     }
     Flea.LoadingState { anchors.fill: parent; visible: root.loading }
-    Flea.CodeRefusal { anchors.fill: parent; visible: !root.compact; binary: root.binary; failed: root.failed; tooLarge: root.tooLarge; markName: "html" }
+    Flea.CodeRefusal { anchors.fill: parent; visible: false; binary: root.binary; failed: root.failed; tooLarge: root.tooLarge; markName: "html" }
 }

@@ -29,7 +29,7 @@ Item {
     // The caller reads the file when the backend must not open it, or when it cannot colour it.
     readonly property bool engine: root.backend !== null && typeof root.backend.askCode === "function"
     // A .csv or .tsv draws as a table; every other text or code file keeps the line view.
-    readonly property bool csv: root.size <= root.maxBytes && Csv.delimiter(root.path) !== ""
+    readonly property bool csv: Csv.tabular(root.path, root.size, root.maxBytes, root.fromFile)
     readonly property bool fromFile: root.truncate || !root.engine
     readonly property string fileText: file.text()
     // The line view, built the first time a text or code file is previewed so a launch that never previews one loads none of it.

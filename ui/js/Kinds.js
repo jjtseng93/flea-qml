@@ -56,6 +56,13 @@ function isMarkdown(name) {
 
 function isHtml(name) { return /\.(html|htm)$/i.test(String(name)) }
 
+// The office documents src/office.js converts: a document or a deck draws in the HTML pane, a workbook's first sheet in the CSV table.
+// Sample input: "Report.DOCX" and "talk.odp" are documents, "budget.xlsx" is a sheet, "old.doc" is neither.
+function isOfficeDocument(name) { return /\.(docx|docm|odt|pptx|pptm|odp)$/i.test(String(name)) }
+function isOfficeSheet(name) { return /\.(xlsx|xlsm|ods)$/i.test(String(name)) }
+// src/office.js's own OFFICE_LIMIT: the container is a zip of compressed XML and pictures, so the text gate does not apply to it.
+var OFFICE_LIMIT = 67108864
+
 // TrueType, OpenType and collections (font/ttf, font/otf, font/collection); the backend checks the MIME type again.
 var FONT_EXTENSIONS = [".ttf", ".otf", ".ttc"]
 

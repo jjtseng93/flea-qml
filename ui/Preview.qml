@@ -38,7 +38,10 @@ Item {
     readonly property bool fontFailed: root.isFont && fontLoader.item !== null && fontLoader.item.failed
     // RenderedPreviews: a Markdown file keeps the text kind and draws its own bar and pane.
     readonly property bool isMarkdown: root.kind === "text" && root.size <= ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "") && Kinds.isMarkdown(root.path)
-    readonly property bool isHtml: root.kind === "text" && root.size <= ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "") && Kinds.isHtml(root.path)
+    // An office document is converted by the backend, so it needs local storage and has its own size gate.
+    readonly property bool isOffice: root.kind === "text" && root.size <= Kinds.OFFICE_LIMIT && Kinds.isOfficeDocument(root.path)
+        && !(root.pane && (root.pane.storageClass === "network" || root.pane.storageClass === "phone"))
+    readonly property bool isHtml: root.isOffice || (root.kind === "text" && root.size <= ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "") && Kinds.isHtml(root.path))
     readonly property bool isDocument: root.isMarkdown || root.isHtml
     // Code and plain text share ui/PreviewText.qml; every text kind draws the Quick Look bar.
     readonly property bool isCodeText: root.kind === "text" && !root.isDocument
@@ -802,7 +805,7 @@ Item {
                     item.size = Qt.binding(function () { return root.size })
                     item.view = Qt.binding(function () { return root.markdownSource ? "source" : "rendered" })
                     item.maxBytes = Qt.binding(function () {
-                        return ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "")
+                        return root.isOffice ? Kinds.OFFICE_LIMIT : ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "")
                     })
                     item.truncate = Qt.binding(function () {
                         return root.pane ? (root.pane.storageClass === "network"

@@ -36,7 +36,7 @@ Item {
     readonly property bool engine: root.backend !== null && typeof root.backend.askCode === "function"
     readonly property bool fromFile: root.truncate || !root.engine
     // A .csv or .tsv is drawn as a table in place of the line view.
-    readonly property bool csv: root.size <= root.maxBytes && Csv.delimiter(root.path) !== ""
+    readonly property bool csv: Csv.tabular(root.path, root.size, root.maxBytes, root.fromFile)
     readonly property var body: root.csv ? csvLoader.item : lines
     // Over the gate by the listing's size, or by the backend's own count when the file grew since.
     readonly property bool tooLarge: (root.fromFile && root.size > root.maxBytes) || (root.body !== null && root.body.answer === "large")

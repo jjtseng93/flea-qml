@@ -86,7 +86,10 @@ Item {
     // Document rows always render in the tall column frame, independently of Quick Look.
     readonly property bool isMarkdownRow: root.rowState === Facts.TEXT && root.row !== null
         && root.row.s <= root.textLimit && Kinds.isMarkdown(root.row.n)
-    readonly property bool isHtmlRow: root.rowState === Facts.CODE && root.row !== null && root.row.s <= root.textLimit && Kinds.isHtml(root.row.n)
+    // An office document is converted by the backend, so it needs local storage and has its own size gate.
+    readonly property bool isOfficeRow: root.rowState === Facts.TEXT && root.row !== null && !root.truncateText
+        && root.row.s <= Kinds.OFFICE_LIMIT && Kinds.isOfficeDocument(root.row.n)
+    readonly property bool isHtmlRow: root.isOfficeRow || (root.rowState === Facts.CODE && root.row !== null && root.row.s <= root.textLimit && Kinds.isHtml(root.row.n))
     readonly property bool isDocumentRow: root.isMarkdownRow || root.isHtmlRow
     // The document pane stays null without a document row, so every reader guards the loader item.
     readonly property var markdown: markdownLoader.item
@@ -271,7 +274,7 @@ Item {
                 onLoaded: {
                     item.path = Qt.binding(function () { return root.path })
                     item.size = Qt.binding(function () { return root.row ? root.row.s : 0 })
-                    item.maxBytes = Qt.binding(function () { return root.textLimit })
+                    item.maxBytes = Qt.binding(function () { return root.isOfficeRow ? Kinds.OFFICE_LIMIT : root.textLimit })
                     item.active = Qt.binding(function () { return root.markdownActive })
                     item.truncate = Qt.binding(function () { return root.truncateText })
                     item.compact = true

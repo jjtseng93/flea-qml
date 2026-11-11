@@ -13,7 +13,21 @@ function delimiter(path) {
     if (dot < 0)
         return ""
     var ext = name.substring(dot + 1).toLowerCase()
+    if (isSheet(name))
+        return ","
     return ext === "csv" ? "," : ext === "tsv" ? "\t" : ""
+}
+
+// A workbook the backend answers as the CSV of its first sheet (src/office.js). Sample input: "budget.xlsx" and "Plan.ODS" are true, "bench.csv" is false.
+function isSheet(path) {
+    return /\.(xlsx|xlsm|ods)$/i.test(String(path))
+}
+
+// Whether a path draws as a table: a CSV or TSV under the text gate, or a workbook when the backend reads it (its own bytes are a zip, never a table).
+function tabular(path, size, maxBytes, fromFile) {
+    if (delimiter(path) === "")
+        return false
+    return isSheet(path) ? !fromFile : size <= maxBytes
 }
 
 // Records of whole lines, each {cells, span, open}. Sample input: ["h", "1,\"two", "lines\""] with "," gives two records.

@@ -6,7 +6,7 @@
 // cannot be sought through, so it is inflated as a stream and its member data dropped as it passes.
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { Readable } from "node:stream";
-import { createGunzip, createZstdDecompress } from "node:zlib";
+import { createGunzip, createZstdDecompress, inflateRawSync } from "node:zlib";
 
 const BLOCK = 512;
 const MAX_RECORD = 1024 * 1024;
@@ -255,7 +255,9 @@ function scanZip(reader, visit) {
       nameLength = central.readUInt16LE(offset + 28),
       extraLength = central.readUInt16LE(offset + 30),
       commentLength = central.readUInt16LE(offset + 32);
-    let size = central.readUInt32LE(offset + 24);
+    let size = central.readUInt32LE(offset + 24),
+      compressed = central.readUInt32LE(offset + 20),
+      local = central.readUInt32LE(offset + 42);
     // Info-ZIP writes UTF-8 names without the 0x800 flag, so a name that decodes as UTF-8 is read
     // as UTF-8 and only the rest as the old code page's stand-in, latin1.
     const raw = central.subarray(offset + 46, offset + 46 + nameLength);
@@ -271,13 +273,25 @@ function scanZip(reader, visit) {
       const id = extra.readUInt16LE(position),
         length = extra.readUInt16LE(position + 2);
       if (length > extra.length - position - 4) throw new Error("truncated zip extra field");
-      if (id === 0x0001 && size === 0xffffffff) {
-        if (length < 8) throw new Error("truncated zip64 size");
-        size = checkedSize(Number(extra.readBigUInt64LE(position + 4)));
+      if (id === 0x0001) {
+        // Only the fields that overflowed are present, in this order.
+        let at = position + 4;
+        const end = position + 4 + length;
+        const next = () => {
+          if (end - at < 8) throw new Error("truncated zip64 size");
+          const value = checkedSize(Number(extra.readBigUInt64LE(at)));
+          at += 8;
+          return value;
+        };
+        if (size === 0xffffffff) size = next();
+        if (compressed === 0xffffffff) compressed = next();
+        if (local === 0xffffffff) local = next();
       }
       position += 4 + length;
     }
-    visit({ name: name.replace(/\/$/, ""), dir: name.endsWith("/"), size });
+    // The second argument is what reading the member's bytes needs (openZip); a listing ignores it.
+    visit({ name: name.replace(/\/$/, ""), dir: name.endsWith("/"), size },
+      { method: central.readUInt16LE(offset + 10), encrypted: (flags & 1) === 1, compressed, local });
     positionInDirectory += length;
   }
 }
@@ -314,5 +328,46 @@ export async function listArchive(path, name, visit) {
     return await streamTar(fd, st.size, kind === "tgz" ? createGunzip() : createZstdDecompress(), visit);
   } finally {
     closeSync(fd);
+  }
+}
+
+// ---- zip members (src/office.js) ----
+
+/** A zip opened for reading single members: `names` in directory order, `sizes` by name, and
+ * `read(name, cap)`, which answers the member's bytes, null for a name the zip does not hold, and
+ * throws for a member over `cap`, encrypted, or stored by a method other than store and deflate.
+ * `close()` releases the descriptor. */
+export function openZip(path) {
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile()) throw new Error("not a file");
+    const reader = fileReader(fd, st.size),
+      entries = new Map();
+    scanZip(reader, (entry, raw) => {
+      if (!entry.dir && !entries.has(entry.name)) entries.set(entry.name, { size: entry.size, ...raw });
+    });
+    return {
+      names: [...entries.keys()],
+      sizes: new Map([...entries].map(([name, entry]) => [name, entry.size])),
+      read(name, cap) {
+        const entry = entries.get(name);
+        if (!entry) return null;
+        if (entry.encrypted) throw new Error("encrypted zip member");
+        if (entry.size > cap) throw new Error("zip member too large");
+        const header = reader.read(entry.local, 30);
+        if (header.length < 30 || header.readUInt32LE(0) !== 0x04034b50) throw new Error("bad local header");
+        const data = reader.read(entry.local + 30 + header.readUInt16LE(26) + header.readUInt16LE(28), entry.compressed);
+        if (data.length !== entry.compressed) throw new Error("truncated zip member");
+        if (entry.method === 0) return data;
+        if (entry.method !== 8) throw new Error("unsupported zip method");
+        // The cap bounds the inflated bytes too, whatever size the directory claims.
+        return inflateRawSync(data, { maxOutputLength: Math.max(1, cap) });
+      },
+      close: () => closeSync(fd),
+    };
+  } catch (error) {
+    closeSync(fd);
+    throw error;
   }
 }

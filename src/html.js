@@ -1,5 +1,6 @@
 // Rebuild a passive fragment. Never use HTMLRewriter's transformed source output.
 import { open, constants } from 'node:fs/promises';
+import { officeKind, officePreview } from './office.js';
 export const HTML_TAGS = new Set('div h1 h2 h3 h4 h5 h6 p br b strong i em u s del pre code ul ol li blockquote table thead tbody tr th td hr sub sup'.split(' '));
 const OMIT = new Set('script style iframe object embed template svg math noembed noframes head'.split(' '));
 export const HTML_LIMIT = 1 << 20;
@@ -23,6 +24,15 @@ export function previewHtml(source) {
 export async function html(request) {
   const answer = {t:'html', slot:request.slot, token:request.token, state:'failed', html:'', total:0};
   if (request.cancel) return null;
+  // A document or a deck is converted to the same fixed tags (src/office.js) and rebuilt like any
+  // other source, so nothing reaches the page that an HTML file could not put there.
+  const kind = officeKind(request.path);
+  if (kind === 'document' || kind === 'slides') {
+    try {
+      const preview = officePreview(request.path);
+      return {...answer,state:'ready',html:previewHtml(preview.html),total:preview.text.split('\n').filter(Boolean).length};
+    } catch { return answer; }
+  }
   let file;
   try {
     file = await open(request.path, constants.O_RDONLY | constants.O_NONBLOCK);

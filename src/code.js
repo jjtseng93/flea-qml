@@ -1,12 +1,13 @@
 // The `code` line: a window of a file's or a text's lines for the preview (docs/protocol.md
 // "code"). Lines are coloured by jsmdcui when it can be found (src/highlight.js) and answered
 // plain otherwise. Upstream: src/backend/code.rs, which runs `bat`.
-// Not done yet: jq formatting of one-line JSON, raw CSV record windows.
+// Not done yet: jq formatting of one-line JSON.
 import { closeSync, fstatSync, mkdtempSync, openSync, readSync, rmSync, statSync, writeFileSync, constants } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { highlightFile } from "./highlight.js";
 import { previewLanguage } from "./preview-language.js";
+import { officeKind, officePreview } from "./office.js";
 
 // Bound IO and layout work: large files show their prefix, never a refusal.
 const BYTE_LIMIT = 1 << 20;
@@ -16,7 +17,19 @@ const LINE_CAP = 400;
 // be the file's; Markdown is answered plain.
 const RENDERED = /\.(md|markdown|mkd)$/i;
 
+// An office document's lines are its extracted text, or its first sheet as CSV (src/office.js);
+// the container's own bytes are a zip and are never shown.
+function readOffice(path) {
+  try {
+    const bytes = Buffer.from(officePreview(path).text);
+    return { bytes: bytes.subarray(0, BYTE_LIMIT), truncated: bytes.length > BYTE_LIMIT, plain: true };
+  } catch {
+    return { state: "failed" };
+  }
+}
+
 function readFile(path) {
+  if (officeKind(path)) return readOffice(path);
   let fd;
   try {
     if (!statSync(path).isFile()) return { state: "failed" };
@@ -55,6 +68,60 @@ async function coloured(request, bytes, signal) {
   }
 }
 
+// The line each RFC 4180 record starts on (0-based), for a raw `csv` table request: a quote opens
+// only at a field's start, `""` is a quote inside quotes, and a line that ends inside quotes
+// carries its record onto the next one. An unterminated quote runs to the end as one record.
+function recordStarts(lines, delimiter) {
+  const starts = [];
+  let quoted = false;
+  for (let index = 0; index < lines.length; index++) {
+    if (!quoted) starts.push(index);
+    const line = lines[index];
+    let fieldStart = !quoted;
+    for (let at = 0; at < line.length; at++) {
+      const ch = line[at];
+      if (quoted) {
+        if (ch !== '"') continue;
+        if (line[at + 1] === '"') at++;
+        else quoted = false;
+      } else if (ch === '"' && fieldStart) {
+        quoted = true;
+        fieldStart = false;
+      } else fieldStart = ch === delimiter;
+    }
+  }
+  return starts;
+}
+
+// The window of a raw `csv` request, as whole records (docs/protocol.md "code").
+function recordWindow(all, request, count) {
+  const starts = recordStarts(all, request.csv);
+  const records = starts.length;
+  // The record holding a line: the last start at or before it.
+  const holding = (line) => {
+    let low = 0, high = starts.length - 1;
+    while (low < high) {
+      const middle = (low + high + 1) >> 1;
+      if (starts[middle] <= line) low = middle;
+      else high = middle - 1;
+    }
+    return low;
+  };
+  let record;
+  if (Number.isFinite(request.record)) {
+    record = Math.max(1, Math.floor(request.record)) - 1;
+    if (record >= records) return { from: all.length, to: all.length, records, firstRecord: record + 1 };
+  } else {
+    const line = Math.max(1, request.first ?? 1) - 1;
+    if (line >= all.length) return { from: all.length, to: all.length, records, firstRecord: records + 1 };
+    record = holding(line);
+  }
+  const from = starts[record];
+  const last = holding(Math.min(all.length - 1, from + Math.max(1, count) - 1));
+  const to = last + 1 < starts.length ? starts[last + 1] : all.length;
+  return { from, to, records, firstRecord: record + 1 };
+}
+
 /** The reply to one `code` request; `signal` ends it when a newer request takes its slot. */
 export async function code(request, signal) {
   const head = { t: "code", token: request.token ?? 0, slot: request.slot ?? "" };
@@ -80,7 +147,12 @@ export async function code(request, signal) {
   const total = bytes.length === 0 ? 0 : all.length;
   const first = Math.max(1, request.first ?? 1),
     count = Math.min(LINE_CAP, Math.max(0, request.count ?? LINE_CAP));
-  const colours = source.truncated || binary || split ? null : await coloured(request, bytes, signal);
+  if (request.raw === true && (request.csv === "," || request.csv === "\t")) {
+    if (total === 0) return { ...head, state: "plain", first: 1, total, lines: [], records: 0, firstRecord: Math.max(1, Math.floor(request.record ?? 1) || 1) };
+    const window = recordWindow(all, request, count);
+    return { ...head, state: "plain", first: window.from + 1, total, lines: all.slice(window.from, window.to).map(plain), records: window.records, firstRecord: window.firstRecord };
+  }
+  const colours = source.truncated || source.plain || binary || split ? null : await coloured(request, bytes, signal);
   if (signal?.aborted) return null;
   let styled = false;
   const lines = all.slice(first - 1, first - 1 + count).map((line, i) => {

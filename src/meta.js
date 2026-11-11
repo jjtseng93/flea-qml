@@ -5,6 +5,7 @@
 import { closeSync, fstatSync, lstatSync, openSync, readSync, readlinkSync, statSync, constants } from "node:fs";
 import { join } from "node:path";
 import { listArchive } from "./archive.js";
+import { officeKind, officePreview } from "./office.js";
 
 // A line count stops here and says it is a floor (`partial`).
 const LINE_BUDGET = 1 << 20;
@@ -65,6 +66,16 @@ function imageSize(b) {
 }
 
 function countLines(path, meta) {
+  // An office document counts the lines its preview shows, not the newlines in its zip.
+  if (officeKind(path)) {
+    try {
+      const text = officePreview(path).text;
+      for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", at + 1)) meta.lines++;
+    } catch {
+      meta.lfailed = true;
+    }
+    return;
+  }
   const file = head(path, LINE_BUDGET);
   if (!file) {
     meta.lfailed = true;

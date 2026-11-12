@@ -1,18 +1,13 @@
 # flea-qml
 
-A fork of [Flea](https://github.com/thisisgm/flea) by GM (thisisgm), the
-fast, keyboard-first file manager for Omarchy.
+Flea QML is a cross-platform file manager written in Bun JavaScript & QML. It's an unofficial fork of [Flea](https://github.com/thisisgm/flea), the fast GUI file manager for Omarchy
 
 > **Preserve the experience, simplify the implementation, extend the capabilities.**
 
-- **Preserve the experience**: Flea's QML interface, its views, keys, cards,
-  previews and wording, carried over as it is.
-- **Simplify the implementation**: replace the Rust backend with JavaScript
-  that speaks the same line protocol, so the whole program is QML and JS.
+- **Preserve the experience**: Flea's QML interface, its views, keys, cards, previews and wording, carried over
+- **Simplify the implementation**: replace the Rust backend with Bun JavaScript, so the build step isn't mandatory anymore
 - **Extend the capabilities**: run across platforms, on Windows, Linux and
-  Android, wherever a QML runtime and a JS engine do, including
-  [buninu-browser](https://github.com/jjtseng93/buninu-browser)'s QML
-  frontend.
+  Android, wherever a QML runtime and a JS engine do, including [buninu-browser](https://github.com/jjtseng93/buninu-browser)'s QML frontend.
 
 The repository aims to be self-contained, needing only buninu-browser to run.
 The backend reads no system database; the one system file it reads is Linux's
@@ -74,7 +69,8 @@ checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p 
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
 `meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`,
-`transfer`, `transfercancel`, `trash`, `trashbrowse`, `menuaction` (selection snapshots and permanent-delete confirmation) and `quit`, and `flea --ui-state`, which keeps
+`transfer`, `transfercancel`, `trash`, `trashbrowse`, `menuaction` (selection snapshots and permanent-delete confirmation),
+`mkdir`, `newfile`, `duplicate`, `bulkrename`, `permissions`, `permissionsBatch`, `formats`, `archive` and `quit`, and `flea --ui-state`, which keeps
 `~/.local/state/flea/ui.json` the way upstream does. A transfer copies and moves
 files, folders and links and answers keep, skip and refuse; it has no undo yet,
 and refuses replace (it needs the Trash), merge and special files. Other requests and `flea`
@@ -84,7 +80,23 @@ Setting `FLEA_BIN` to upstream's `flea` binary uses it instead, for what is
 not ported yet.
 
 Archive previews list ZIP, tar, tar.gz/tgz and tar.zst/tzst without loading the
-whole archive into memory. Compressed tar member data is streamed and discarded;
+whole archive into memory.
+
+Compress writes `.zip`, `.tar`, `.tar.gz` and `.tar.zst`, and Extract reads the
+same four, in JavaScript with `node:zlib`; no `bsdtar` or `7z` runs. Both stream
+member data, work under a hidden `.flea-work-*` name beside the result and publish
+it under the first free name (`pack.zip`, `pack copy.zip`, ...), so a failed or
+cancelled run leaves nothing under a real name. Extraction refuses absolute and
+`..` member names and any member that would be written through a link, applies the
+umask to stored modes, and copies a tar hard-link member's bytes instead of
+linking. Passwords, `.7z`, `.rar`, `.tar.xz`, `.tar.bz2`, packages and the
+free-space check are not ported; those are refused with a sentence.
+
+New folder, New file, Duplicate, Bulk rename and Permissions follow upstream's
+rules: names are bare (no separator or NUL), creations are exclusive, a bulk rename
+is checked whole before anything moves and swaps through temporary names, and a
+permissions batch changes every item or puts back what it changed. None of these
+is in an undo journal yet. File tags (`settags`, `tagstates`) are not ported. Compressed tar member data is streamed and discarded;
 metadata records over 1 MiB and malformed or truncated archives are rejected.
 Keyboard hints are enabled by default; an explicitly saved disabled setting is
 preserved.

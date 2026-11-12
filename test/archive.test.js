@@ -30,11 +30,15 @@ test('cap extended metadata before allocation',async()=>{
   await expect(read(gzipSync(header('extended','10000000','x')),'tgz')).rejects.toThrow('too large');
 });
 test('reject partial trailing block',async()=>{await expect(read(Buffer.concat([valid,Buffer.from('bad')]))).rejects.toThrow();});
+// One stored member: its local header and bytes, then the central directory and its end record.
+const ZIP_CENTRAL=30+'hello'.length+3;
 function zip(name='hello',size=3) {
-  const h=Buffer.alloc(46); h.writeUInt32LE(0x02014b50); h.writeUInt32LE(size,24); h.writeUInt16LE(name.length,28);
+  const l=Buffer.alloc(30); l.writeUInt32LE(0x04034b50); l.writeUInt32LE(size,18); l.writeUInt32LE(size,22); l.writeUInt16LE(name.length,26);
+  const local=Buffer.concat([l,Buffer.from(name),Buffer.alloc(size,0x61)]);
+  const h=Buffer.alloc(46); h.writeUInt32LE(0x02014b50); h.writeUInt32LE(size,20); h.writeUInt32LE(size,24); h.writeUInt16LE(name.length,28);
   const c=Buffer.concat([h,Buffer.from(name)]), e=Buffer.alloc(22);
-  e.writeUInt32LE(0x06054b50);e.writeUInt16LE(1,10);e.writeUInt32LE(c.length,12);
-  return Buffer.concat([c,e]);
+  e.writeUInt32LE(0x06054b50);e.writeUInt16LE(1,8);e.writeUInt16LE(1,10);e.writeUInt32LE(c.length,12);e.writeUInt32LE(local.length,16);
+  return Buffer.concat([local,c,e]);
 }
 test('zip central listing',async()=>{expect(await read(zip(),'zip')).toEqual([{name:'hello',size:3,dir:false}]);});
 test('reject oversized central directory before allocation',async()=>{
@@ -42,7 +46,12 @@ test('reject oversized central directory before allocation',async()=>{
   await expect(read(b,'zip')).rejects.toThrow();
 });
 test('reject truncated central entry name',async()=>{
-  const b=zip();b.writeUInt16LE(65000,28);await expect(read(b,'zip')).rejects.toThrow();
+  const b=zip();b.writeUInt16LE(65000,ZIP_CENTRAL+28);await expect(read(b,'zip')).rejects.toThrow();
+});
+test('reject a split archive and a member outside the archive',async()=>{
+  const split=zip();split.writeUInt16LE(1,split.length-18);await expect(read(split,'zip')).rejects.toThrow('split');
+  const outside=zip();outside.writeUInt32LE(1000,ZIP_CENTRAL+42);await expect(read(outside,'zip')).rejects.toThrow('range');
+  const wide=zip();wide.writeUInt32LE(0xffffffff,ZIP_CENTRAL+24);await expect(read(wide,'zip')).rejects.toThrow('zip64');
 });
 test('reject corrupt later tar header instead of partial success',async()=>{
   await expect(read(Buffer.concat([valid,Buffer.alloc(512,42)]))).rejects.toThrow();

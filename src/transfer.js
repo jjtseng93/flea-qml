@@ -128,7 +128,7 @@ export function collisions(request, send, listing, stamp) {
 
 // ---- copying ----
 
-const reason = (e) =>
+export const reason = (e) =>
   e instanceof Cancelled
     ? "cancelled"
     : ({
@@ -279,6 +279,8 @@ function treeSentence(ctx, verb) {
 // ---- the transfer ----
 
 let nextId = 1;
+// One id space for transfers and archive jobs, so a transfercancel names exactly one of them.
+export const nextJobId = () => nextId++;
 const jobs = new Map(),
   // The tail of each destination drive's queue.
   queues = new Map();
@@ -423,6 +425,15 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
   if (refused.length) done.refused = refused;
   send(done);
   for (const path of touched) send({ t: "changed", path });
+}
+
+// One item and everything under it copied to `dst`, which must not exist yet: duplicate's copy.
+// A tree entry the drive refused fails the whole copy with the transfer's own sentence.
+export async function copyTree(src, dst) {
+  const ctx = { job: new Job(0, () => {}), index: 0, name: basename(src), root: dirname(dst), made: new Set(),
+    refused: [], refusedCount: 0, durable: false, fat: false, unconfirmed: false };
+  await copyAny(src, dst, ctx, true);
+  if (ctx.refusedCount) throw Object.assign(Error(treeSentence(ctx, "copied")), { sentence: treeSentence(ctx, "copied") });
 }
 
 export function transferCancel(request) {

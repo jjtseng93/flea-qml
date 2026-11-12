@@ -228,21 +228,34 @@ function scanZip(reader, visit) {
       break;
     }
   if (eocd < 0) throw new Error("not a zip archive");
+  // The bounds below follow buninu-linux's initramfs/bin/unzip: one disk only, and every range
+  // inside the space before the record that names it.
+  if (tail.readUInt16LE(eocd + 4) !== 0 || tail.readUInt16LE(eocd + 6) !== 0 || tail.readUInt16LE(eocd + 8) !== tail.readUInt16LE(eocd + 10))
+    throw new Error("split archives are not supported");
+  const uint64 = (buffer, offset) => checkedSize(Number(buffer.readBigUInt64LE(offset)));
   let entryCount = tail.readUInt16LE(eocd + 10),
     directorySize = tail.readUInt32LE(eocd + 12),
-    directoryOffset = tail.readUInt32LE(eocd + 16);
+    directoryOffset = tail.readUInt32LE(eocd + 16),
+    directoryLimit = reader.size - tailLength + eocd;
   // zip64: the locator sits just before the end of central directory record.
   if (eocd >= 20 && tail.readUInt32LE(eocd - 20) === 0x07064b50) {
-    const record = reader.read(Number(tail.readBigUInt64LE(eocd - 20 + 8)), 56);
+    if (tail.readUInt32LE(eocd - 16) !== 0 || tail.readUInt32LE(eocd - 4) !== 1) throw new Error("split zip64 archives are not supported");
+    const recordOffset = uint64(tail, eocd - 20 + 8);
+    if (recordOffset > directoryLimit - 20 - 56) throw new Error("bad zip64 record range");
+    const record = reader.read(recordOffset, 56);
     if (record.length < 56 || record.readUInt32LE(0) !== 0x06064b50) throw new Error("bad zip64 end of central directory");
-    entryCount = Number(record.readBigUInt64LE(32));
-    directorySize = Number(record.readBigUInt64LE(40));
-    directoryOffset = Number(record.readBigUInt64LE(48));
+    if (record.readUInt32LE(16) !== 0 || record.readUInt32LE(20) !== 0 || uint64(record, 24) !== uint64(record, 32) || uint64(record, 4) < 44)
+      throw new Error("bad or split zip64 directory");
+    directoryLimit = recordOffset;
+    entryCount = uint64(record, 32);
+    directorySize = uint64(record, 40);
+    directoryOffset = uint64(record, 48);
   }
   checkedSize(entryCount);
   checkedSize(directoryOffset);
   checkedSize(directorySize);
-  if (directorySize > reader.size - directoryOffset || entryCount > Math.floor(directorySize / 46)) throw new Error("bad central directory bounds");
+  if (directoryOffset > directoryLimit || directorySize > directoryLimit - directoryOffset || entryCount > Math.floor(directorySize / 46))
+    throw new Error("bad central directory bounds");
   let positionInDirectory = 0;
   for (let index = 0; index < entryCount; index++) {
     if (directorySize - positionInDirectory < 46) throw new Error("truncated central directory");
@@ -251,13 +264,17 @@ function scanZip(reader, visit) {
     if (length > directorySize - positionInDirectory) throw new Error("truncated central entry");
     const central = reader.read(directoryOffset + positionInDirectory, length), offset = 0;
     if (central.readUInt32LE(0) !== 0x02014b50) throw new Error("bad central directory");
+    if (central.readUInt16LE(34) !== 0) throw new Error("split members are not supported");
     const flags = central.readUInt16LE(offset + 8),
       nameLength = central.readUInt16LE(offset + 28),
       extraLength = central.readUInt16LE(offset + 30),
       commentLength = central.readUInt16LE(offset + 32);
     let size = central.readUInt32LE(offset + 24),
       compressed = central.readUInt32LE(offset + 20),
-      local = central.readUInt32LE(offset + 42);
+      local = central.readUInt32LE(offset + 42),
+      mtime;
+    const wide = [size, compressed, local].filter((value) => value === 0xffffffff).length;
+    let foundWide = false;
     // Info-ZIP writes UTF-8 names without the 0x800 flag, so a name that decodes as UTF-8 is read
     // as UTF-8 and only the rest as the old code page's stand-in, latin1.
     const raw = central.subarray(offset + 46, offset + 46 + nameLength);
@@ -273,7 +290,10 @@ function scanZip(reader, visit) {
       const id = extra.readUInt16LE(position),
         length = extra.readUInt16LE(position + 2);
       if (length > extra.length - position - 4) throw new Error("truncated zip extra field");
-      if (id === 0x0001) {
+      // "UT": the modification time in whole Unix seconds, which the DOS stamp rounds to two.
+      if (id === 0x5455 && length >= 5 && extra[position + 4] & 1) mtime = extra.readInt32LE(position + 5);
+      if (id === 0x0001 && !foundWide) {
+        foundWide = true;
         // Only the fields that overflowed are present, in this order.
         let at = position + 4;
         const end = position + 4 + length;
@@ -289,9 +309,14 @@ function scanZip(reader, visit) {
       }
       position += 4 + length;
     }
+    if (wide && !foundWide) throw new Error("missing zip64 extra field");
+    if (local > directoryOffset || directoryOffset - local < 30 || compressed > directoryOffset - local - 30)
+      throw new Error("bad zip member range");
     // The second argument is what reading the member's bytes needs (openZip); a listing ignores it.
     visit({ name: name.replace(/\/$/, ""), dir: name.endsWith("/"), size },
-      { method: central.readUInt16LE(offset + 10), encrypted: (flags & 1) === 1, compressed, local });
+      { method: central.readUInt16LE(offset + 10), encrypted: (flags & 1) === 1, compressed, local,
+        crc: central.readUInt32LE(offset + 16), madeBy: central.readUInt16LE(offset + 4) >> 8,
+        external: central.readUInt32LE(offset + 38), time: central.readUInt16LE(offset + 12), date: central.readUInt16LE(offset + 14), mtime });
     positionInDirectory += length;
   }
 }
@@ -371,3 +396,7 @@ export function openZip(path) {
     throw error;
   }
 }
+
+// The pieces src/archiveops.js reads member data with: extraction needs the type, mode, link and
+// bytes of every member, which the listing above never keeps.
+export { BLOCK, MAX_RECORD, checkedSize, checksumMatches, fileReader, kindOf, octal, paxRecords, scanZip, text };

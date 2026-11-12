@@ -1,7 +1,8 @@
 // flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
 // line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
 // So far: list, window, sort, fsinfo, peek, meta, code, the four clip requests,
-// paths, menuaction (snapshot, activate, validate, close), collisions, transfer, transfercancel, places and quit, and `changed` lines for watched folders. Any other request is noted on stderr and
+// paths, menuaction (snapshot, activate, validate, close), collisions, transfer, transfercancel, places and quit,
+// mkdir, newfile, duplicate, bulkrename, permissions, permissionsBatch, formats and archive, and `changed` lines for watched folders. Any other request is noted on stderr and
 // left unanswered, which ui/ already survives for an operation that never reports back.
 import { createInterface } from "node:readline";
 import { fsinfo } from "./fsinfo.js";
@@ -14,6 +15,10 @@ import { collisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction, capturedPaths } from "./menu.js";
 import {renameWithTrashRecord} from './trash-record.js';
 import { trash } from "./trash.js";
+import { duplicate, mkdir, newfile } from "./create.js";
+import { bulkrename } from "./bulkrename.js";
+import { permissions, permissionsBatch } from "./permissions.js";
+import { archive, archiveCancel, formats } from "./archiveops.js";
 import { trashbrowse, readTrash, watchTrashCount } from "./trashbrowse.js";
 import { findCommand } from "./find.js";
 import { places } from "./places.js";
@@ -272,7 +277,16 @@ const handlers = {
   },
   collisions: (request) => collisions(request, send, listing, stamp),
   transfer: (request) => transfer(request, send, listing, stamp),
-  transfercancel: (request) => transferCancel(request),
+  // One id space for both: an archive job's id is never a transfer's.
+  transfercancel: (request) => archiveCancel(request.id) || transferCancel(request),
+  mkdir: (request) => mkdir(request, send),
+  newfile: (request) => newfile(request, send),
+  duplicate: (request) => duplicate(request, send),
+  bulkrename: (request) => bulkrename(request, send),
+  permissions: (request) => permissions(request, send),
+  permissionsBatch: (request) => permissionsBatch(request, send),
+  formats: (request) => formats(request, send),
+  archive: (request) => archive(request, send),
   // The sidebar's folders and drives, found by looking; `watch` keeps looking while a rail shows.
   places: (request) => places(request, send),
   quit: () => process.exit(0),

@@ -68,12 +68,14 @@ This needs a buninu-browser whose QML `TapHandler` understands
 checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml`.
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
-`meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`,
+`meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`, `mergecollisions`,
 `transfer`, `transfercancel`, `trash`, `trashbrowse`, `menuaction` (selection snapshots and permanent-delete confirmation),
 `mkdir`, `newfile`, `duplicate`, `bulkrename`, `permissions`, `permissionsBatch`, `formats`, `archive` and `quit`, and `flea --ui-state`, which keeps
 `~/.local/state/flea/ui.json` the way upstream does. A transfer copies and moves
-files, folders and links and answers keep, skip and refuse; it has no undo yet,
-and refuses replace (it needs the Trash), merge and special files. Other requests and `flea`
+files, folders and links and answers keep, skip, refuse, replace and merge; it has no undo yet,
+and refuses special files. Replace moves the item already there to flea's Trash first and puts it
+back when the transfer fails; merge folds a folder into the folder already there, asking once
+about the names both hold. Other requests and `flea`
 modes are not ported yet; the interface reports them as failed, as with an
 unreachable backend.
 Setting `FLEA_BIN` to upstream's `flea` binary uses it instead, for what is

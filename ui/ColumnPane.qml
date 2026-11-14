@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "." as Flea
 import "js/ClipMarks.js" as ClipMarks
 import "js/Filter.js" as Filter
@@ -9,6 +10,7 @@ import "js/ScrollOff.js" as ScrollOff
 import "js/Tap.js" as Tap
 import "js/Thumbs.js" as Thumbs
 import "js/DirSizes.js" as DirSizes
+import "js/Sort.js" as Sort
 import "js/DragOut.js" as DragOut
 import "js/DropDev.js" as DropDev
 
@@ -156,6 +158,8 @@ Item {
     // The same viewport plan the list runs, over this column's own scroll position. Only the active
     // column can ask: dirsize resolves against st.listing, which a peeked row has no index in.
     function requestDirSizes() {
+        // Folder sizes are measured only when the user asks: a ⚖️ click, see Pane.measureDirs.
+        return
         if (root.pane === null || !root.visible || root.pane.total === 0 || root.pane.listInFlight)
             return
         // The active column always draws its size, so only the class gate applies here.
@@ -229,9 +233,63 @@ Item {
         destDev: root.pane && root.pane.backend && !root.pane.listInFlight ? root.pane.backend.dirDev : 0
     }
 
+    // flea-qml: every column carries the list's own titles, so the columns view (and its preview
+    // column) never loses them: Name in each, and on the pane's own column the ⚖️ that measures
+    // every folder and the Size title over the size cells. Name and Size sort as the list's do.
+    Item {
+        id: columnHeader
+        anchors.top: parent.top
+        anchors.left: parent.left
+        width: root.width
+        height: Theme.chromeHeight
+        // The rows keep the scroll lane clear; the titles over them keep it too, the fill spans it.
+        readonly property real lane: root.width - Scroll.contentWidth(root.width, Theme.spacing.rowPaddingX)
+        readonly property bool own: root.pane !== null && root.pane !== undefined
+        readonly property string sortBy: own && root.pane.backend ? root.pane.backend.sortBy : ""
+        readonly property bool sortDesc: own && root.pane.backend ? root.pane.backend.sortDesc : false
+        function title(label, key) { return columnHeader.sortBy === key ? Sort.title(label, columnHeader.sortDesc) : label }
+        Rectangle { anchors.fill: parent; color: Style.normalFill }
+        PanelSectionHeader {
+            id: columnName
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.spacing.rowPaddingX + Theme.iconSize + Theme.spacing.gap
+            anchors.right: columnScale.visible ? columnScale.left : parent.right
+            anchors.rightMargin: columnScale.visible ? Theme.spacing.gap : columnHeader.lane + Theme.spacing.rowPaddingX
+            anchors.verticalCenter: parent.verticalCenter
+            text: columnHeader.title("Name", "name")
+            elide: Text.ElideRight
+            TapHandler { enabled: columnHeader.own; onTapped: Sort.column(root.pane, "name") }
+        }
+        Text {
+            id: columnScale
+            anchors.right: columnSize.left
+            anchors.rightMargin: Theme.spacing.gap
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.showsSize
+            text: DirSizes.UNMEASURED
+            textFormat: Text.PlainText
+            font.pixelSize: columnName.font.pixelSize
+            HoverHandler { cursorShape: Qt.PointingHandCursor }
+            TapHandler { onTapped: root.pane.measureAllDirs() }
+        }
+        PanelSectionHeader {
+            id: columnSize
+            anchors.right: parent.right
+            anchors.rightMargin: columnHeader.lane + Theme.spacing.rowPaddingX + Theme.spacing.gap
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.showsSize
+            text: columnHeader.title("Size", "size")
+            horizontalAlignment: Text.AlignRight
+            TapHandler { onTapped: Sort.column(root.pane, "size") }
+        }
+    }
+
     ListView {
         id: view
-        anchors.fill: parent
+        anchors.top: columnHeader.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
 
         model: Flea.StableModel { id: stable; view: view; total: root.visible || root.keptTotal === root.rowTotal ? root.rowTotal : 0; keptRows: true
                                   warm: root.pane !== null && view.visible && root.pane.searchMode.length > 0 && root.pane.swap.searchWarm === true; warmRows: Math.floor((view.height + view.cacheBuffer) / Theme.fileRowHeight) + 1 }
@@ -303,7 +361,7 @@ Item {
             row: !cell.live ? cell.row : root.pane ? root.pane.rowFor(listingIndex) : root.rows[index] !== undefined ? root.rows[index] : null
             thumb: !cell.live ? cell.thumb : root.pane !== null && Thumbs.allowed(row, ViewState.thumbnailMode) ? root.pane.thumbFor(listingIndex) : ""
             showSize: root.showsSize
-            dirSize: !cell.live ? cell.dirSize : root.pane !== null ? DirSizes.sizeFor(root.pane.dirSizeState, listingIndex) : null
+            dirSize: !cell.live ? cell.dirSize : root.pane !== null ? DirSizes.cellFor(root.pane.dirSizeState, listingIndex) : null
             pane: root.pane
             // The clipboard mark is looked up only on the pane's own column, and never while it is empty.
             clipMark: !cell.live ? cell.clipMark : root.clipEmpty ? "" : (root.pane !== null ? ClipMarks.markForRow(root.pane, cell.row ? cell.row.n : "", root.pane.clipboard) : "")
@@ -336,7 +394,9 @@ Item {
                             root.tabRequested(cell.row)
                         else if (button === Qt.RightButton)
                             root.menuRequested(cell.listingIndex, eventPoint)
-                        else
+                        else if (cell.onSizeCell(eventPoint.position)) {
+                            if (tap.tapCount === 1) root.pane.measureDirs([cell.listingIndex])
+                        } else
                             root.picked(cell.listingIndex, tap.tapCount, tap.point.modifiers, Tap.onName(cell.nameItem(), cell, eventPoint.position, false))
                         return
                     }

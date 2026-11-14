@@ -142,7 +142,7 @@ ListView {
         // A search's location layout builds hidden after the strip's first frame, so no answer pays for it.
         locateArmed: root.pane.searchMode.length > 0 && root.pane.swap.searchWarm === true
         kindNames: cell.live ? root.pane.kindNames : cell.kindNames
-        dirSize: cell.live ? root.dirSizeFor(listingIndex) : cell.dirSize
+        dirSize: cell.live ? DirSizes.cellFor(root.pane.dirSizeState, listingIndex) : cell.dirSize
         // A filter paints its run the same way a search does; filtering below is what keeps the
         // ordinary columns, because these rows are still this directory's own and not walk results.
         searchQuery: !cell.live ? cell.searchQuery : root.pane.searchMode.length > 0 ? root.pane.swap.answeredQuery : root.pane.filterQuery
@@ -179,7 +179,10 @@ ListView {
                     Tap.tappedTab(root.pane.rowFor(listingIndex), root.pane.path, root.pane)
                 else if (button === Qt.RightButton)
                     Tap.tappedMenu(listingIndex, eventPoint, root.pane, root.menu)
-                else {
+                else if (cell.onSizeCell(eventPoint.position)) {
+                    // A folder's ⚖️ Size cell measures that folder and does nothing else; a double click stays one ask.
+                    if (tap.tapCount === 1) root.pane.measureDirs([listingIndex])
+                } else {
                     var wasSole = root.pane.slowClickWasSole(listingIndex)
                     Tap.tapped(listingIndex, tap.tapCount, tap.point.modifiers, root.pane)
                     Tap.slowTap(root.pane, tap.tapCount === 1 && Tap.onName(cell.nameItem(), cell, eventPoint.position, false),
@@ -233,11 +236,7 @@ ListView {
             root.cursorClamped(first, last)
         }
         root.menu.close()
-        // Gated on hasPending (see DirSizes.js) rather than diffed at settle like thumbcancel, see docs/protocol.md "dirsizecancel".
-        if (DirSizes.hasPending(root.pane.dirSizeState)) {
-            root.pane.backend.dirsizecancel()
-            root.dirSizesCancelled()
-        }
+        // A scroll never cancels a size the user asked for (src/dirsize.js).
         coalesce.start()
         settle.restart()
     }
@@ -377,10 +376,7 @@ ListView {
                 root.pane.backend.thumbcancel(work.drop)
                 root.thumbsApplied(work)
             }
-            if (DirSizes.hasPending(root.pane.dirSizeState)) {
-                root.pane.backend.dirsizecancel()
-                root.dirSizesCancelled()
-            }
+            // A scroll never cancels a size the user asked for (src/dirsize.js).
             settle.restart()
         }
     }
@@ -435,6 +431,8 @@ ListView {
 
     // Same idiom as requestThumbs, minus a cancel: onContentYChanged already sent it, see above.
     function requestDirSizes() {
+        // Folder sizes are measured only when the user asks: a ⚖️ click, see Pane.measureDirs.
+        return
         if (!root.visible || root.pane.shownTotal === 0 || root.pane.listInFlight)
             return
         // A hidden Size column or a network or phone folder draws no size, so it asks for no walk.

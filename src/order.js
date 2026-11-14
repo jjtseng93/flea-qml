@@ -70,10 +70,13 @@ export const NEEDS_STAT = new Set(["size", "mtime", "date"]);
  * when `by` needs a stat, and `row.group` (kinds.js's class, e.g. "image") when it is "kind" or
  * kinds group.
  */
+// A file's own size; a folder's is the size the user measured (src/dirsize.js), never its dirent's.
+const sizeOf = (row) => (row.dir ? row.measured ?? 0 : row.st?.size ?? 0);
+
 export function sortRows(rows, { by = "name", desc = false, foldersFirst = true, groupByKind = false, hiddenLast = false }) {
   const key =
     by === "size"
-      ? (a, b) => (a.st?.size ?? 0) - (b.st?.size ?? 0)
+      ? (a, b) => sizeOf(a) - sizeOf(b)
       : by === "mtime" || by === "date"
         ? (a, b) => (a.trash ? Date.parse(a.trash.deleted)||0 : a.st?.mtimeMs ?? 0) - (b.trash ? Date.parse(b.trash.deleted)||0 : b.st?.mtimeMs ?? 0)
         : by === "kind"
@@ -82,12 +85,16 @@ export function sortRows(rows, { by = "name", desc = false, foldersFirst = true,
             ? (a, b) => (a.dir || b.dir ? 0 : extensionOrder(a, b))
             : () => 0;
   const directional = (a, b) => {
+    if (by === "size" && a.dir && b.dir && a.measured === undefined && b.measured === undefined) return nameOrder(a, b);
     const order = key(a, b) || nameOrder(a, b);
     return desc ? -order : order;
   };
   // Groups never reverse with `desc`: hidden last outermost, then kind groups or folders first.
+  // flea-qml: a size order never measures; a folder nobody measured sorts after the measured ones,
+  // by name, in either direction.
   const group = (row) =>
     (hiddenLast && row.name.startsWith(".") ? 10 : 0) +
-    (groupByKind ? (row.dir ? 0 : row.group === "image" ? 1 : 2) : foldersFirst && !row.dir ? 1 : 0);
+    (groupByKind ? (row.dir ? 0 : row.group === "image" ? 1 : 2) : foldersFirst && !row.dir ? 1 : 0) +
+    (by === "size" && row.dir && row.measured === undefined ? 0.5 : 0);
   rows.sort((a, b) => group(a) - group(b) || directional(a, b));
 }

@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Ui
 import "." as Flea
 import "js/Columns.js" as Columns
+import "js/DirSizes.js" as DirSizes
 import "js/Sort.js" as Sort
 
 // The column header renders sort state and owns none of it, so Pane stays the one state owner.
@@ -136,7 +137,28 @@ Item {
         text: root.title("Size", "size")
         horizontalAlignment: Text.AlignRight
 
-        TapHandler { enabled: root.sortable; onTapped: root.sortRequested("size") }
+        // flea-qml: the ⚖️ at the cell's left measures every folder in the listing (ui/Pane.qml
+        // measureAllDirs); the title itself still sorts. One handler decides by where the click landed.
+        Text {
+            id: sizeScale
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.pane !== null && !root.recent && headerSize.width > 0
+            text: DirSizes.UNMEASURED
+            textFormat: Text.PlainText
+            font.pixelSize: headerSize.font.pixelSize
+        }
+        HoverHandler {
+            id: scaleHover
+            cursorShape: scaleHover.point.position.x < sizeScale.width + Theme.spacing.gap && sizeScale.visible ? Qt.PointingHandCursor : Qt.ArrowCursor
+        }
+        TapHandler {
+            enabled: root.sortable || sizeScale.visible
+            onTapped: function (eventPoint) {
+                if (sizeScale.visible && eventPoint.position.x < sizeScale.width + Theme.spacing.gap) root.pane.measureAllDirs()
+                else if (root.sortable) root.sortRequested("size")
+            }
+        }
     }
 
     PanelSectionHeader {

@@ -76,7 +76,8 @@ function receive(pane, message) {
         var entry = take(s.sets, pane.backend)
         if (!entry) return
         if (!message.ok) {
-            entry.pane.message(Format.fill(WORDS.setFailed, message.error), true)
+            // The copy itself worked, inside this window: a notice, so the paste's own result line is not held under it.
+            entry.pane.message(Format.fill(WORDS.setFailed, message.error), false)
         } else {
             // Both panes can echo any earlier owner after a later set has answered.
             if (message.token) s.ownTokens[message.token] = true

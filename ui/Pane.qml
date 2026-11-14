@@ -130,6 +130,8 @@ FocusScope {
 
     // flea-qml: Find's scope, Search.HERE, HOME or ROOT; it starts in the folder and Tab turns it.
     property int searchStep: 0
+    // flea-qml: Ctrl+G's content search: Find runs grep over the scope instead of find.
+    property bool searchContents: false
     property bool searchRunning: false
     property bool searchCancelled: false
     // Newest sent query generation, rising across sessions; answers for an older one are dropped.
@@ -306,6 +308,8 @@ FocusScope {
     readonly property int firstSettleMs: 70
     // Seven screens of history at this row height, so a policy bug costs memory slowly, not without limit.
     readonly property int thumbCap: 240
+    // Sizes are only ever what the user asked for, so the map holds a whole listing's folders.
+    readonly property int dirSizeCap: 1000000
     property var thumbState: Thumbs.empty()
     // The class verdict the last refresh spent, so a preview change that moves nothing for
     // this directory (zoom step, other classes) refreshes nothing; see ui/js/ExtThumbs.js.
@@ -517,6 +521,18 @@ FocusScope {
 
     function applyPendingSelect() { Nav.applyPendingSelect(root); Nav.applyPendingBackground(root) }
     function openBackgroundMenu(at) { menu.openBackground(at) }
+    // flea-qml: measure folders only when the user asks; see src/dirsize.js and ui/js/DirSizes.js.
+    function measureDirs(rows) {
+        var dirs = rows.filter(function (i) { var r = root.rowFor(i); return r && r.d })
+        if (dirs.length === 0) return
+        root.dirSizeState = DirSizes.asking(root.dirSizeState, dirs)
+        root.backend.dirsize(dirs)
+    }
+    function measureAllDirs() {
+        root.dirSizeState = DirSizes.askingAll(root.dirSizeState)
+        root.backend.dirsizeAll()
+    }
+
     function refresh(selectPath, keepSelection) {
         // Recent re-reads the history rather than re-listing its base, which is the root: see
         // ui/js/RecentMode.js refresh, and Nav.refresh for every other listing.
@@ -935,8 +951,8 @@ FocusScope {
         // flea-qml: the count is the last run's; an edited line waiting for Enter says so instead.
         searchNote: Search.note(root.total, root.searchRunning, root.searchSent.length === 0)
         // flea-qml: the keys the strip answers, named plainly.
-        searchWayOut: "Enter/Tab/Esc"
-        searchPlaceholder: Search.placeholder(root.path, root.home, root.searchStep)
+        searchWayOut: "Enter/Tab/Esc/Ctrl+G"
+        searchPlaceholder: Search.placeholder(root.path, root.home, root.searchStep, root.searchContents)
         searchTabHint: ""
         searchRunning: root.searchRunning
         onSearchCloseRequested: Search.dismiss(root)

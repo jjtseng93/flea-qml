@@ -199,6 +199,10 @@ function act(action, root, menuId, paths) {
     case "selectAll": root.selectAll(); return
     // flea-qml: Find and Filter are independent; a filter left up narrows the results by name too.
     case "search": Search.start(root); return
+    case "searchContents": Search.contents(root); return
+    // flea-qml: = measures the selected folders, or the cursor's; Alt+= every folder (src/dirsize.js).
+    case "measureDirs": root.measureDirs(root.selectionCount() > 0 ? root.selectedIndices() : [root.cursorIndex]); return
+    case "measureAllDirs": root.measureAllDirs(); return
     case "filter": Filter.start(root); return
     case "reveal": if (root.recentMode.length > 0) { if (root.listInFlight) root.message("A directory is already loading.", false); else RecentMode.reveal(root) } else Search.reveal(root); return
     // The write operations; every one of them is reversible with undo, so none of them confirms.

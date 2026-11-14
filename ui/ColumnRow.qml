@@ -5,6 +5,7 @@ import "js/Drag.js" as DragOps
 import "js/Icons.js" as Icons
 import "js/LangMarks.js" as LangMarks
 import "js/Format.js" as Format
+import "js/DirSizes.js" as DirSizes
 import "js/Match.js" as Match
 
 // One row of a Miller column: a mark, a name, and the chevron a chosen directory carries. Simpler
@@ -192,7 +193,8 @@ Item {
         font.family: Theme.font.family
         font.pixelSize: Theme.font.caption
         textFormat: Text.PlainText
-        elide: Text.ElideRight
+        // A narrow cell loses the ⚖️ before any digit of the size.
+        elide: Text.ElideLeft
     }
 
     // The drop label, the clip mark and the match mark build above the row content, so a row at rest builds none.
@@ -298,8 +300,14 @@ Item {
     function sizeText() {
         if (Format.isSymlink(root.row.p)) return "link"
         if (!root.row.d) return Format.size(root.row.s)
-        if (!root.dirSize) return "·"
-        return (root.dirSize.partial ? ">" : "") + Format.size(root.dirSize.bytes)
+        return DirSizes.folderText(root.dirSize, root.row)
+    }
+
+    // A folder's Size cell takes a click: measure it, as ui/Row.qml's does.
+    function onSizeCell(point) {
+        if (!root.row || !root.row.d || Format.isSymlink(root.row.p) || !sizeCell.visible || sizeCell.width <= 0) return false
+        var at = sizeCell.mapFromItem(root, point.x, point.y)
+        return at.x >= 0 && at.x < sizeCell.width
     }
 
     // Only a chosen directory carries it: it says the column to the right is showing what is inside.

@@ -420,10 +420,7 @@ GridView {
         // A scroll under a resting pointer moves the hovered tile without a point change.
         if (hoverProbe.hovered) root.hoverScene(hoverProbe.point.scenePosition)
         root.menu.close()
-        if (DirSizes.hasPending(root.pane.dirSizeState)) {
-            root.pane.backend.dirsizecancel()
-            root.dirSizesCancelled()
-        }
+        // A scroll never cancels a size the user asked for (src/dirsize.js).
         coalesce.start()
         settle.restart()
     }
@@ -625,10 +622,7 @@ GridView {
                 root.pane.backend.thumbcancel(work.drop)
                 root.thumbsApplied(work)
             }
-            if (DirSizes.hasPending(root.pane.dirSizeState)) {
-                root.pane.backend.dirsizecancel()
-                root.dirSizesCancelled()
-            }
+            // A scroll never cancels a size the user asked for (src/dirsize.js).
             settle.restart()
         }
     }
@@ -653,6 +647,8 @@ GridView {
     }
 
     function requestDirSizes() {
+        // Folder sizes are measured only when the user asks: a ⚖️ click, see Pane.measureDirs.
+        return
         if (!root.visible || root.pane.shownTotal === 0 || root.pane.listInFlight)
             return
         // A tile draws no size, so the grid never asks, whatever rows are visible.

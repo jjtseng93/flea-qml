@@ -56,6 +56,8 @@ Item {
     signal localSendSent(bool ok, string reason)
     signal thumbed(int row, string file)
     signal dirSized(int row, real bytes, bool partial)
+    // Sample input: {"t":"dirsizedone","cancelled":false}
+    signal dirSizeDone(bool cancelled)
     signal tagStatesResult(var message)
     signal settagged(var message)
     signal searching(int total, int scanned, real ms)
@@ -110,6 +112,8 @@ Item {
     // The coloured lines of one slot's file or text, answered late with the token askCode returned.
     signal codeResult(var message)
     signal htmlResult(var message)
+    // Sample input: {"t":"markdownhtml","slot":"look","token":9,"state":"ready","html":"<!doctype html>..."}
+    signal markdownHtmlResult(var message)
     property int codeToken: 0
     // The unified diff of two files, or the reason there is none, answered late with the token askCompare returned.
     signal compareResult(var message)
@@ -275,6 +279,13 @@ Item {
     // SIGINT stops a run and keeps what it printed. The four functions keep upstream's names and
     // meanings, so ui/js/Search.js is unchanged in what it asks.
     property var findArgv: null
+    // flea-qml: Ctrl+G's content search runs this grep instead (findcommand's `grep`).
+    property var grepArgv: null
+    // Whether the running walk is a content search, its matches beside findBatch, and the files
+    // already answered: -o can print several snippets of a file's one matching line.
+    property bool findContents: false
+    property var findMatches: []
+    property var findSeen: ({})
     property string findScope: ""
     property string findFolder: ""
     property bool findHidden: false
@@ -297,9 +308,9 @@ Item {
     }
 
     // Each query is one find; a newer one stops the older first and starts once it has exited.
-    function searchQuery(query, gen, count, sizes) {
+    function searchQuery(query, gen, count, sizes, contents) {
         root.findCount = count
-        root.findPending = { query: String(query || ""), gen: gen }
+        root.findPending = { query: String(query || ""), gen: gen, contents: contents === true }
         if (finder.running) { root.findClosing = true; finder.signal(2); return }
         root.startFind()
     }
@@ -330,6 +341,9 @@ Item {
         root.findCancelled = false
         root.findClosing = false
         root.findBatch = []
+        root.findMatches = []
+        root.findSeen = ({})
+        root.findContents = next.contents === true
         root.findStarted = Date.now()
         var done = { scanned: 0, ms: 0, cancelled: false, walking: false }
         // An emptied query is the folder itself again.
@@ -340,26 +354,31 @@ Item {
             root.send(listing)
             return
         }
-        if (!root.findArgv || root.findScope.length === 0) {
+        var argv = root.findContents ? root.grepArgv : root.findArgv
+        if (!argv || root.findScope.length === 0) {
             root.send({ c: "listpaths", base: root.findScope || "/", paths: [], first: root.findCount, gen: next.gen, searched: done })
             return
         }
         // The old rows go at once; the first batch appends to this empty listing.
         root.send({ c: "listpaths", base: root.findScope, paths: [], first: root.findCount, gen: next.gen })
-        // Hidden folders are pruned rather than filtered, so find never walks into .cache or .git.
-        var expression = Find.expression(next.query, root.findHidden)
+        // Hidden folders are pruned rather than filtered, so find never walks into .cache or .git;
+        // grep skips the same names unless hidden files are shown.
         finder.workingDirectory = root.findScope
-        finder.command = root.findArgv.concat(["."], expression)
+        finder.command = root.findContents
+            ? argv.concat(Find.grepArguments(next.query, root.findHidden))
+            : argv.concat(["."], Find.expression(next.query, root.findHidden))
         finder.running = true
     }
 
     function flushFind(last) {
         if (root.findBatch.length === 0 && !last) return
         var request = { c: "listpaths", base: root.findScope, paths: root.findBatch, first: root.findCount, gen: root.findGen, append: true }
+        if (root.findContents) request.matches = root.findMatches
         // Every batch ends with a terminal line, walking until the last, as upstream's live answers
         // do: that is what moves the count and lands the rows while the find still runs.
         request.searched = { scanned: 0, ms: Date.now() - root.findStarted, cancelled: last && root.findCancelled, walking: !last }
         root.findBatch = []
+        root.findMatches = []
         root.send(request)
     }
 
@@ -368,6 +387,15 @@ Item {
         stdout: SplitParser {
             onRead: function (line) {
                 if (root.findClosing) return
+                if (root.findContents) {
+                    // One row per file: the first snippet of its matching line.
+                    var hit = Find.grepLine(line)
+                    if (!hit || root.findSeen[hit.path] === true) return
+                    root.findSeen[hit.path] = true
+                    root.findBatch.push(hit.path)
+                    root.findMatches.push({ l: hit.line, t: hit.text })
+                    return
+                }
                 var path = String(line)
                 if (path.length > 0 && path !== ".") root.findBatch.push(path)
             }
@@ -465,6 +493,13 @@ Item {
     function askCode(slot, source, first, count) {
         root.codeToken += 1
         root.send(Object.assign({ c: "code", token: root.codeToken, slot: slot, first: first, count: count }, source))
+        return root.codeToken
+    }
+
+    // A Markdown file as one passive page for WebPreview; theme holds the page's #rrggbb colours and body size.
+    function askMarkdownHtml(slot, path, theme) {
+        root.codeToken += 1
+        root.send({ c: "markdownhtml", token: root.codeToken, slot: slot, path: path, theme: theme })
         return root.codeToken
     }
 
@@ -586,6 +621,12 @@ Item {
         }
         root.dirSizeRequests += 1
         root.send({ c: "dirsize", rows: rows })
+    }
+
+    // The Size header's ⚖️: every folder in the listing, in the backend's own numbering.
+    function dirsizeAll() {
+        root.dirSizeRequests += 1
+        root.send({ c: "dirsize", all: true })
     }
 
     // Unlike thumbcancel, dirsizecancel carries no rows: it always means everything queued, see docs/protocol.md.

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "js/Columns.js" as Columns
+import "js/DirSizes.js" as DirSizes
 import "js/Format.js" as Format
 import "js/Icons.js" as Icons
 import "js/LangMarks.js" as LangMarks
@@ -64,6 +65,8 @@ Item {
     // The name, then a link's target; a folder carries no slash, its glyph and the folders-first order already say it.
     readonly property string decoratedName: root.displayName + root.linkMark
     readonly property string locationText: root.locating && root.row ? (root.recenting ? Recent.locationUnder(root.row.trash ? root.row.trash.original.replace(/^\//, "") : root.row.n, Quickshell.env("HOME") || "") : Match.location(root.row.n)) : ""
+    // flea-qml: a content search's match, "line: text", shown before the location; empty otherwise.
+    readonly property string matchText: root.searching && root.row && root.row.g ? root.row.g.l + ": " + root.row.g.t : ""
     readonly property var nameRun: Match.run(root.displayName, root.searchQuery)
     // Assigned by List.qml's shared budgets; -2 keeps the local geometry default for PickerList and drop-target rows.
     property int assignedNameBudget: -2
@@ -269,11 +272,12 @@ Item {
                 anchors.leftMargin: parent.owner.recenting && !parent.owner.cols.location ? 0 : Theme.spacing.gap
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.locationText
+                // A content search leads with the matched text, so the location gives way first.
+                text: root.matchText.length > 0 ? root.matchText + (root.locationText.length > 0 ? "   " + root.locationText : "") : root.locationText
                 color: root.cellInk
                 font.family: Theme.font.family
                 font.pixelSize: Theme.font.caption
-                elide: Text.ElideLeft
+                elide: root.matchText.length > 0 ? Text.ElideRight : Text.ElideLeft
                 textFormat: Text.PlainText
             }
         }
@@ -313,7 +317,8 @@ Item {
         font.family: Theme.font.family
         font.pixelSize: Theme.font.caption
         horizontalAlignment: Text.AlignRight
-        elide: Text.ElideRight
+        // A narrow cell loses the ⚖️ before any digit of the size.
+        elide: Text.ElideLeft
         textFormat: Text.PlainText
     }
     Text {
@@ -383,10 +388,15 @@ Item {
         if (!root.row.d) {
             return Format.size(root.row.s)
         }
-        if (!root.dirSize) {
-            return "·"
-        }
-        return (root.dirSize.partial ? ">" : "") + Format.size(root.dirSize.bytes)
+        return DirSizes.folderText(root.dirSize, root.row)
+    }
+
+    // A folder's Size cell takes a click: measure it (src/dirsize.js). The whole cell is the target,
+    // since the text inside it is right-aligned and short.
+    function onSizeCell(point) {
+        if (!root.row || !root.row.d || Format.isSymlink(root.row.p) || !size.visible || size.width <= 0) return false
+        var at = size.mapFromItem(root, point.x, point.y)
+        return at.x >= 0 && at.x < size.width && at.y >= -size.y && at.y < root.height - size.y
     }
 
     // The window's one stamp, or the picker's compact three; both are cell text and nothing more.

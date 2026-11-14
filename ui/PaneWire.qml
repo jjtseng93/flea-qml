@@ -258,8 +258,11 @@ Item {
         // A dirsized line for the previous listing is still in the pipe when open() clears the map.
         function onDirSized(row, bytes, partial) {
             if (!pane.listInFlight)
-                pane.dirSizeState = DirSizes.remember(pane.dirSizeState, row, bytes, partial, pane.thumbCap)
+                pane.dirSizeState = DirSizes.remember(pane.dirSizeState, row, bytes, partial, pane.dirSizeCap)
         }
+
+        // The measuring run ended: nothing still waiting will be answered.
+        function onDirSizeDone(cancelled) { pane.dirSizeState = DirSizes.settled(pane.dirSizeState) }
 
         // Sample input: {"t":"transferstarted","id":12,"n":2,"moving":true}
         // The verb comes off the wire, never off the clipboard: paste spends a cut before this line

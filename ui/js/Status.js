@@ -191,7 +191,7 @@ function selectionBytes(pane) {
             return -1
         }
         if (row.d) {
-            var walked = DirSizes.sizeFor(pane.dirSizeState, indices[i])
+            var walked = DirSizes.known(DirSizes.sizeFor(pane.dirSizeState, indices[i]), row)
             if (!walked || walked.partial) {
                 return -1
             }

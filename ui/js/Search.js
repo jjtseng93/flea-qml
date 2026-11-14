@@ -15,7 +15,8 @@ var TYPING = "typing"
 var RESULTS = "results"
 
 // f opens the session with no rows touched; from Recent it leaves first, so the scope and rows are the real folder.
-function start(root) {
+// flea-qml: `contents` (Ctrl+G) opens it as a content search; f and a tag place open a name search.
+function start(root, contents) {
     // A virtual collection has no single recursive filesystem scope. Never search
     // the unrelated directory that was visible before opening Trash.
     if (root.recentMode === "trash") {
@@ -45,6 +46,7 @@ function start(root) {
         root.restoreRecentSort()
     }
     root.searchFrom = root.path
+    root.searchContents = contents === true
     root.searchMode = TYPING
     openScope(root)
     // Recent's rows name paths under "/", so the folder's own rows are asked for now and Esc re-lists it.
@@ -97,7 +99,20 @@ function sendQuery(root) {
     root.searchKeyAt = Date.now()
     root.searchFirstRowsAt = 0
     root.searchSettledAt = 0
-    root.backend.searchQuery(root.searchQuery, root.searchGen, root.windowSize, root.sizeWish)
+    root.backend.searchQuery(root.searchQuery, root.searchGen, root.windowSize, root.sizeWish, root.searchContents === true)
+}
+
+// flea-qml: Ctrl+G. Outside Find it opens a content search; inside, it turns the search between
+// names and contents. Either way nothing runs until Enter: from the results it goes back to the
+// query line, as f does, so the next Enter runs the query in the new mode.
+function contents(root) {
+    if ((root.searchMode || "").length === 0) {
+        start(root, true)
+        return
+    }
+    if (root.searchLeaving === true) return
+    root.searchContents = root.searchContents !== true
+    if (root.searchMode === RESULTS) root.searchMode = TYPING
 }
 
 // flea-qml: typing only edits the query line; Enter runs the find.
@@ -170,7 +185,9 @@ function rescope(root) {
 
 // flea-qml: the command the empty query line stands for, after the scope it runs in.
 // The space after -iname is the one a shell command line holds before its argument.
-function placeholder(path, home, step) {
+function placeholder(path, home, step, contents) {
+    // A content search names the text it looks for; the scope is the "in" after the field.
+    if (contents === true) return "grep -ri "
     return "find " + SCOPE_MARK[step === HOME && !home ? HERE : step] + " -iname "
 }
 
@@ -349,6 +366,10 @@ function typeKey(event, root) {
     // Issue 30's control: tab flips the scope between the whole home directory and the one the pane
     // is standing in. It is the only writer, and nothing resets it, so the flip holds for the window;
     // ui/SearchStrip.qml draws "in <scope>" under the caret, so every search says which one it took.
+    if (event.key === Qt.Key_G && (event.modifiers & Qt.ControlModifier) && !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier))) {
+        contents(root)
+        return true
+    }
     if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
         rescope(root)
         return true

@@ -14,9 +14,7 @@ function cellText(key, row, kindNames, dirSize) {
             return "link"
         if (!row.d)
             return Format.size(row.s)
-        if (!dirSize)
-            return "·"
-        return (dirSize.partial ? ">" : "") + Format.size(dirSize.bytes)
+        return DirSizes.folderText(dirSize, row)
     }
     if (key === "date")
         return row.m === null ? "--" : Format.date(row.m)

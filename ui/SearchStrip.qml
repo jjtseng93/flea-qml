@@ -105,6 +105,8 @@ Item {
 
     // Keys that act on the search rather than on its text.
     function leavesField(event) {
+        // Ctrl+G turns the search between names and contents (ui/js/Search.js contents).
+        if (event.key === Qt.Key_G && (event.modifiers & Qt.ControlModifier)) return true
         switch (event.key) {
         case Qt.Key_Return: case Qt.Key_Enter: case Qt.Key_Escape: case Qt.Key_Tab: case Qt.Key_Backtab:
         case Qt.Key_Up: case Qt.Key_Down: case Qt.Key_PageUp: case Qt.Key_PageDown:
@@ -166,16 +168,56 @@ Item {
         textFormat: Text.PlainText
     }
 
-    Text {
+    // flea-qml: the keys the strip answers, each one a button: a tap puts the caret back in the
+    // query line, as a click into it does, and sends the same key the keyboard would there through
+    // keyOut, so a click and a press in the field can never mean different things (Tab rescopes
+    // rather than moving focus on from the results).
+    readonly property var wayOutKeys: root.wayOut.length > 0 ? root.wayOut.split("/") : []
+    function pressKey(name) {
+        var keys = {
+            "Enter": { key: Qt.Key_Return, modifiers: Qt.NoModifier },
+            "Tab": { key: Qt.Key_Tab, modifiers: Qt.NoModifier },
+            "Esc": { key: Qt.Key_Escape, modifiers: Qt.NoModifier },
+            "Ctrl+G": { key: Qt.Key_G, modifiers: Qt.ControlModifier }
+        }
+        var pressed = keys[name]
+        if (!pressed) return
+        field.forceActiveFocus()
+        // Said at once rather than left to the focus change, which may land after the key.
+        root.fieldEntered()
+        root.keyOut({ key: pressed.key, modifiers: pressed.modifiers, text: "", isAutoRepeat: false, accepted: false })
+    }
+    Row {
         id: wayOutText
         anchors.right: closeButton.left
         anchors.rightMargin: Theme.spacing.gap
         anchors.verticalCenter: parent.verticalCenter
-        text: root.wayOut
-        color: Theme.color.muted
-        font.family: Theme.font.family
-        font.pixelSize: Theme.font.caption
-        textFormat: Text.PlainText
+        Repeater {
+            model: root.wayOutKeys
+            delegate: Row {
+                required property string modelData
+                required property int index
+                Text {
+                    visible: index > 0
+                    text: "/"
+                    color: Theme.color.muted
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.font.caption
+                    textFormat: Text.PlainText
+                }
+                Text {
+                    objectName: "findKey" + modelData
+                    text: modelData
+                    color: keyHover.hovered ? Theme.color.foreground : Theme.color.muted
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.font.caption
+                    font.underline: keyHover.hovered
+                    textFormat: Text.PlainText
+                    HoverHandler { id: keyHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: root.pressKey(modelData) }
+                }
+            }
+        }
     }
 
     ChromeButton {

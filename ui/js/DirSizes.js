@@ -1,4 +1,10 @@
 .pragma library
+.import "Format.js" as Format
+
+// flea-qml: a folder's size is measured only when the user asks (src/dirsize.js). A folder never
+// measured shows UNMEASURED in its Size cell and the Size header carries it too; both take a click.
+var UNMEASURED = "\u2696\ufe0f"
+var MEASURING = "\u2026"
 
 // A row this listing has asked about: null means asked and waiting, an object is the answer.
 var ASKED = null
@@ -86,7 +92,7 @@ function inlined(state, rows, held) {
         next = next || state || empty()
         if (next.file[held + i] === undefined)
             next.order.push(held + i)
-        next.file[held + i] = { bytes: rows[i].z, partial: false }
+        next.file[held + i] = { bytes: rows[i].z, partial: rows[i].zp === true }
     }
     return next || state
 }
@@ -100,7 +106,7 @@ function remember(state, row, bytes, partial, cap) {
     while (state.order.length > cap) {
         delete state.file[state.order.shift()]
     }
-    return { file: state.file, order: state.order }
+    return { file: state.file, order: state.order, all: state.all }
 }
 
 // Sample input: ("network") trues, ("usb") falses.
@@ -122,8 +128,53 @@ function wantsSizes(viewMode, hiddenCols, storageClass, storageKnown) {
     return true
 }
 
-// null covers both "never asked" and "asked and still waiting": the Size cell renders both as the middle dot.
+// null covers both "never asked" and "asked and still waiting"; cellFor tells them apart for drawing.
 function sizeFor(state, row) {
     var value = state.file[row]
     return value && typeof value === "object" ? value : null
+}
+
+// What a Size cell draws from: the answer, { waiting: true } while a walk is out for it, or null.
+function cellFor(state, row) {
+    var value = state.file[row]
+    if (value && typeof value === "object") return value
+    if (value === ASKED || (value === undefined && state.all === true)) return { waiting: true }
+    return null
+}
+
+// A folder's size from this listing's answers, else the size a row came back carrying (z, zp).
+// Sample input: (null, {d: true, z: 2048}) gives {bytes: 2048, partial: false}; (null, {d: true}) gives null.
+function known(cell, row) {
+    if (cell && !cell.waiting) return cell
+    if (row && row.z !== undefined) return { bytes: row.z, partial: row.zp === true }
+    return null
+}
+
+// The Size cell of a folder: MEASURING while asked, else UNMEASURED, followed by the size once
+// there is one, so a measured folder still shows what a click on it does: measure it again.
+// Sample input: ({bytes: 2048, partial: false}) gives "⚖️ 2 kB"; (null) gives "⚖️".
+function folderText(cell, row) {
+    if (cell && cell.waiting) return MEASURING
+    var size = known(cell, row)
+    return size ? UNMEASURED + " " + (size.partial ? ">" : "") + Format.size(size.bytes) : UNMEASURED
+}
+
+// Rows the user asked to measure wait until their answers, or the run's end, land.
+function asking(state, rows) {
+    for (var i = 0; i < rows.length; i++) {
+        if (state.file[rows[i]] === undefined) state.order.push(rows[i])
+        state.file[rows[i]] = ASKED
+    }
+    return { file: state.file, order: state.order, all: state.all }
+}
+
+// The header's ⚖️: every folder in the listing waits, held in the window or not, and is measured anew.
+function askingAll(state) {
+    return { file: {}, order: [], all: true }
+}
+
+// The run ended (dirsizedone): whatever still waits has no answer coming.
+function settled(state) {
+    var next = cancelled(state)
+    return { file: next.file, order: next.order }
 }

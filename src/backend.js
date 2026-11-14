@@ -1,7 +1,7 @@
 // flea-qml's backend: the requests ui/Backend.qml writes to `flea --backend`, one JSON object per
 // line on stdin, answered one per line on stdout (docs/protocol.md). Upstream: src/backend/run.rs.
 // So far: list, window, sort, fsinfo, peek, meta, code, the four clip requests,
-// paths, menuaction (snapshot, activate, validate, close), collisions, transfer, transfercancel, places and quit,
+// paths, menuaction (snapshot, activate, validate, close), collisions, mergecollisions, transfer, transfercancel, places and quit,
 // mkdir, newfile, duplicate, bulkrename, permissions, permissionsBatch, formats and archive, and `changed` lines for watched folders. Any other request is noted on stderr and
 // left unanswered, which ui/ already survives for an operation that never reports back.
 import { createInterface } from "node:readline";
@@ -9,9 +9,11 @@ import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
 import { compare } from "./compare.js";
 import { html } from "./html.js";
+import { markdownHtml } from "./markdown-html.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
-import { collisions, sources, transfer, transferCancel } from "./transfer.js";
+import { dirsize, dirsizeCancel, dirsizeInit, forgetSizes } from "./dirsize.js";
+import { collisions, mergeCollisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction, capturedPaths } from "./menu.js";
 import {renameWithTrashRecord} from './trash-record.js';
 import { trash } from "./trash.js";
@@ -20,7 +22,7 @@ import { bulkrename } from "./bulkrename.js";
 import { permissions, permissionsBatch } from "./permissions.js";
 import { archive, archiveCancel, formats } from "./archiveops.js";
 import { trashbrowse, readTrash, watchTrashCount } from "./trashbrowse.js";
-import { findCommand } from "./find.js";
+import { findCommand, grepCommand } from "./find.js";
 import { places } from "./places.js";
 import { listDone, listFailed, onChanged, watchColumn, watchList } from "./watch.js";
 import { meta } from "./meta.js";
@@ -33,6 +35,8 @@ import { basename, dirname, join, resolve, isAbsolute } from "node:path";
 // FLEA_BACKEND_LOG=/some/file appends every request and answer there, for debugging.
 const trace = process.env.FLEA_BACKEND_LOG ? (await import("node:fs")).appendFileSync.bind(null, process.env.FLEA_BACKEND_LOG) : null;
 const send = (object) => {
+  // A changed folder's size, and every size above it, is no longer known (src/dirsize.js).
+  if (object.t === "changed") forgetSizes(object.path);
   const line = `${JSON.stringify(object)}\n`;
   trace?.(`< ${line}`);
   process.stdout.write(line);
@@ -104,6 +108,16 @@ function list(request) {
     send({ ...request.searched, t: "searched", n: listing.rows.length, ...genOf(request) });
 }
 
+// The longest matched text a row keeps; the client already cuts it, this bounds what it may send.
+export const MATCH_TEXT_LIMIT = 400;
+/** A content search's match for one row, checked and bounded, or null. */
+export function matchOf(value) {
+  if (!value || typeof value !== "object") return null;
+  const l = Number(value.l);
+  if (!Number.isInteger(l) || l < 1 || typeof value.t !== "string") return null;
+  return { l, t: value.t.slice(0, MATCH_TEXT_LIMIT) };
+}
+
 // A listing of the paths the client names, in that order (docs/protocol.md "listpaths"). flea-qml
 // adds `base`, for Find: the paths are relative to it, as a `find .` run there prints them, and the
 // listing's own base is that folder. `append` adds to the listing the same base and gen built, so a
@@ -115,7 +129,11 @@ function listpaths(request) {
     first = request.first ?? 0,
     gen = genOf(request);
   const fresh = [];
-  for (const path of Array.isArray(request.paths) ? request.paths : []) {
+  // A content search sends, beside each path, the line it matched: {l: line number, t: text}.
+  const matches = Array.isArray(request.matches) ? request.matches : [];
+  const paths = Array.isArray(request.paths) ? request.paths : [];
+  for (let at = 0; at < paths.length; at++) {
+    const path = paths[at];
     if (typeof path !== "string" || !path) continue;
     let name;
     if (request.base) name = path.replace(/^\.\//, "");
@@ -127,7 +145,10 @@ function listpaths(request) {
     } catch {
       continue;
     }
-    fresh.push({ name, dir: st.isDirectory(), link: st.isSymbolicLink() });
+    const row = { name, dir: st.isDirectory(), link: st.isSymbolicLink() };
+    const match = matchOf(matches[at]);
+    if (match) row.match = match;
+    fresh.push(row);
   }
   const appending = request.append === true && listing?.fromPaths && listing.path === base && listing.gen === request.gen;
   if (appending) listing.rows.push(...fresh);
@@ -190,6 +211,7 @@ function sort(request) {
 const codeJobs = new Map();
 
 const htmlJobs = new Map();
+const markdownJobs = new Map();
 let compareJob;
 const handlers = {
   compare: request => {
@@ -217,6 +239,22 @@ const handlers = {
       if (htmlJobs.get(slot) !== job) return;
       htmlJobs.delete(slot);
       send({t:"html",slot,token:request.token,state:"failed",html:"",total:0});
+    });
+  },
+  // A Markdown file as one passive page for a sandboxed web view (src/markdown-html.js);
+  // a newer request on the same slot drops the older one's reply.
+  markdownhtml: request => {
+    const slot = request.slot ?? "";
+    const job = {};
+    markdownJobs.set(slot, job);
+    markdownHtml(request).then(reply => {
+      if (markdownJobs.get(slot) !== job) return;
+      markdownJobs.delete(slot);
+      send(reply);
+    }).catch(() => {
+      if (markdownJobs.get(slot) !== job) return;
+      markdownJobs.delete(slot);
+      send({t:"markdownhtml",slot,token:request.token,state:"failed",html:""});
     });
   },
   list,
@@ -276,6 +314,9 @@ const handlers = {
     trash(request, send, named);
   },
   collisions: (request) => collisions(request, send, listing, stamp),
+  mergecollisions: (request) => mergeCollisions(request, send, listing, stamp),
+  dirsize,
+  dirsizecancel: dirsizeCancel,
   transfer: (request) => transfer(request, send, listing, stamp),
   // One id space for both: an archive job's id is never a transfer's.
   transfercancel: (request) => archiveCancel(request.id) || transferCancel(request),
@@ -294,8 +335,9 @@ const handlers = {
 
 export function runBackend() {
   onChanged(send);
+  dirsizeInit(send, () => listing);
   // The command the interface runs for Find, which it spawns and reads itself; null when none exists.
-  send({ t: "findcommand", argv: findCommand() });
+  send({ t: "findcommand", argv: findCommand(), grep: grepCommand() });
   // The sidebar's Trash count, sent when it changes; upstream's UI ran `gio monitor` for it.
   let trashRevision = 0;
   watchTrashCount((count) => send({ t: "trashcount", count, revision: ++trashRevision }));

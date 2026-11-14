@@ -4,6 +4,7 @@ import { accessSync, constants, lstatSync, readdirSync, readlinkSync, statSync }
 import { join, basename } from "node:path";
 import { describeKind } from "./kinds.js";
 import { NEEDS_STAT, sortRows } from "./order.js";
+import { keptSize } from "./dirsize.js";
 
 const S_IFMT = 0o170000,
   S_IFLNK = 0o120000;
@@ -29,6 +30,8 @@ export class Listing {
   sort(order) {
     const started = performance.now();
     if (NEEDS_STAT.has(order.by)) for (const row of this.rows) this.stat(row);
+    if (order.by === "size")
+      for (const row of this.rows) row.measured = row.dir && !row.trash ? keptSize(join(this.path || ".", row.name))?.bytes : undefined;
     // Kind ordering compares the name's class alone, so it reads no file and pays no stat.
     if (order.by === "kind" || order.groupByKind)
       for (const row of this.rows) row.group ??= describeKind(row.trash ? basename(row.trash.original || row.name) : row.name, row.dir, 0, undefined).group;
@@ -93,7 +96,17 @@ export class Listing {
     };
     if (row.trash) out.trash = {name: basename(row.trash.original || row.name), original: row.trash.original, deleted: row.trash.deleted, identity: row.trash.identity};
     if (link !== undefined) out.l = link;
+    // A content search's matched line, drawn under the name in its results.
+    if (row.match) out.g = row.match;
     if (row.dir) out.v = st ? st.dev : 0;
+    // A folder the user already measured keeps its size on every later row: z, and zp for a floor.
+    if (row.dir && !row.trash) {
+      const kept = keptSize(join(this.path || ".", row.name));
+      if (kept) {
+        out.z = kept.bytes;
+        if (kept.partial) out.zp = true;
+      }
+    }
     return out;
   }
 

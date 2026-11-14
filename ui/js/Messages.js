@@ -25,6 +25,8 @@ function route(root, message) {
         root.thumbed(message.row, message.file)
     } else if (message.t === "dirsized") {
         root.dirSized(message.row, message.bytes, message.partial)
+    } else if (message.t === "dirsizedone") {
+        root.dirSizeDone(message.cancelled === true)
     } else if (message.t === "settagged") {
         root.settagged(message)
     } else if (message.t === "tagstates") {
@@ -87,6 +89,7 @@ function route(root, message) {
     // flea-qml: the command Find spawns, named once at start; null when nothing can run it.
     } else if (message.t === "findcommand") {
         root.findArgv = Array.isArray(message.argv) && message.argv.length > 0 ? message.argv : null
+        root.grepArgv = Array.isArray(message.grep) && message.grep.length > 0 ? message.grep : null
     // flea-qml: the backend's Trash count, sent at start and whenever it changes.
     } else if (message.t === "trashcount") {
         root.trashCount = message.count
@@ -114,6 +117,8 @@ function route(root, message) {
         root.codeResult(message)
     } else if (message.t === "html") {
         root.htmlResult(message)
+    } else if (message.t === "markdownhtml") {
+        root.markdownHtmlResult(message)
     } else if (message.t === "compare") {
         root.compareResult(message)
     } else if (message.t === "shebang") {

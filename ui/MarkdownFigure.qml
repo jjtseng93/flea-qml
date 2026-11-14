@@ -53,7 +53,7 @@ Item {
         font.bold: true
     }
 
-    readonly property bool failed: root.error !== ""
+    readonly property bool failed: root.kind === "math" || root.error !== ""
     readonly property bool ready: root.svg !== ""
     readonly property bool working: root.ticket > 0
     property string svg: ""
@@ -84,9 +84,10 @@ Item {
     // The request this figure last sent; an ask for the same state is dropped, so a burst of changes renders once.
     property string lastRequest: ""
     function ask() {
+        if (root.kind === "math") return;
         root.askRuns++;
         // Offscreen property changes invalidate the settled figure until it enters the viewport.
-        if (!root.askArmed || root.source === "" || !root.inView) {
+        if (root.kind === "math" || !root.askArmed || root.source === "" || !root.inView) {
             root.ticket = 0;
             root.svg = "";
             root.error = "";
@@ -130,7 +131,7 @@ Item {
     onInViewChanged: if (root.created && root.inView && root.askArmed && root.source !== "" && root.ticket === 0 && root.svg === "" && root.error === "") root.ask()
     // The service's held answer for this exact request, taken on the change itself, so a formula typeset ahead is drawn in the first frame.
     function takeRemembered() {
-        if (!root.askArmed || root.source === "" || !root.inView)
+        if (root.kind === "math" || !root.askArmed || root.source === "" || !root.inView)
             return false;
         var theme = FigureDate.datedTheme(root.kind, root.source, root.hexTheme());
         var hit = FigureService.cached(root.kind, root.source, theme, root.display);

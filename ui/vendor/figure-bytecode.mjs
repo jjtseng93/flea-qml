@@ -11,7 +11,6 @@ const IDENTIFIER = /^[\w$]+$/;
 
 // Each bundle ends in one export clause, so its text becomes a global the module sets: a compiled module has no name to import it by.
 export const BUNDLES = {
-    math: { file: "math.mjs", blob: "math.bc", global: "__figureMath" },
     mermaid: { file: "mermaid.mjs", blob: "mermaid.bc", global: "__figureMermaid" },
 };
 

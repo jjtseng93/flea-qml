@@ -3,7 +3,6 @@ import * as std from "qjs:std";
 
 // Sample input: {"id":3,"kind":"math","source":"\\frac{a}{b}","display":true,"theme":{"bg":"#101315","fg":"#c0caf5"}}.
 var worker = await import("../js/FigureWorker.mjs");
-var mathApi = null;
 var mermaidApi = null;
 // Sample argv: figure-helper.mjs --bytecode=/home/gm/.cache/flea/figures/<key> --warm=mermaid,math --report; each flag is optional.
 function flagValue(name) {
@@ -14,7 +13,7 @@ function flagValue(name) {
 // The launcher names the verified bytecode directory; none means every bundle is parsed from source.
 var bytecodeDir = flagValue("bytecode");
 var bytecode = bytecodeDir ? await import("./figure-bytecode.mjs") : null;
-var KINDS = ["math", "mermaid"];
+var KINDS = ["mermaid"];
 // The kinds a warm start loads before the first request, so the first figure finds its bundle ready.
 var warmKinds = flagValue("warm").split(",").filter(function (kind, at, all) { return KINDS.includes(kind) && all.indexOf(kind) === at; });
 var ERROR_WORDS = 160;
@@ -45,7 +44,7 @@ async function bundleOf(kind) {
         }
     }
     if (!api)
-        api = kind === "math" ? await import("./math.mjs") : await import("./mermaid.mjs");
+        api = await import("./mermaid.mjs");
     if (reportLoads)
         answer({ id: 0, bundle: kind, from: from });
     return api;
@@ -59,11 +58,6 @@ async function renderOne(req) {
     var kind = req.kind;
     var source = String(req.source || "");
     var theme = themeOf(req);
-    if (kind === "math") {
-        if (!mathApi)
-            mathApi = await bundleOf("math");
-        return worker.renderFigure(kind, source, !!req.display, theme, mathApi);
-    }
     if (kind === "mermaid") {
         if (!mermaidApi)
             mermaidApi = await bundleOf("mermaid");

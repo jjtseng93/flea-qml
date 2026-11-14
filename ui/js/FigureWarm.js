@@ -8,7 +8,7 @@ function query(blocks, themes, keyOf) {
     var keys = [];
     var kinds = [];
     for (var i = 0; i < blocks.length; i++) {
-        if (blocks[i].type !== "figure")
+        if (blocks[i].type !== "figure" || blocks[i].kind === "math")
             continue;
         var theme = FigureDate.datedTheme(blocks[i].kind, blocks[i].source, themes[blocks[i].kind]);
         // A figure with no theme has no key and so is never known.

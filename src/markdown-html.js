@@ -1,0 +1,258 @@
+// Markdown to one passive HTML page, for a preview shown in a sandboxed web view
+// (WebEngineView: buninu-browser's iframe, or Qt WebEngine). Bun.markdown.html writes the
+// HTML; nothing it writes is used as it comes. Formulas are set aside first and set by
+// src/mathml.js; the rest is parsed again and rebuilt from the same allowlist the QML
+// preview applies to raw HTML (ui/js/MdHtml.js, ui/js/MdUrl.js): those tags, those
+// attributes, http(s)/mailto/relative links, and only pictures inside the document's
+// folder, which are embedded as data: URLs so the page loads nothing. A remote picture is
+// a note naming its host. The page carries no script and no resource reference.
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, extname, resolve, sep } from "node:path";
+import { texToMathML, cleanMathML } from "./mathml.js";
+
+/** The largest Markdown source converted, as the QML preview's maxBytes default. */
+export const MARKDOWN_LIMIT = 1 << 20;
+// Qt WebEngine's loadHtml shows nothing past 2 MB (it loads a data: URL), so embedded
+// pictures share 1 MB beside the at most 1 MB of text.
+const IMAGE_LIMIT = 1 << 20;
+const IMAGES_TOTAL = 1 << 20;
+
+// Tags re-emitted with the attributes below; any other tag is dropped and its content kept.
+const ALLOWED = new Set(("a b strong i em u s del strike sub sup kbd code br small mark span p div h1 h2 h3 h4 h5 h6 hr " +
+  "img picture source details summary table thead tbody tr th td ul ol li blockquote pre font input").split(" "));
+// Tags dropped with their content: active content, foreign namespaces (formulas come back
+// through their own path), and the elements whose content the parser keeps as raw text,
+// which would turn back into markup if only the tag were dropped.
+const DROP_CONTENT = new Set(("script style iframe object embed template noscript svg math textarea title xmp " +
+  "plaintext noembed noframes select option head").split(" "));
+const VOID = new Set(["br", "hr", "img", "source", "input"]);
+const GLOBAL_ATTRIBUTES = new Set(["align", "alt", "width", "height", "title", "colspan", "rowspan"]);
+const STRIKE_AS = { del: "s", strike: "s" };
+const IMAGE_TYPES = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp", ".avif": "image/avif" };
+
+const escapeText = (text) => text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+const escapeAttribute = (value) => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+// Entities, percent escapes and control characters undone until the text settles, as
+// MdUrl.targetAllowed decodes before it judges a scheme; a target still changing after
+// eight passes is refused.
+function decodedTarget(raw) {
+  let seen = String(raw);
+  for (let pass = 0; pass < 8; pass++) {
+    let next = seen.replace(/&(#x[0-9a-f]+|#\d+|colon|tab|newline|amp|lt|gt|quot|apos);?/gi, (all, name) => {
+      const lower = name.toLowerCase();
+      if (lower === "colon") return ":";
+      if (lower === "tab") return "\t";
+      if (lower === "newline") return "\n";
+      if (lower[0] === "#") {
+        const code = lower[1] === "x" ? parseInt(lower.slice(2), 16) : parseInt(lower.slice(1), 10);
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+      }
+      return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[lower];
+    });
+    try { next = decodeURIComponent(next); } catch {}
+    next = next.replace(/[\u0000- \u007f-\u009f]/g, "");
+    if (next === seen) return next;
+    seen = next;
+  }
+  return null;
+}
+
+/** Whether a link target may stay: http(s), mailto, or no scheme (relative, #fragment). */
+export function linkAllowed(raw) {
+  const target = decodedTarget(raw);
+  if (target === null) return false;
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(target)?.[1]?.toLowerCase();
+  return !scheme || scheme === "http" || scheme === "https" || scheme === "mailto";
+}
+
+const isRemote = (url) => /^(https?:)?\/\//i.test(url);
+const hostOf = (url) => {
+  const rest = url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/^\/\//, "");
+  const host = rest.split(/[/?#]/)[0].split("@").pop();
+  return (host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0]) || url;
+};
+
+/**
+ * A picture's source: "remote" with its host, "local" with a data: URL for a file inside
+ * `folder` (symbolic links resolved, so none leads out), or "dropped". Every other scheme,
+ * data: included, is dropped.
+ */
+export function classifyImage(raw, folder, budget) {
+  const url = decodedTarget(raw ?? "");
+  if (!url) return { kind: "dropped" };
+  if (isRemote(url)) return { kind: "remote", host: hostOf(url) };
+  let path;
+  if (/^file:/i.test(url)) path = url.replace(/^file:(\/\/)?/i, "");
+  else if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return { kind: "dropped" };
+  else path = url.split(/[?#]/)[0];
+  if (path.includes("\\")) return { kind: "dropped" };
+  const type = IMAGE_TYPES[extname(path).toLowerCase()];
+  if (!type) return { kind: "dropped" };
+  try {
+    const root = realpathSync(folder);
+    const file = realpathSync(resolve(folder, path.startsWith("/") ? path : `./${path}`));
+    if (file !== root && !file.startsWith(root + sep)) return { kind: "dropped" };
+    const size = statSync(file).size;
+    if (size > IMAGE_LIMIT || size > budget.left) return { kind: "dropped" };
+    budget.left -= size;
+    return { kind: "local", url: `data:${type};base64,${readFileSync(file).toString("base64")}` };
+  } catch {
+    return { kind: "dropped" };
+  }
+}
+
+/**
+ * Rebuilds HTML from the allowlist: allowed tags with their allowed attributes, text
+ * escaped, everything else dropped (DROP_CONTENT with its content, other tags keeping
+ * theirs). Nothing of the source survives as markup except what is emitted here.
+ */
+export function cleanHtml(source, folder) {
+  const out = [];
+  const budget = { left: IMAGES_TOTAL };
+  let hidden = 0;
+  new HTMLRewriter().on("*", {
+    element(el) {
+      const tag = el.tagName.toLowerCase();
+      const foreign = el.namespaceURI !== "http://www.w3.org/1999/xhtml";
+      if (hidden || DROP_CONTENT.has(tag) || foreign) {
+        if (el.canHaveContent) { hidden++; el.onEndTag(() => { hidden--; }); }
+        return;
+      }
+      if (!ALLOWED.has(tag)) return;
+      const name = STRIKE_AS[tag] ?? (tag === "font" ? "span" : tag);
+      let attributes = "";
+      for (const [key, value] of el.attributes) {
+        const attribute = key.toLowerCase();
+        if (GLOBAL_ATTRIBUTES.has(attribute)) attributes += ` ${attribute}="${escapeAttribute(value)}"`;
+        else if (attribute === "href" && tag === "a" && linkAllowed(value)) attributes += ` href="${escapeAttribute(value)}"`;
+        // A task list's box: shown, never editable.
+        else if (tag === "input" && attribute === "checked") attributes += " checked";
+      }
+      if (tag === "input") {
+        if (String(el.getAttribute("type")).toLowerCase() !== "checkbox") return;
+        attributes += ' type="checkbox" disabled';
+      }
+      if (tag === "img" || tag === "source") {
+        if (tag === "source") return; // picture keeps its img; a source set is not followed
+        const picked = classifyImage(el.getAttribute("src"), folder, budget);
+        if (picked.kind === "remote") {
+          out.push(`<span class="remote">Remote image not loaded · ${escapeText(picked.host)}</span>`);
+          return;
+        }
+        if (picked.kind === "dropped") {
+          const alt = el.getAttribute("alt");
+          if (alt) out.push(`<span class="alt">${escapeText(alt)}</span>`);
+          return;
+        }
+        attributes += ` src="${picked.url}"`;
+      }
+      out.push(`<${name}${attributes}>`);
+      if (!VOID.has(tag) && el.canHaveContent) el.onEndTag(() => out.push(`</${name}>`));
+    },
+  }).onDocument({
+    text(chunk) {
+      if (!hidden) out.push(escapeText(chunk.text));
+    },
+  }).transform(String(source));
+  return out.join("");
+}
+
+// ---- formulas ----
+
+// Private-use markers, which Markdown leaves alone (it turns NUL into U+FFFD).
+const OPEN = "", CLOSE = "";
+
+/**
+ * Sets formulas aside: $$…$$ and $…$ (TeX) and raw <math>…</math> (MathML), outside code
+ * fences and code spans. Returns the text with markers and the formulas they stand for.
+ */
+export function holdFormulas(source) {
+  const formulas = [];
+  const hold = (formula) => `${OPEN}${formulas.push(formula) - 1}${CLOSE}`;
+  const lines = String(source).replace(/[]/g, "�").split("\n");
+  const kept = [];
+  let fence = null;
+  let prose = [];
+  const flush = () => {
+    if (!prose.length) return;
+    let text = prose.join("\n");
+    prose = [];
+    // Code spans are kept whole: a run of backticks up to the same run.
+    const spans = [];
+    text = text.replace(/(`+)[\s\S]*?\1/g, (span) => `${spans.push(span) - 1}`);
+    text = text
+      .replace(/<math\b[\s\S]*?<\/math\s*>/gi, (markup) => hold({ markup }))
+      .replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => hold({ tex, display: true }))
+      // Inline TeX as pandoc reads it: no space just inside either $, and no digit right
+      // after the closing one, so "$5 and $10" stays prose.
+      .replace(/(^|[^\\$])\$(?=\S)([^$\n]*?\S)\$(?!\d)/g, (_, before, tex) => before + hold({ tex, display: false }));
+    kept.push(text.replace(/(\d+)/g, (_, index) => spans[Number(index)]));
+  };
+  for (const line of lines) {
+    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence) {
+      kept.push(line);
+      if (marker && marker[0] === fence[0] && marker.length >= fence.length && !line.trim().slice(marker.length).trim()) fence = null;
+    } else if (marker) {
+      flush();
+      fence = marker;
+      kept.push(line);
+    } else prose.push(line);
+  }
+  flush();
+  return { text: kept.join("\n"), formulas };
+}
+
+// A formula's MathML, or its source as escaped text when it is refused.
+function formulaHtml({ tex, display, markup }) {
+  try {
+    return markup !== undefined ? cleanMathML(markup) : texToMathML(tex, display);
+  } catch {
+    const source = markup ?? (display ? `$$${tex}$$` : `$${tex}$`);
+    return `<code class="formula-source">${Bun.escapeHTML(source)}</code>`;
+  }
+}
+
+// ---- the page ----
+
+const HEX = /^#[0-9a-f]{6}$/i;
+const colour = (value, fallback) => (HEX.test(String(value)) ? String(value) : fallback);
+
+/** The page's own stylesheet, from the preview's theme colours (each checked as #rrggbb). */
+export function pageStyle(theme = {}) {
+  const fg = colour(theme.foreground, "#d8dee9"), bg = colour(theme.background, "#171b22");
+  const muted = colour(theme.muted, "#8a93a6"), surface = colour(theme.surface, "#232833"), accent = colour(theme.accent, "#88c0d0");
+  const body = Math.max(8, Math.min(40, Number(theme.bodyPx) || 14));
+  return `html{background:${bg}}body{margin:12px 16px;color:${fg};background:${bg};font:${body}px sans-serif;line-height:1.7;overflow-wrap:anywhere}` +
+    `a{color:${accent}}h1,h2{color:${fg}}h1{font-size:1.45em}h2{font-size:1.2em}h3,h4,h5,h6{font-size:1em}` +
+    `pre,code,kbd{font-family:monospace;background:${surface}}code,kbd{padding:0 4px;border-radius:3px}` +
+    `pre{padding:8px 12px;white-space:pre-wrap}pre code{padding:0;background:none}` +
+    `blockquote{margin:0;padding-left:12px;border-left:3px solid ${muted};color:${muted}}` +
+    `table{border-collapse:collapse}td,th{border:1px solid ${muted};padding:2px 8px}hr{border:0;border-top:1px solid ${muted}}` +
+    `.remote{display:inline-block;border:1px dashed ${muted};color:${muted};padding:2px 6px}.alt{color:${muted}}` +
+    `math[display=block]{display:block;margin:6px 0}.formula-source{color:${muted}}img{max-width:100%}`;
+}
+
+/** One complete, passive page for a Markdown source in `folder`. */
+export function markdownPage(source, folder, theme = {}) {
+  if (Buffer.byteLength(String(source)) > MARKDOWN_LIMIT) throw Error("Markdown preview exceeds size limit");
+  const { text, formulas } = holdFormulas(source);
+  const html = Bun.markdown.html(text, { tables: true, strikethrough: true, tasklists: true });
+  const body = cleanHtml(html, folder)
+    .replace(new RegExp(`${OPEN}(\\d+)${CLOSE}`, "g"), (_, index) => formulas[Number(index)] ? formulaHtml(formulas[Number(index)]) : "");
+  return `<!doctype html><meta charset="utf-8"><style>${pageStyle(theme)}</style>${body}`;
+}
+
+/** The backend's answer to one `markdownhtml` request for the file at `request.path`. */
+export async function markdownHtml(request) {
+  const answer = { t: "markdownhtml", slot: request.slot ?? "", token: request.token, state: "failed", html: "" };
+  try {
+    const path = String(request.path ?? "");
+    if (!path || statSync(path).size > MARKDOWN_LIMIT) return answer;
+    const source = await Bun.file(path).text();
+    return { ...answer, state: "ready", html: markdownPage(source, dirname(resolve(path)), request.theme ?? {}) };
+  } catch {
+    return answer;
+  }
+}

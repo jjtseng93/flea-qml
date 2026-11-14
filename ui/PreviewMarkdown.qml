@@ -244,6 +244,7 @@ Item {
             // A save that unlinks and recreates the file can fail one reload; the next good load clears it.
             root.readFailed = false
             root.askParse()
+            root.askWeb()
         }
         onLoadFailed: {
             root.loadedText = ""
@@ -389,6 +390,7 @@ Item {
     function reparseForTheme() {
         if (!root.active || !file.loaded)
             return
+        root.askWeb()
         root.askParse()
     }
     // A theme switch moves ink and chrome in one turn, so both ask through one callLater and the parse sees both.
@@ -605,6 +607,41 @@ Item {
         bodyPx: root.bodyPx
     }
 
+    // Where the runtime has a web view, the rendered view is one sandboxed page the backend builds
+    // (src/markdown-html.js): formulas are set, and scrolling is the browser's. The block list
+    // below stays the view everywhere else, and for the source view.
+    readonly property bool useWeb: web.available && !root.tooLarge && !root.readFailed
+        && root.shownView === Markdown.RENDERED
+    property int webToken: 0
+    function askWeb() {
+        if (!root.useWeb || !root.active || root.path === "" || root.backend === null
+                || typeof root.backend.askMarkdownHtml !== "function")
+            return
+        root.webToken = root.backend.askMarkdownHtml("markdown-" + root.slot, root.path, {
+            foreground: root.inkHex, background: root.hexOf(Theme.color.background), muted: root.mutedHex,
+            surface: root.surfaceHex, accent: root.accentHex, bodyPx: root.bodyPx
+        })
+    }
+    onUseWebChanged: root.askWeb()
+    Connections {
+        target: root.backend
+        ignoreUnknownSignals: true
+        function onMarkdownHtmlResult(message) {
+            if (message.token === root.webToken && message.state === "ready")
+                web.html = message.html
+        }
+    }
+    Flea.WebPreview {
+        id: web
+        anchors.fill: parent
+        visible: root.useWeb
+        // A link opens outside, under the same gate as the block view's links.
+        onLinkActivated: function (url) {
+            if (Markdown.isExternalLink(url))
+                Qt.openUrlExternally(url)
+        }
+    }
+
     // Render only visible blocks and a bounded cache, even for a 1 MiB document.
     ListView {
         id: body
@@ -613,8 +650,9 @@ Item {
         anchors.rightMargin: root.insetX
         clip: true
         visible: (!root.tooLarge && !root.readFailed && root.parseError === "")
-            && root.shownView !== Markdown.SOURCE
-        model: root.blockList
+            && root.shownView !== Markdown.SOURCE && !root.useWeb
+        // The web page draws the document then, so no block delegates are built behind it.
+        model: root.useWeb ? [] : root.blockList
         // A new model resets the view to its origin, so the saved place is restored once that reset is done.
         onModelChanged: root.restoreScroll()
         onContentYChanged: { root.releaseHeldPlace(); root.noteEnd() }

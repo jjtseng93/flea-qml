@@ -90,6 +90,10 @@ export function runsOf(line) {
 export async function highlightFile(path, signal, filetype = null) {
   const command = jsmdcui();
   if (!command) return null;
+  // Each highlight is a whole Bun process; a document with many code blocks in view
+  // must not start them all at once, so at most HIGHLIGHT_LIMIT run and the rest wait.
+  // A request cancelled while waiting never starts one.
+  if (!(await acquire(signal))) return null;
   try {
     const args = [...command, "--cat", "--edit"];
     // jsmdcui settings use one dash: --filetype would name a different setting.
@@ -101,5 +105,37 @@ export async function highlightFile(path, signal, filetype = null) {
     return text.split("\n").map(runsOf);
   } catch {
     return null;
+  } finally {
+    release();
   }
+}
+
+/** Highlight processes allowed at once. */
+export const HIGHLIGHT_LIMIT = 2;
+let running = 0;
+const waiting = [];
+// Resolves true when a slot is taken, false when `signal` aborts first.
+function acquire(signal) {
+  if (signal?.aborted) return Promise.resolve(false);
+  if (running < HIGHLIGHT_LIMIT) {
+    running++;
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    const entry = { resolve };
+    const abort = () => {
+      const index = waiting.indexOf(entry);
+      if (index >= 0) waiting.splice(index, 1);
+      resolve(false);
+    };
+    entry.resolve = (taken) => { signal?.removeEventListener("abort", abort); resolve(taken); };
+    signal?.addEventListener("abort", abort, { once: true });
+    waiting.push(entry);
+  });
+}
+// A finished highlight hands its slot straight to the oldest waiting one.
+function release() {
+  const next = waiting.shift();
+  if (next) next.resolve(true);
+  else running--;
 }

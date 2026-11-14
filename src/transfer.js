@@ -4,17 +4,22 @@
 // Ported: copy and move of files, folders and symlinks, each target created exclusively; a
 // cross-drive move copies and then removes the source; per-drive queueing; progress; cancel,
 // which removes what the item in flight had written; the collide words keep, skip and refuse;
-// fsync onto FAT-family drives. Not yet: undo's journal, `replace` (it needs the Trash),
-// `merge` (the question answers mergeable:false, so the card never offers it), `fatnames`, and
-// fifos, sockets and device nodes, which are refused rather than opened.
+// fsync onto FAT-family drives; `replace`, which moves the item already there to flea's Trash
+// first and puts it back when the transfer fails; `merge` with `mergecollisions`' second question.
+// Not yet: undo's journal, `fatnames`, and fifos, sockets and device nodes, which are refused
+// rather than opened.
 import {trashRecord,forgetTrashRecord} from './trash-record.js';
-import { constants, promises as fsp, lstatSync, statSync, accessSync } from "node:fs";
+import { trashOne } from "./trash.js";
+import { constants, promises as fsp, lstatSync, statSync, accessSync, readdirSync, readlinkSync, realpathSync, renameSync, unlinkSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import { fsTypeOf } from "./fsinfo.js";
 import { describeKind } from "./kinds.js";
 import { capturedPaths, captureSelection, selectionItemUnchanged } from "./menu.js";
 
 const WORDS = new Set(["keep", "replace", "skip", "refuse", "merge"]);
+// A merge's second answer, for names inside the folders it folds together: no merge of its own.
+const INNER = new Set(["keep", "replace", "skip", "refuse"]);
+const LINK_LIMIT = 40;
 const FAT = new Set(["vfat", "exfat", "fat", "fat12", "fat16", "fat32", "msdos", "ntfs", "ntfs3"]);
 const CHUNK = 1 << 20,
   WINDOW = 150,
@@ -104,7 +109,8 @@ export function collisions(request, send, listing, stamp) {
     dest = request.dest,
     held = new Map(),
     names = [];
-  let total = 0;
+  let total = 0,
+    mergeable = false;
   if (!destProblem(dest)) {
     for (const path of named.paths) {
       if (!isAbsolute(path) || sameFolder(path, dest)) continue;
@@ -114,6 +120,8 @@ export function collisions(request, send, listing, stamp) {
       if (!there) continue;
       total++;
       held.set(path, identity(there));
+      // lstat on both sides: a link to a folder is replaced or kept, never merged through.
+      mergeable ||= source.isDirectory() && there.isDirectory();
       if (names.length < 3) {
         const name = basename(path),
           dir = source.isDirectory();
@@ -123,8 +131,124 @@ export function collisions(request, send, listing, stamp) {
   }
   question = { id, dest: typeof dest === "string" ? resolve(dest) : "", held,
     menuId: request.menuId, selection: !request.menuId ? null : captureSelection(request.menuId) };
-  send({ t: "collisions", id, total, names, mergeable: false });
+  send({ t: "collisions", id, total, names, mergeable });
 }
+
+const nameEntry = (name, st) => ({ n: name, d: st.isDirectory(), i: describeKind(name, st.isDirectory(), st.mode, undefined).icon });
+
+// After the first card answered Merge: one read-only walk of each folder that merges, gathering
+// every relative name both sides hold except folders that merge further down. It follows the
+// `collisions` question just kept and folds only the names that question saw, still unchanged.
+export function mergeCollisions(request, send, listing, stamp) {
+  const outer = question;
+  question = null;
+  const id = request.id ?? 0,
+    dest = request.dest,
+    reply = (total, names) => send({ t: "mergecollisions", id, total, names });
+  const matches = !!outer && typeof dest === "string" && outer.dest === resolve(dest) && outer.menuId === request.menuId;
+  const selection = !request.menuId ? null : matches ? outer.selection : captureSelection(request.menuId);
+  const named = request.menuId && selection ? { paths: selection.paths } : sources(request, listing, stamp, "mergecollisions");
+  if (named.stale) return request.menuId ? reply(0, []) : send(named.stale);
+  const held = matches ? outer.held : new Map(),
+    inner = new Map(),
+    names = [];
+  let total = 0;
+  const note = (rel, source, there, name) => {
+    total++;
+    inner.set(rel, identity(there));
+    if (names.length < 3) names.push(nameEntry(name, source));
+  };
+  const walk = (src, dst, rel) => {
+    let entries;
+    try {
+      entries = readdirSync(src);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const source = lstatOrNull(join(src, entry)), there = source && lstatOrNull(join(dst, entry));
+      if (!there) continue;
+      if (source.isDirectory() && there.isDirectory()) walk(join(src, entry), join(dst, entry), join(rel, entry));
+      else note(join(rel, entry), source, there, entry);
+    }
+  };
+  if (!destProblem(dest)) {
+    for (const path of named.paths) {
+      if (!isAbsolute(path) || sameFolder(path, dest)) continue;
+      const source = lstatOrNull(path), name = basename(path), there = source && lstatOrNull(join(dest, name));
+      if (!there || held.get(path) !== identity(there)) continue;
+      if (source.isDirectory() && there.isDirectory()) walk(path, join(dest, name), name);
+      else note(name, source, there, name);
+    }
+  }
+  question = { id, dest: typeof dest === "string" ? resolve(dest) : "", held, inner,
+    menuId: request.menuId, selection: outer && matches ? outer.selection : selection };
+  reply(total, names);
+}
+
+// ---- replacing ----
+
+// Why the item at `target` may not go to Trash for `src`, or "" when it may.
+function replaceProblem(src, source, target, paths) {
+  const there = resolve(target);
+  for (const path of paths) {
+    const full = resolve(path);
+    if (full === there || full.startsWith(there + sep)) return "the item already there holds the one being moved in, so it was not replaced";
+  }
+  if (source.isSymbolicLink() && linkLeadsTo(src, target)) return "the incoming link points at the item already there, so it was not replaced";
+  return "";
+}
+
+// Whether the link at `src`, once it sits at `target`, would name `target` itself: now, or by its
+// own text looked up from there through any other link on the way. Past LINK_LIMIT links it is let
+// through like a dangling link, which the kernel refuses anyway.
+function linkLeadsTo(src, target) {
+  const there = resolve(target);
+  try {
+    const now = statSync(src), held = statSync(there);
+    if (now.dev === held.dev && now.ino === held.ino) return true;
+  } catch {}
+  let text;
+  try {
+    text = readlinkSync(src);
+  } catch {
+    return false;
+  }
+  let at = resolve(dirname(there), text);
+  for (let hops = 0; hops < LINK_LIMIT; hops++) {
+    let parent = dirname(at);
+    try {
+      parent = realpathSync(parent);
+    } catch {}
+    at = join(parent, basename(at));
+    if (at === there) return true;
+    let st;
+    try {
+      st = lstatSync(at);
+    } catch {
+      return false;
+    }
+    if (!st.isSymbolicLink()) return false;
+    at = resolve(dirname(at), readlinkSync(at));
+  }
+  return false;
+}
+
+// Puts a replaced item back from the Trash; "" when it is back, else why it stays there.
+function putBack(trashed, target) {
+  if (lstatOrNull(target)) return "a new item now has its name";
+  try {
+    renameSync(trashed.file, target);
+  } catch (e) {
+    return reason(e);
+  }
+  try {
+    unlinkSync(trashed.info);
+  } catch {}
+  return "";
+}
+
+const stillInTrash = (err, why) => `${err}; the item it replaced is still in the Trash (${why})`;
 
 // ---- copying ----
 
@@ -255,6 +379,7 @@ async function fsyncPath(path, ctx) {
 async function move(src, dst, ctx) {
   // rename(2) replaces a file silently, and so does Windows' MoveFileEx, so the name is checked first.
   if (lstatOrNull(dst)) throw Object.assign(Error("exists"), { code: "EEXIST" });
+  const refusedBefore = ctx.refusedCount;
   try {
     await fsp.rename(src, dst);
     if (ctx.durable) {
@@ -266,8 +391,75 @@ async function move(src, dst, ctx) {
     if (e.code !== "EXDEV") throw e;
   }
   await copyAny(src, dst, ctx, true);
-  if (ctx.refusedCount) return;
+  if (ctx.refusedCount > refusedBefore) return;
   await fsp.rm(src, { recursive: true, force: false });
+}
+
+function refuseEntry(ctx, path, err) {
+  if (ctx.refused.length < REFUSED_CAP) ctx.refused.push({ name: relative(ctx.root, path), err });
+  ctx.refusedCount++;
+}
+
+// Folds the folder `src` into the folder `dst`: what is missing lands, folders on both sides fold the
+// same way down, and a name on both sides takes the inner answer when the walk saw it unchanged.
+// A move moves each landed entry and removes each source folder it emptied.
+async function mergeInto(src, dst, rel, ctx, m) {
+  ctx.job.check();
+  for (const entry of await fsp.readdir(src)) {
+    ctx.job.check();
+    const from = join(src, entry), at = join(dst, entry), key = join(rel, entry),
+      source = lstatOrNull(from);
+    if (!source) continue;
+    const there = lstatOrNull(at);
+    let target = at,
+      choice = "",
+      trashed = null;
+    if (there) {
+      if (source.isDirectory() && there.isDirectory()) {
+        await mergeInto(from, at, key, ctx, m);
+        continue;
+      }
+      choice = m.innerHeld.get(key) === identity(there) ? m.inner : "refuse";
+      if (choice === "skip") continue;
+      if (choice === "keep") {
+        target = freeCopyPath(dst, entry);
+        if (!target) {
+          refuseEntry(ctx, at, "every copy name for this item is already taken");
+          continue;
+        }
+      } else if (choice === "replace") {
+        const problem = replaceProblem(from, source, at, m.paths);
+        if (problem) {
+          refuseEntry(ctx, at, problem);
+          continue;
+        }
+        try {
+          trashed = trashOne(at);
+        } catch {
+          refuseEntry(ctx, at, "the item already there could not be moved to Trash, so nothing was replaced");
+          continue;
+        }
+      } else {
+        refuseEntry(ctx, at, "an item with that name is already there");
+        continue;
+      }
+    }
+    try {
+      if (m.moving) await move(from, target, ctx);
+      else await copyAny(from, target, ctx, true);
+    } catch (e) {
+      // Only the entry in flight is taken back on a cancel; what already landed stays.
+      if ((e instanceof Cancelled || trashed) && !m.moving && ctx.made.has(target)) await fsp.rm(target, { recursive: true, force: true }).catch(() => {});
+      const why = trashed ? putBack(trashed, at) : "";
+      if (e instanceof Cancelled) throw why ? Object.assign(new Cancelled(), { sentence: stillInTrash("cancelled", why) }) : e;
+      refuseEntry(ctx, target, why ? stillInTrash(e?.sentence ?? reason(e), why) : e?.sentence ?? reason(e));
+      continue;
+    }
+    m.merged++;
+    if (choice === "keep") m.keptBoth++;
+  }
+  if (m.moving) await fsp.rmdir(src).catch(() => {});
+  if (ctx.durable) await fsyncPath(dst, ctx);
 }
 
 function treeSentence(ctx, verb) {
@@ -302,11 +494,16 @@ export function transfer(request, send, listing, stamp) {
   const collide = request.collide;
   if (collide !== undefined && !WORDS.has(collide))
     return send({ t: "error", where: "transfer", path: dest, msg: `no collision answer is named ${collide}` });
+  const inner = collide === "merge" ? request.inner ?? "refuse" : "refuse";
+  if (!INNER.has(inner))
+    return send({ t: "error", where: "transfer", path: dest, msg: `no collision answer inside a merge is named ${inner}` });
   const moving = request.op === "move",
     paths = named.paths,
     id = nextId++,
     job = new Job(id, send);
   const answered = collide !== undefined && matches ? asked.held : new Map();
+  // Inner names are answered only by the merge walk this transfer names.
+  const innerHeld = collide === "merge" && matches && asked.inner ? asked.inner : new Map();
   jobs.set(id, job);
   send({ t: "transferstarted", id, n: paths.length, moving });
   let drive;
@@ -315,13 +512,13 @@ export function transfer(request, send, listing, stamp) {
   } catch {
     drive = dest;
   }
-  const run = () => runTransfer(job, { paths, dest, moving, collide, answered, selection }).finally(() => jobs.delete(id));
+  const run = () => runTransfer(job, { paths, dest, moving, collide, answered, selection, inner, innerHeld }).finally(() => jobs.delete(id));
   const tail = (queues.get(drive) ?? Promise.resolve()).then(run, run);
   queues.set(drive, tail);
   tail.finally(() => queues.get(drive) === tail && queues.delete(drive));
 }
 
-async function runTransfer(job, { paths, dest, moving, collide, answered, selection }) {
+async function runTransfer(job, { paths, dest, moving, collide, answered, selection, inner, innerHeld }) {
   const send = job.send,
     fstype = (() => {
       try {
@@ -337,7 +534,9 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
     unconfirmed = false;
   const retryPaths = [],
     refused = [],
-    touched = new Set([dest]);
+    touched = new Set([dest]),
+    m = { moving, inner, innerHeld, paths, merged: 0, keptBoth: 0 },
+    folded = [];
   for (let index = 0; index < paths.length; index++) {
     const src = paths[index],
       name = basename(src);
@@ -359,7 +558,10 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
       fail(isAbsolute(src) ? "it no longer exists" : "the path is not absolute");
       continue;
     }
-    let target = join(dest, name);
+    let target = join(dest, name),
+      trashed = null,
+      merging = false,
+      choice = "";
     if (sameFolder(src, dest)) {
       if (collide === undefined) {
         fail("already in that folder");
@@ -373,18 +575,29 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
     } else {
       const there = lstatOrNull(target);
       if (there) {
-        const choice = answered.get(src) === identity(there) ? collide : "refuse";
-        if (choice === "skip") {
+        choice = answered.get(src) === identity(there) ? collide : "refuse";
+        if (choice === "merge") {
+          // A folder on a folder folds in; anything else on the first card takes the inner answer.
+          if (source.isDirectory() && there.isDirectory()) merging = true;
+          else choice = innerHeld.get(name) === identity(there) ? inner : "refuse";
+        }
+        if (merging) {
+        } else if (choice === "skip") {
           skipped++;
           continue;
-        }
-        if (choice === "keep") target = freeCopyPath(dest, name);
+        } else if (choice === "keep") target = freeCopyPath(dest, name);
         else if (choice === "replace") {
-          fail("replacing through the Trash is not ported yet, so nothing was replaced");
-          continue;
-        } else if (choice === "merge") {
-          fail("merging folders is not ported yet, so nothing was merged");
-          continue;
+          const problem = replaceProblem(src, source, target, paths);
+          if (problem) {
+            fail(problem);
+            continue;
+          }
+          try {
+            trashed = trashOne(target);
+          } catch {
+            fail("the item already there could not be moved to Trash, so nothing was replaced");
+            continue;
+          }
         } else {
           fail("an item with that name is already there");
           continue;
@@ -400,10 +613,17 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
       continue;
     }
     const ctx = { job, index, name, root: dest, made: new Set(), refused: [], refusedCount: 0, durable, fat: FAT.has(fstype), unconfirmed: false };
-    const trashMetadata = moving ? trashRecord(src) : null;
+    const trashMetadata = moving && !merging ? trashRecord(src) : null;
     try {
-      if (moving) await move(src, target, ctx);
+      if (merging) {
+        folded.push(name);
+        await mergeInto(src, target, name, ctx, m);
+      } else if (moving) await move(src, target, ctx);
       else await copyAny(src, target, ctx, true);
+      if (!merging) {
+        m.merged++;
+        if (choice === "keep") m.keptBoth++;
+      }
       if (moving) forgetTrashRecord(trashMetadata);
       if (ctx.durable) await fsyncPath(dirname(target), ctx);
       unconfirmed ||= ctx.unconfirmed;
@@ -417,11 +637,18 @@ async function runTransfer(job, { paths, dest, moving, collide, answered, select
       }
     } catch (e) {
       // A cancel removes what the item in flight wrote; any other failure leaves it, as upstream does for undo.
-      if (e instanceof Cancelled && ctx.made.size) await fsp.rm(target, { recursive: true, force: true }).catch(() => {});
-      fail(e?.sentence ?? reason(e));
+      // A merge never removes the folder it folds into: mergeInto took back its own entry in flight.
+      if (e instanceof Cancelled && ctx.made.size && !merging) await fsp.rm(target, { recursive: true, force: true }).catch(() => {});
+      // A failed copy that replaced an item takes back its partial copy, so the replaced item can return.
+      if (trashed && !moving && ctx.made.has(target)) await fsp.rm(target, { recursive: true, force: true }).catch(() => {});
+      const err = e?.sentence ?? reason(e),
+        why = trashed ? putBack(trashed, target) : "";
+      fail(why ? stillInTrash(err, why) : err);
     }
   }
   const done = { t: "transferdone", id: job.id, ok, failed, skipped, cancelled: job.cancelled, retryPaths, durable: durable && !unconfirmed && failed === 0, note: unconfirmed ? "copied, but the drive did not confirm the folder" : "" };
+  // `into` names the merging folder only when it was the transfer's one item; anything beside it landed in dest.
+  if (collide === "merge") Object.assign(done, { merged: m.merged, keptBoth: m.keptBoth, into: folded.length === 1 && paths.length === 1 ? folded[0] : basename(resolve(dest)) || resolve(dest) });
   if (refused.length) done.refused = refused;
   send(done);
   for (const path of touched) send({ t: "changed", path });

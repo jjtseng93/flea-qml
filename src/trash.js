@@ -157,7 +157,7 @@ function reserve(trash, name, record) {
   throw new Error("every Trash name for this item is taken");
 }
 
-// Moves one item to the Trash; throws with a sentence when it cannot.
+// Moves one item to the Trash and answers where it went, { file, info }; throws with a sentence when it cannot.
 export function trashOne(path) {
   if (!isAbsolute(path) || resolve(path) === dirname(resolve(path))) throw new Error("Refusing to trash a filesystem root or relative path");
   const full = resolve(path),
@@ -180,6 +180,7 @@ export function trashOne(path) {
     unlinkSync(join(where.trash, "info", `${name}.trashinfo`));
     throw e.code === "EXDEV" ? new Error("This drive has no Trash that could be used, so the item was left in place") : e;
   }
+  return { file: join(where.trash, "files", name), info: join(where.trash, "info", `${name}.trashinfo`) };
 }
 
 const reason = (e) =>

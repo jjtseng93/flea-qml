@@ -20,6 +20,8 @@ Loader {
     // A merge holds its transfer across two cards: the walk's answer lands on the second.
     property bool merging: false
     property var outerNames: []
+    // How many names the first card counted, of which outerNames shows at most three.
+    property int outerTotal: 0
     property var probe: null
     // Built by the first FAT answer, with no placeholder: a Loader here would stand at startup for a card most windows never open.
     property var fatCard: null
@@ -57,6 +59,7 @@ Loader {
             return
         }
         root.outerNames = names
+        root.outerTotal = total
         root.active = true
         // Paste as links never merges: the Merge card is the transfer's own second card.
         root.item.open(Collide.title(names, total, root.pending.dest), names, Collide.more(total, names.length),
@@ -92,7 +95,7 @@ Loader {
             root.decideMerge("refuse")
             return
         }
-        var into = Collide.mergeDest(root.pending, root.outerNames)
+        var into = Collide.mergeDest(root.pending, root.outerNames, root.outerTotal)
         root.item.open(Collide.title(names, total, into), names, Collide.more(total, names.length), false)
     }
 

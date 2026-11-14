@@ -154,10 +154,12 @@ function mergeTransfer(request, inner, id) {
     return Object.assign({}, request, { collide: "merge", collideId: id, inner: inner })
 }
 
-// The second card names the folder it merges into: the one merging folder, else the destination.
-function mergeDest(request, outerNames) {
+// The second card names the folder it merges into: the one merging folder when it was the only
+// name the first card counted, else the destination, which every other name it lists lands in.
+// Sample input: a first card of trip/ alone gives ".../trip"; trip/ beside a.txt gives the destination.
+function mergeDest(request, outerNames, outerTotal) {
     var folders = (outerNames || []).filter(function (n) { return n.d === true }).map(function (n) { return n.n })
-    if (folders.length === 1)
+    if (folders.length === 1 && (outerTotal === undefined || outerTotal === 1))
         return String(request.dest).replace(/\/$/, "") + "/" + folders[0]
     return request.dest
 }

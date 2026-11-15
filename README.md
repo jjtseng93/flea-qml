@@ -28,6 +28,7 @@ bun --version
 bunx buninu
 
 # Open in the current terminal
+# Kitty graphics support is required if you want to show Flea QML inside it directly
 bunx buninu --local
 
 # Or do nothing in a @drxiaozhi/minapk Android App

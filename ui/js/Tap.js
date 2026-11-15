@@ -7,9 +7,15 @@
 // (ui/js/Focus.js leavesLine): the filter keeps its query standing and gives up its caret, and a Find
 // line hands the keys to the results without running. Otherwise the next Space or letter is typed
 // into the line the pointer has just left.
+function focusListing(root) {
+    if (root.renameEditor && root.renameEditor()) return
+    root.focusView = "list"
+    if (root.listArea) root.listArea.forceActiveFocus()
+}
 function releaseLines(root) {
     if (root.filterTyping) Filter.commit(root)
     if (root.searchMode === Search.TYPING) root.searchMode = Search.RESULTS
+    focusListing(root)
 }
 
 // Hit the drawn label instead of the whole name slot, including centered grid captions.

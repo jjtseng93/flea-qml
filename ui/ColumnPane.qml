@@ -286,6 +286,8 @@ Item {
 
     ListView {
         id: view
+        // The shared pane owns selection and arrow navigation, including after rename.
+        keyNavigationEnabled: false
         anchors.top: columnHeader.bottom
         anchors.left: parent.left
         anchors.right: parent.right

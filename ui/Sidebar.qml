@@ -713,15 +713,11 @@ Item {
         rest -= root.networkEntries.length
         return devRepeater.itemAt(rest)
     }
-    // Above the Flickable and every row, because a PointHandler under their exclusive press grab is never given the press; a passive handler leaves the press to the row.
-    Item {
-        anchors.fill: parent
-        z: 1
-        PointHandler {
-            acceptedButtons: Qt.AllButtons
-            // After pressed(), which can hand an overlay rail the keyboard, so the press that claimed it still hides the frame.
-            onActiveChanged: if (active) { root.pressed(); if (root.focused) root.pointerFocus = true }
-        }
+    // Observe the whole sidebar, including its empty background. A sibling
+    // overlay does not receive DOM events dispatched to rows beneath it.
+    PointHandler {
+        acceptedButtons: Qt.AllButtons
+        onActiveChanged: if (active) { root.pressed(); if (root.focused) root.pointerFocus = true }
     }
     // The rail edge, one Divider shared with the column edges.
     Flea.Divider {

@@ -33,12 +33,38 @@ Item {
     function focusPress(p) {
         var pane = root.pane
         if (p.x < 0 || p.y < 0 || p.x >= pane.width || p.y >= pane.height) return
+        // Preserve an input caret when the press is inside that very editor.
+        var focused = pane.Window.window ? pane.Window.window.activeFocusItem : null
+        if (focused && focused.cursorPosition !== undefined && focused.mapFromItem) {
+            var caret = focused.mapFromItem(pane, p.x, p.y)
+            if (caret.x >= 0 && caret.y >= 0 && caret.x < focused.width && caret.y < focused.height) return
+        }
         // The shown Sidebar can extend past its zero-width overlay host.
         var sidebar = root.item
         var r = sidebar ? sidebar.mapFromItem(pane, p.x, p.y) : null
         if (!root.hidden && r && r.x >= 0 && r.y >= 0 && r.x < sidebar.width && r.y < sidebar.height) {
-            if (root.overlay) pane.railPane.focusView = Focus.RAIL
-        } else { pane.focusView = Focus.LIST; pane.focusRequested() }
+            pane.railPane.focusView = Focus.RAIL
+            if (!sidebar.renameEditor()) sidebar.forceActiveFocus()
+        } else {
+            if (pane.terminalId) return
+            var preview = pane.previewColumnItem
+            if (preview && preview.visible) {
+                var at = preview.mapFromItem(pane, p.x, p.y)
+                if (at.x >= 0 && at.y >= 0 && at.x < preview.width && at.y < preview.height) {
+                    preview.forceActiveFocus()
+                    return
+                }
+            }
+            var list = pane.listArea
+            if (!list || !list.visible) return
+            var local = list.mapFromItem(pane, p.x, p.y)
+            if (local.x < 0 || local.y < 0 || local.x >= list.width || local.y >= list.height) return
+            // Keep a live rename's caret and click-away commit semantics.
+            if (pane.renameEditor()) return
+            pane.focusView = Focus.LIST
+            pane.focusRequested()
+            list.forceActiveFocus()
+        }
     }
 
     // Long enough that crossing the edge on the way somewhere else does not flash the rail, and that
@@ -161,7 +187,10 @@ Item {
             menu: root.pane.railPane.contextMenu()
             onRenameFinished: root.pane.railPane.listArea.forceActiveFocus()
             // The pane's own PointHandler never sees a press a row grabs, so an overlay rail claims the keyboard itself; a docked rail leaves it.
-            onPressed: if (root.overlay) root.pane.railPane.focusView = Focus.RAIL
+            onPressed: {
+                root.pane.railPane.focusView = Focus.RAIL
+                if (!sidebar.renameEditor()) sidebar.forceActiveFocus()
+            }
             onReleasingChanged: root.holdRelease(sidebar.releasing)
         }
         // Disabled with the Sidebar, so an unload under the pointer clears it; a handler inside the Sidebar dies without reporting.

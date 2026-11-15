@@ -41,6 +41,11 @@ so far:
   two Omarchy QML modules the interface imports, `ui/boot/Commons` and
   `ui/boot/Ui`, from
   [`omacom/omarchy@3c7027d`](https://github.com/omacom/omarchy/commit/3c7027db2a4fa9fa6a49d7af7f87c27ac48e677d).
+- Markdown formulas are set as MathML by Temml (`src/mathml.js`), and Mermaid
+  diagrams are drawn by the backend (`src/figure.js`: Pele in a Bun Worker, one
+  diagram at a time under a deadline). The HTML preview embeds each diagram as an
+  SVG picture; the block view asks the backend for the same SVG. Upstream's
+  sandboxed quickjs figure helper and its figure cache are not used.
 
 ## Layout
 
@@ -51,7 +56,7 @@ so far:
 | `src/flea.js` | The `flea` the interface runs; `--backend` answers `ui/Backend.qml` |
 | `src/` (rest) | The backend: listing, ordering, kinds and emoji, filesystem facts |
 | `docs/protocol.md` | Upstream's description of the backend line protocol |
-| `demos/` | One file for every emoji a row can show |
+| `demos/` | One file for every emoji a row can show, and `math-and-diagrams.md` for formulas and Mermaid |
 
 ## Running it
 
@@ -186,8 +191,8 @@ afterward; no compositor is required.
 MIT, as upstream. See [LICENSE](LICENSE): GM's copyright notice for Flea is
 kept, followed by Dr. John's (醫者小智) for this fork.
 
-The tree also carries Omarchy's QML modules, Lucide icon geometry, MathJax,
-Pele, and simple-icons and markdown-mark logos, each under its own licence;
+The tree also carries Omarchy's QML modules, Lucide icon geometry, Temml (with
+mhchem), Pele, and simple-icons and markdown-mark logos, each under its own licence;
 see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ### Preview fallback and syntax audit

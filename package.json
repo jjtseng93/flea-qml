@@ -1,6 +1,6 @@
 {
   "name": "flea-qml",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Flea QML is a cross-platform file manager written in Bun JavaScript & QML. It's an unofficial fork of Flea, the fast GUI file manager for Omarchy",
   "type": "module",
   "main": "./index.js",

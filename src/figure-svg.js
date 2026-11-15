@@ -1,4 +1,4 @@
-// Diagram SVG from Pele (src/vendor/mermaid.mjs), made safe and themed for a passive page or Qt SVG.
+// Diagram SVG from Pele (src/pele-wrapper.js), made safe and themed for a passive page or Qt SVG.
 // Pure functions: src/figure-thread.js runs them in a Bun Worker beside the bundle.
 
 export var MERMAID_LIMIT = 32768;

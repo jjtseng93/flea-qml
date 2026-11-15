@@ -79,14 +79,10 @@ Item {
         id: opener
         // A dropped request is the app being busy, not a failure, so it takes the plain role.
         onBusy: function (path) { pane.message("Still opening the last file; try again in a moment.", false) }
-        // canonicalize proved the path before every failure src/open.rs and src/terminal.rs report under their one status, so neither sentence below names a cause.
-        onFailed: function (path) { pane.message("No application on this system opened that file.", true) }
-        onIsDirectory: function (path) { pane.open(path) }
+        onFailed: function (path) { pane.message("xdg-open could not open that file. Make sure xdg-open is available on PATH.", true) }
         onTerminalBusy: function (path) { pane.message("Still opening the last terminal; try again in a moment.", false) }
         onTerminalFailed: function (path) { pane.message("No terminal on this system opened that folder.", true) }
-        // The run card's own answers: a program asks once on its raw ask line, and a file no application claims asks Open with.
-        onAskRunRaw: function (path, text) { pane.askRunCard({ path: path, raw: text }) }
-        onAskOpenWith: function (path) { pane.showOpenWith(path) }
+
     }
 
     Flea.ShareLink {

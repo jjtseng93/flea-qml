@@ -246,7 +246,7 @@ function openCursor(pane, opener) {
     opener.open(path)
 }
 
-// The run card's entrances always reach the opener, so Run asks through flea --open like Enter does.
+// The run card's open action uses the same xdg-open route as Enter.
 function runCursor(pane, opener, verb) {
     var row = openableRow(pane)
     if (!row) return

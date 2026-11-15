@@ -135,6 +135,11 @@ frontend may intercept a shortcut before Flea receives it.
 | `,`, Ctrl+, | Open settings |
 | `?` | Open the searchable keymap |
 
+Enter on an ordinary file invokes `xdg-open` from PATH on every platform,
+including Windows. Install or provide an `xdg-open` command there; Flea does not
+substitute a platform-specific opener. Folders navigate inside Flea and archives
+open the built-in preview (except AppImage). Space uses the built-in preview.
+
 ### Selection and file operations
 
 | Keys | Action |

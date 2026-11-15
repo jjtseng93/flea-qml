@@ -2,38 +2,24 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// The one component that runs Flea's own opening modes, so the huge page corner has one owner; see AGENTS.md "Opening a file".
+// Open files through xdg-open on PATH on every platform, including Windows.
 Item {
     id: root
 
     signal failed(string path)
-    signal isDirectory(string path)
     signal terminalFailed(string path)
     // Raised where the two single-flight guards below drop a request, so a swallowed press says so.
     signal busy(string path)
     signal terminalBusy(string path)
-    // flea --open answers 4 with the run card's own ask line on stdout, and 5 where no application claims the file.
-    signal askRunRaw(string path, string text)
-    signal askOpenWith(string path)
-
-    // The status src/open.rs returns for a directory, which the caller navigates to instead.
-    readonly property int isDirectoryStatus: 3
-    // The two statuses src/runfile.rs added beside it: ask the card, or ask Open with.
-    readonly property int askRunStatus: 4
-    readonly property int askOpenWithStatus: 5
-
     property string current: ""
     // The terminal launch's own path: open() and openTerminal() run on separate
     // Processes guarded only against themselves, so sharing current let whichever
     // started second rewrite the path the first one's onExited still reports.
     property string terminalCurrent: ""
-    // One open at a time: pending is the launch with no exit yet, and the stream arrives before the exit.
+    // One open at a time until xdg-open exits.
     property bool pending: false
-    property string askText: ""
+    property int openSerial: 0
 
-    // flea --open waits for gio open and not for the application it starts, and that wait is 11 to 15 ms
-    // for an Exec= handler but 0.32 to 0.75 s for a DBusActivatable one, which is what this box's
-    // twenty-five archive types default to, so this guard drops a second Enter for that long and says so.
     function open(path) {
         if (child.running || root.pending) {
             root.busy(path)
@@ -41,38 +27,32 @@ Item {
         }
         root.current = path
         root.pending = true
-        root.askText = ""
-        child.command = [Quickshell.env("FLEA_BIN") || "flea", "--open", path]
+        root.openSerial++
+        child.command = ["xdg-open", path]
         child.running = true
     }
 
     Process {
         id: child
-        stdout: StdioCollector {
-            waitForEnd: true
-            onStreamFinished: root.askText = this.text
-        }
-
-        // An ask status without its line is a launch that died mid-answer, so it says the plain failure and opens no card.
+        // xdg-open's nonzero exit codes are failures, not Flea's private statuses.
         onExited: function (exitCode, exitStatus) {
             root.pending = false
-            if (exitCode === 0)
-                return
-            if (exitCode === root.isDirectoryStatus)
-                root.isDirectory(root.current)
-            else if (exitCode === root.askRunStatus && root.askText !== "")
-                root.askRunRaw(root.current, root.askText)
-            else if (exitCode === root.askOpenWithStatus)
-                root.askOpenWith(root.current)
-            else
+            if (exitCode !== 0 || exitStatus !== 0)
                 root.failed(root.current)
         }
         // A program that never started reports no exit, only running turning false.
         onRunningChanged: {
             if (child.running || !root.pending)
                 return
-            root.pending = false
-            root.failed(root.current)
+            // running may change before onExited. Let that signal settle first;
+            // a deferred failure must not apply to a later open request.
+            var serial = root.openSerial
+            Qt.callLater(function () {
+                if (root.pending && !child.running && root.openSerial === serial) {
+                    root.pending = false
+                    root.failed(root.current)
+                }
+            })
         }
     }
 

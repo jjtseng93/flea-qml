@@ -24,8 +24,12 @@ function normalize(path) {
     if (text.length === 0) {
         return ""
     }
+    if (/^[A-Za-z]:[\\/]/.test(text) || /^\\\\/.test(text)) text = text.replace(/\\/g, "/")
+    var drive = /^[A-Za-z]:\//.test(text)
+    var unc = text.indexOf("//") === 0
     var parts = text.split("/")
     var out = []
+    var floor = drive ? 1 : unc ? 2 : 0
     for (var i = 0; i < parts.length; i++) {
         var part = parts[i]
         // An empty part is a doubled or a trailing slash, and neither names a directory of its own.
@@ -34,12 +38,12 @@ function normalize(path) {
         }
         if (part === "..") {
             // The root has no parent, which is where climbing stops, exactly as ui/js/Nav.js parent does.
-            out.pop()
+            if (out.length > floor) out.pop()
             continue
         }
         out.push(part)
     }
-    return "/" + out.join("/")
+    return (drive ? "" : unc ? "//" : "/") + out.join("/") + (drive && out.length === 1 ? "/" : "")
 }
 
 // A file:// URI is what a paste from another application carries, and Flea's own --select takes one
@@ -68,7 +72,8 @@ function unwrap(text) {
     }
     body = cut < 0 ? "/" : body.substring(cut)
     try {
-        return decodeURIComponent(body)
+        var decoded = decodeURIComponent(body)
+        return /^\/[A-Za-z]:\//.test(decoded) ? decoded.substring(1) : decoded
     } catch (e) {
         return body
     }
@@ -112,7 +117,7 @@ function resolve(text, current, home) {
     // The tilde only expands against a home the shell actually published; with none, it is a name.
     if (home.length > 0 && (body === "~" || body.indexOf("~/") === 0)) {
         body = home + body.substring(1)
-    } else if (body.charAt(0) !== "/") {
+    } else if (body.charAt(0) !== "/" && !/^[A-Za-z]:[\\/]/.test(body) && !/^\\\\/.test(body)) {
         // Relative to where the pane is, so "Downloads" and Enter is a directory down.
         body = current + "/" + body
     }

@@ -272,8 +272,13 @@ function trimSlash(path) {
 }
 
 function parentOf(path) {
-    var text = trimSlash(path)
+    var text = String(path)
+    if (/^[A-Za-z]:[\\/]/.test(text) || /^\\\\/.test(text)) text = text.replace(/\\/g, "/")
+    text = trimSlash(text)
+    if (/^[A-Za-z]:$/.test(text)) return text + "/"
+    if (/^\/\/[^/]+\/[^/]+$/.test(text)) return text
     var cut = text.lastIndexOf("/")
+    if (cut === 2 && /^[A-Za-z]:/.test(text)) return text.substring(0, 3)
     return cut <= 0 ? "/" : text.substring(0, cut)
 }
 
@@ -299,9 +304,10 @@ function parent(pane) {
         return
     }
     var here = pane.path
-    var cut = here.lastIndexOf("/")
+    var target = parentOf(here)
+    if (target === here) return
     pane.pendingSelect = here
-    pane.open(cut <= 0 ? "/" : here.substring(0, cut))
+    pane.open(target)
 }
 
 // A click on the folder already shown is a no-op, so the rail and columns routes land here.

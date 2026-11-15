@@ -50,7 +50,7 @@ function pathOf(href) {
     if (/[\x00-\x1f\x7f]/.test(decoded)) {
         return ""
     }
-    return decoded
+    return /^\/[A-Za-z]:\//.test(decoded) ? decoded.substring(1) : decoded
 }
 
 // Sample bookmarks: [{ href: "file:///home/gm/a.txt", stamp: "2026-08-30T11:32:04Z" }].
@@ -102,7 +102,7 @@ function locationOf(path) {
         return "/"
     }
     var parent = text.substring(0, cut)
-    return parent.charAt(0) === "/" ? parent : "/" + parent
+    return parent.charAt(0) === "/" || /^[A-Za-z]:/.test(parent) ? parent : "/" + parent
 }
 
 // Sample input: "home/gm/Documents/claude/a.md" under "/home/gm" is "Documents/claude", a file in home "~", outside it absolute.

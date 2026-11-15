@@ -34,7 +34,8 @@ var PICTURE_SIZE_DEADLINE_MS = 1500
 // Sample input: "file:///d/b%20c.png" answers "/d/b c.png"; "file:///d/100%.png" (a stray percent) answers "".
 function pathOfUrl(url) {
     try {
-        return decodeURIComponent(String(url).slice(FILE_SCHEME_LENGTH))
+        var decoded = decodeURIComponent(String(url).slice(FILE_SCHEME_LENGTH))
+        return /^\/[A-Za-z]:\//.test(decoded) ? decoded.substring(1) : decoded
     } catch (e) {
         return ""
     }

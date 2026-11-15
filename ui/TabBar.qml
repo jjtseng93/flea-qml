@@ -1,3 +1,4 @@
+import "js/Format.js" as Format
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -652,7 +653,7 @@ Item {
     Loader {
         id: tearPanels
         active: root.outActive
-        source: "file://" + Quickshell.shellDir + "/tabtearoff.qml"
+        source: Format.fileUri(Quickshell.shellDir + "/tabtearoff.qml")
         onLoaded: {
             item.tabBar = root
             item.tabMime = Tabs.TAB_MIME

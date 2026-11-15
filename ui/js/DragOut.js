@@ -19,7 +19,8 @@ function filePath(url) {
         path = rest.substring(slash)
     }
     try {
-        return decodeURIComponent(path)
+        var decoded = decodeURIComponent(path)
+        return /^\/[A-Za-z]:\//.test(decoded) ? decoded.substring(1) : decoded
     } catch (error) {
         return null
     }

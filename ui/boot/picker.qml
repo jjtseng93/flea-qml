@@ -13,11 +13,26 @@ import QtQuick
 ShellRoot {
     id: root
 
+    function fileUrl(path) {
+        path = String(path)
+        // Only Windows paths use backslashes as separators; POSIX filenames may contain them.
+        var drive = /^[A-Za-z]:[\\/]/.test(path)
+        var unc = /^\\\\[^\\]/.test(path)
+        if (drive || unc) path = path.replace(/\\/g, "/")
+        // File paths collapse repeated separators before URL dot-segment resolution.
+        path = (path.indexOf("//") === 0 ? "//" : "") + path.replace(/^\/\//, "").replace(/\/+/g, "/")
+        var parts = path.split("/")
+        for (var i = 0; i < parts.length; i++) {
+            if (!(drive && i === 0)) parts[i] = encodeURIComponent(parts[i])
+        }
+        return (drive ? "file:///" : path.indexOf("//") === 0 ? "file:" : "file://") + parts.join("/")
+    }
+
     LazyLoader {
         id: chooser
         active: true
         // This directory cannot import ui/js/Format.js through qs:, so the one call is written out.
-        source: "file://" + encodeURI(Quickshell.shellDir + "/../PickerWindow.qml").replace(/#/g, "%23").replace(/\?/g, "%3F")
+        source: root.fileUrl(Quickshell.shellDir + "/../PickerWindow.qml")
     }
 
     // Well past the 1.7 to 3.0 s the first launch after an update spends writing Qt's cache.

@@ -1,4 +1,5 @@
 import Quickshell
+import "js/Format.js" as Format
 import QtQuick
 import qs.Commons
 import "."
@@ -257,7 +258,7 @@ Rectangle {
     Loader {
         id: tabAck
         active: true
-        source: "file://" + Quickshell.shellDir + "/fleatab.qml"
+        source: Format.fileUri(Quickshell.shellDir + "/fleatab.qml")
         onLoaded: {
             item.tabBar = tabBar
             item.view = view

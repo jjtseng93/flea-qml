@@ -9,6 +9,9 @@ Flea QML is a cross-platform file manager written in Bun JavaScript & QML. It's 
 - **Extend the capabilities**: run across platforms, on Windows, Linux and
   Android, wherever a QML runtime and a JS engine do, including [buninu-browser](https://github.com/jjtseng93/buninu-browser)'s QML frontend.
 
+> [!WARNING]
+> Flea QML is still in early development. Features and APIs may be unstable and may change without notice.
+
 ## Running it
 
 1. Install Bun first, then check that it is available on PATH:

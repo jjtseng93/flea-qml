@@ -175,7 +175,7 @@ Esc acts on that query rather than the other one.
 | Ctrl+Tab | Focus the preview column; from Quick Look, close Quick Look |
 | `i` | Toggle file facts in the visible preview column |
 | Up / Down, `k` / `j` in Quick Look | Preview the previous / next file |
-| PageUp / PageDown, Ctrl+U / Ctrl+D, `B` / `F` | Scroll the preview by a page |
+| PageUp / PageDown, `B` / `F` | Scroll the preview by a page |
 | `B` / `F` in the file list | Scroll the preview column by a page |
 | `w` in text/code Quick Look | Toggle line wrapping |
 | `r` in document Quick Look | Switch between rendered document and source |

@@ -360,7 +360,7 @@ Flea.PreviewColumn {
                     || root.loadedIdentity !== root.identity(root.pane.rowFor(root.loadedIndex))) return
             root.pendingToken = 0
             root.meta = { w: message.w, h: message.h, durationMs: message.ms, sampleRate: message.rate,
-                entries: message.entries, unpacked: message.unpacked, archiveFailed: message.afailed,
+                topEntries: typeof message.topEntries === "number" ? message.topEntries : -1, entries: message.entries, unpacked: message.unpacked, archiveFailed: message.afailed,
                 names: message.names, lines: message.lines, partial: message.partial,
                 linesFailed: message.lfailed, target: message.target, targetDir: message.targetdir,
                 owner: message.owner || "", orient: message.orient || 1, frames: message.frames || 0, photo: message.photo || null }

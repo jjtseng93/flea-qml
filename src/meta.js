@@ -4,7 +4,7 @@
 // Not read yet: media duration and rate, EXIF orientation and camera facts, RAW previews, owners.
 import { closeSync, fstatSync, lstatSync, openSync, readSync, readlinkSync, statSync, constants } from "node:fs";
 import { join } from "node:path";
-import { listArchive } from "./archive.js";
+import { listArchive, topLevelArchiveName } from "./archive.js";
 import { officeKind, officePreview } from "./office.js";
 
 // A line count stops here and says it is a floor (`partial`).
@@ -98,10 +98,16 @@ function addEntry(meta, name, isDir, size) {
 // Every member through src/archive.js, which reads a zip's directory and a tar's headers only.
 async function listMembers(path, name, meta) {
   try {
-    await listArchive(path, name, (member) => addEntry(meta, member.name, member.dir, member.size));
+    const roots = new Set();
+    await listArchive(path, name, member => {
+      addEntry(meta, member.name, member.dir, member.size);
+      const root = topLevelArchiveName(member.name);
+      if (root) roots.add(root);
+    });
+    meta.topEntries = roots.size;
   } catch {
     // A failed read carries nothing, so a partial count never reads as a total.
-    Object.assign(meta, { entries: 0, unpacked: 0, names: [], afailed: true });
+    Object.assign(meta, { entries: 0, topEntries: -1, unpacked: 0, names: [], afailed: true });
   }
 }
 

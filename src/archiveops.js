@@ -15,7 +15,7 @@ import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { crc32, createDeflateRaw, createGunzip, createGzip, createInflateRaw, createZstdCompress, createZstdDecompress } from "node:zlib";
-import { BLOCK, MAX_RECORD, checkedSize, checksumMatches, fileReader, octal, paxRecords, scanZip, text } from "./archive.js";
+import { BLOCK, MAX_RECORD, listArchive, topLevelArchiveName, checkedSize, checksumMatches, fileReader, octal, paxRecords, scanZip, text } from "./archive.js";
 import { capturedPaths } from "./menu.js";
 import { copyName, nextJobId, reason } from "./transfer.js";
 
@@ -439,25 +439,56 @@ function extract(request, send, id, refuse) {
   send({ t: "archivestarted", id });
   send({ t: "extractstarted", id });
   send({ t: "transferprogress", id, index: 0, name: basename(path), bytes: 0, total: 0, scanned: 0 });
-  const staged = stagingName(dest, "ext", id);
+  const here = request.here === true;
+  const staged = stagingName(here ? join(dest, "contents") : dest, "ext", id);
+  let ownsStaged = false;
   (async () => {
+    if (here) {
+      if (!lstatOrNull(dest)?.isDirectory()) throw Error("Extract here needs an existing real folder");
+      if (request.confirmed !== true) {
+        const entries = new Set();
+        await listArchive(path, path, member => {
+          check(job);
+          const root = topLevelArchiveName(member.name);
+          if (root) entries.add(root);
+          if (entries.size > 5) throw Error("Extract here needs confirmation for more than 5 top-level items");
+        });
+      }
+    }
     await fsp.mkdir(staged, { mode: 0o700 });
+    ownsStaged = true;
     const out = new Extractor(staged, job);
     if (kind === "zip") await readZip(path, out, job);
     else await readTar(path, kind, out, job);
     await out.finish();
     check(job);
-    const written = await publish(staged, dest, null);
+    let written = dest;
+    if (here) {
+      // Publish complete top-level items without merging existing folders. Roll back our
+      // moves if publishing fails; cancellation is checked before this short commit phase.
+      const moved = [];
+      try {
+        for (const name of await fsp.readdir(staged)) {
+          const source = join(staged, name);
+          const target = await publish(source, join(dest, name), lstatOrNull(source)?.isDirectory() ? null : "");
+          moved.push([source, target]);
+        }
+      } catch (error) {
+        for (const [source, target] of moved.reverse()) await fsp.rename(target, source);
+        throw error;
+      }
+      await fsp.rmdir(staged);
+    } else written = await publish(staged, dest, null);
     send({ t: "archivedone", id, ok: true, verified: true, err: "", path: slash(path), dest: slash(written) });
   })()
     .catch(async (e) => {
-      await fsp.rm(staged, { recursive: true, force: true }).catch(() => {});
+      if (ownsStaged) await fsp.rm(staged, { recursive: true, force: true }).catch(() => {});
       send({ t: "archivedone", id, ok: false, verified: true, path: slash(path), dest: slash(dest),
         err: e instanceof Cancelled ? "cancelled" : e?.sentence ?? reason(e) });
     })
     .finally(() => {
       jobs.delete(id);
-      send({ t: "changed", path: slash(dirname(dest)) });
+      send({ t: "changed", path: slash(here ? dest : dirname(dest)) });
     });
 }
 

@@ -8,7 +8,7 @@
 var SEVEN_TAILS = [".appimage", ".cpio", ".cab", ".jar", ".apk", ".rpm", ".deb", ".iso"]
 
 // Longest form first, so ".tar.gz" matches before ".gz"; .rar is read here and never offered to write (src/backend/archive.rs).
-var EXTENSIONS = [".tar.zst", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".tar", ".zip", ".7z", ".rar"].concat(SEVEN_TAILS)
+var EXTENSIONS = [".tar.zst", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".tzst", ".tar", ".zip", ".7z", ".rar"].concat(SEVEN_TAILS)
 
 // A disk image lists in the archive preview and is never extracted.
 var LIST_ONLY = [".iso"]

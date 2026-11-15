@@ -327,6 +327,8 @@ Item {
                 anchors.margins: Theme.spacing.gap
                 visible: root.previewState === Facts.ARCHIVE && root.meta !== null
                 meta: root.meta
+                path: root.path
+                pane: root.pane
             }
 
             Flea.LoadingState {

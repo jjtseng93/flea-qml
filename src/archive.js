@@ -400,3 +400,8 @@ export function openZip(path) {
 // The pieces src/archiveops.js reads member data with: extraction needs the type, mode, link and
 // bytes of every member, which the listing above never keeps.
 export { BLOCK, MAX_RECORD, checkedSize, checksumMatches, fileReader, kindOf, octal, paxRecords, scanZip, text };
+
+// Extraction normalizes both separators and ignores empty/dot path components.
+export function topLevelArchiveName(name) {
+  return String(name).replaceAll("\\", "/").split("/").find(part => part && part !== ".") || "";
+}

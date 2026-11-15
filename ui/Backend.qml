@@ -121,7 +121,7 @@ Item {
     property int compareToken: 0
     // One counter numbers every PDF fetch, so two viewers never share an id.
     property int pdfCopySeq: 0
-    signal meta(int row, int w, int h, int orient, real durationMs, int sampleRate, int entries, real unpacked, bool archiveFailed, var names, real lines, bool partial, bool linesFailed, string target, bool targetDir, string owner)
+    signal meta(int row, int w, int h, int orient, real durationMs, int sampleRate, int entries, real unpacked, bool archiveFailed, var names, real lines, bool partial, bool linesFailed, string target, bool targetDir, string owner, int topEntries)
     signal shebang(string path, bool hasShebang, int id)
     // A PDF fetched into a session-private copy under a deadline; err names the refusal, stalled is the wait that ran out.
     signal pdfCopied(int id, string path, string err, bool stalled)
@@ -564,6 +564,10 @@ Item {
     function compressPassword(paths, dest, format, password, encryptNames, menuId) {
         root.send({ c: "archive", op: "compress", paths: paths, dest: dest, format: format,
                     password: password, encryptNames: encryptNames === true, menuId: menuId || 0 })
+    }
+
+    function extractHere(path, dest, confirmed) {
+        root.send({ c: "archive", op: "extract", path: path, dest: dest, here: true, confirmed: confirmed === true })
     }
 
     function extract(path, dest, menuId) {

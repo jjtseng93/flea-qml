@@ -217,6 +217,11 @@ test('an archive that names a path outside its folder extracts nothing', async (
   expect(done.err).toMatch(/outside its folder/);
   expect(readdirSync(dir).sort()).toEqual(['evil.tar']);
   expect(existsSync(join(root, 'escape'))).toBe(false);
+  const here = collector();
+  archive({ op: 'extract', path: join(dir, 'evil.tar'), dest: dir, here: true, confirmed: true }, here.send);
+  expect((await until(here.lines, l => l.t === 'archivedone')).ok).toBe(false);
+  expect(readdirSync(dir)).toEqual(['evil.tar']);
+  expect(existsSync(join(root, 'escape'))).toBe(false);
 });
 
 test('a password, a format it cannot read and a disk image are refused without starting', () => {
@@ -238,4 +243,65 @@ test('cancelling a compress removes its staging file', async () => {
   const done = await until(lines, (l) => l.t === 'archivedone');
   expect(done).toMatchObject({ ok: false, err: 'cancelled' });
   expect(readdirSync(dir)).toEqual(['big']);
+});
+
+for (const count of [5, 6]) test(`extract here ${count} items requires confirmation only above five`, async () => {
+  const dir = fresh(), input = join(dir, 'input'), dest = join(dir, 'destination');
+  mkdirSync(input); mkdirSync(dest);
+  const paths = Array.from({ length: count }, (_, i) => {
+    const path = join(input, `item${i}.txt`); writeFileSync(path, `content ${i}`); return path;
+  });
+  const pack = collector();
+  archive({ op: 'compress', paths, dest: join(dir, 'pack.zip'), format: 'zip' }, pack.send);
+  const packed = await until(pack.lines, l => l.t === 'archivedone');
+  expect(packed.ok).toBe(true);
+  writeFileSync(join(dest, 'item0.txt'), 'keep');
+  const run = async confirmed => {
+    const c = collector();
+    archive({ op: 'extract', path: packed.path, dest, here: true, confirmed }, c.send);
+    return await until(c.lines, l => l.t === 'archivedone');
+  };
+  const first = await run(false);
+  expect(first.ok).toBe(count <= 5);
+  if (count > 5) {
+    expect(first.err).toContain('confirmation');
+    expect(readdirSync(dest)).toEqual(['item0.txt']);
+    expect((await run(true)).ok).toBe(true);
+  }
+  expect(readFileSync(join(dest, 'item0.txt'), 'utf8')).toBe('keep');
+  expect(readdirSync(dest).length).toBe(count + 1);
+  expect(readdirSync(dest).some(n => n.startsWith('.flea-work'))).toBe(false);
+  expect(readdirSync(dest).filter(n => n !== 'item0.txt').map(n => readFileSync(join(dest, n), 'utf8')).sort()).toEqual(paths.map((_, i) => `content ${i}`).sort());
+});
+
+test('extract here never merges an existing folder; folder extraction keeps copy naming', async () => {
+  const dir = fresh(), input = join(dir, 'folder'), dest = join(dir, 'out');
+  mkdirSync(input); writeFileSync(join(input, 'new.txt'), 'new');
+  mkdirSync(dest); mkdirSync(join(dest, 'folder')); writeFileSync(join(dest, 'folder', 'old.txt'), 'old');
+  const c = collector();
+  archive({ op: 'compress', paths: [input], dest: join(dir, 'pack.tar'), format: 'tar' }, c.send);
+  const packed = await until(c.lines, l => l.t === 'archivedone');
+  for (const here of [true, false]) {
+    const result = collector();
+    archive({ op: 'extract', path: packed.path, dest, here, confirmed: true }, result.send);
+    expect((await until(result.lines, l => l.t === 'archivedone')).ok).toBe(true);
+  }
+  expect(readFileSync(join(dest, 'folder', 'old.txt'), 'utf8')).toBe('old');
+  expect(existsSync(join(dest, 'folder', 'new.txt'))).toBe(false);
+  expect(readFileSync(join(dest, 'folder copy', 'new.txt'), 'utf8')).toBe('new');
+  expect(readFileSync(join(dir, 'out copy', 'folder', 'new.txt'), 'utf8')).toBe('new');
+});
+
+for (const format of ['zip','tar']) test(`extract here counts top-level names, not nested members (${format})`, async () => {
+  const dir=fresh(), input=join(dir,'one-folder'), dest=join(dir,'destination');
+  mkdirSync(input);mkdirSync(dest);
+  for(let i=0;i<8;i++)writeFileSync(join(input,`item${i}.txt`),`content ${i}`);
+  const pack=collector();
+  archive({op:'compress',paths:[input],dest:join(dir,'pack.'+format),format},pack.send);
+  const packed=await until(pack.lines,l=>l.t==='archivedone');expect(packed.ok).toBe(true);
+  const result=collector();
+  archive({op:'extract',path:packed.path,dest,here:true,confirmed:false},result.send);
+  expect((await until(result.lines,l=>l.t==='archivedone')).ok).toBe(true);
+  expect(readdirSync(dest)).toEqual(['one-folder']);
+  expect(readdirSync(join(dest,'one-folder')).length).toBe(8);
 });

@@ -9,6 +9,7 @@ Column {
     spacing: Theme.spacing.gap
     property string path: ""
     property var meta: null
+    property var pane: null
 
     // corner: a filename is arbitrary text, so PlainText, the same rule every name on this surface follows.
     Text {
@@ -34,5 +35,7 @@ Column {
         width: parent.width
         height: parent.height - y
         meta: root.meta
+        path: root.path
+        pane: root.pane
     }
 }

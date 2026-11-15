@@ -205,6 +205,18 @@ Esc acts on that query rather than the other one.
 | `e` in PDF Quick Look | Toggle expanded view |
 | `y` in Compare Quick Look | Copy the diff patch |
 
+### Extracting archives
+
+Both Quick Look and the right preview column offer **Extract to Folder** and
+**Extract here** for ZIP, TAR, TAR.GZ/TGZ and TAR.ZST/TZST archives. Extract to
+Folder uses the archive name without its extension; existing destinations get
+` copy`, ` copy 2`, and so on. Extract here places the contents beside the archive
+and asks for confirmation when the archive contains more than five top-level items
+(files and directories; nested contents count only toward their top-level folder). Cancel is the default.
+Existing items are kept: colliding names get a copy suffix, and existing folders
+are not merged. Work is prepared under a hidden unique name at the destination,
+not in the system temporary directory, so publication stays on the same filesystem.
+
 ### Menus and dialogs
 
 Use Up/Down (or `k`/`j`) to choose a menu row, Right/`l` to enter a submenu,

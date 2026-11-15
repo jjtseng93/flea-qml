@@ -342,6 +342,7 @@ Rectangle {
             view.openArchiveCards().askCompressPassword(primaryPane, paths, menuId)
         }
         onExtractPasswordRequested: function (path, dest, err) { view.openArchiveCards().openExtractPassword({ path: path, dest: dest }, primaryPane, err) }
+        onExtractHereRequested: function(path, entries) { view.openArchiveCards().askExtractHere(primaryPane, path, entries) }
         onPermissionsRequested: function (path) { permissionsDialog.open(path, primaryPane) }
         // Permissions040: the whole selection's paths for the multi-row card.
         onPermissionsBatchRequested: function (paths) { permissionsDialog.openMany(paths, primaryPane) }
@@ -405,6 +406,7 @@ Rectangle {
                     view.openArchiveCards().askCompressPassword(otherPane, paths, menuId)
                 }
                 onExtractPasswordRequested: function (path, dest, err) { view.openArchiveCards().openExtractPassword({ path: path, dest: dest }, otherPane, err) }
+                onExtractHereRequested: function(path, entries) { view.openArchiveCards().askExtractHere(otherPane, path, entries) }
                 onPermissionsRequested: function(path) { permissionsDialog.open(path, otherPane) }
                 onPermissionsBatchRequested: function (paths) { permissionsDialog.openMany(paths, otherPane) }
                 onBulkRenameRequested: function (paths) { view.openBulkRename(paths, otherPane) }

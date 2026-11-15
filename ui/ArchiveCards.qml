@@ -18,7 +18,7 @@ Item {
 
     // One card at a time: a second request is answered with a sentence and never dropped silently.
     function cardBusy(holder) {
-        if (!compressDialog.opened && !extractDialog.opened)
+        if (!compressDialog.opened && !extractDialog.opened && !hereDialog.opened)
             return false
         holder.message(ArchiveCard.CARD_BUSY, true)
         return true
@@ -36,6 +36,33 @@ Item {
         extractOwner = holder
         extractDialog.active = true
         extractDialog.item.open(source, holder, err)
+    }
+
+    function askExtractHere(holder, path, entries) {
+        if (cardBusy(holder)) return
+        var dest = path.substring(0, path.lastIndexOf("/") + 1)
+        if (entries >= 0 && entries <= 5) {
+            holder.backend.extractHere(path, dest, false)
+            return
+        }
+        hereDialog.active = true
+        hereDialog.item.open({ path: path, dest: dest, entries: entries, holder: holder, focusItem: holder.preview && holder.preview.active ? holder.preview : holder })
+    }
+
+    Loader {
+        id: hereDialog
+        anchors.fill: parent
+        active: false
+        source: "ArchiveHereConfirm.qml"
+        readonly property bool opened: item !== null && item.opened
+    }
+    Connections {
+        target: hereDialog.item
+        function onConfirmed(source) {
+            source.holder.backend.extractHere(source.path, source.dest, true)
+            source.focusItem.forceActiveFocus()
+        }
+        function onCancelled() { if (hereDialog.item.snapshot.focusItem) hereDialog.item.snapshot.focusItem.forceActiveFocus() }
     }
 
     anchors.fill: parent

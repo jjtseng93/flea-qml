@@ -641,9 +641,9 @@ Item {
 
     Connections {
         target: root.pane ? root.pane.backend : null
-        function onMeta(row, w, h, orient, durationMs, sampleRate, entries, unpacked, archiveFailed, names, lines, partial, linesFailed, target, targetDir, owner) {
+        function onMeta(row, w, h, orient, durationMs, sampleRate, entries, unpacked, archiveFailed, names, lines, partial, linesFailed, target, targetDir, owner, topEntries) {
             if (root.isArchive && row === root.archiveRow)
-                root.archiveMeta = { entries: entries, unpacked: unpacked, archiveFailed: archiveFailed, names: names }
+                root.archiveMeta = { topEntries: typeof topEntries === "number" ? topEntries : -1, entries: entries, unpacked: unpacked, archiveFailed: archiveFailed, names: names }
             if (root.isMedia && row === root.mediaRow)
                 root.mediaRate = sampleRate
             if (root.isImage && !root.isRawFile && row === root.imageRow && root.imageRowShown()) {
@@ -916,6 +916,7 @@ Item {
                 visible: root.isArchive && root.archiveMeta !== null && !root.archiveFailed
                 path: root.path
                 meta: root.archiveMeta
+                pane: root.pane
             }
 
             // Declined, or an archive whose index could not be read: a mark over the sentence, never a bare surface.

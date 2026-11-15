@@ -11,14 +11,26 @@ Flea QML is a cross-platform file manager written in Bun JavaScript & QML. It's 
 
 ## Running it
 
-Install Bun first, then check that it is available on PATH:
+1. Install Bun first, then check that it is available on PATH:
 
 ```sh
 npm i -g bun
 bun --version
 ```
 
-Start Flea QML with:
+2. Enter the [Buninu userspace](https://github.com/jjtseng93/buninu)
+
+```sh
+# Run a server & open in a browser
+bunx buninu
+
+# Open in the current terminal
+bunx buninu --local
+
+# Or do nothing in a @drxiaozhi/minapk Android App
+```
+
+3. Start Flea QML with npx or bunx:
 
 ```sh
 npx flea-qml

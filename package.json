@@ -1,0 +1,36 @@
+{
+  "name": "flea-qml",
+  "version": "0.1.0",
+  "description": "Flea QML is a cross-platform file manager written in Bun JavaScript & QML. It's an unofficial fork of Flea, the fast GUI file manager for Omarchy",
+  "type": "module",
+  "main": "./index.js",
+  "bin": {
+    "flea-qml": "./index.js"
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "author": "Dr. John (醫者小智)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjtseng93/flea-qml.git"
+  },
+  "homepage": "https://github.com/jjtseng93/flea-qml",
+  "bugs": {
+    "url": "https://github.com/jjtseng93/flea-qml/issues"
+  },
+  "keywords": [
+    "bun",
+    "qml",
+    "file-manager",
+    "quickshell",
+    "buninu"
+  ],
+  "scripts": {
+    "start": "bun index.js",
+    "test": "bun test",
+    "browser": "bunx buninu-browser@0.10.4"
+  }
+}

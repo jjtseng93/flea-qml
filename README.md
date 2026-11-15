@@ -9,6 +9,195 @@ Flea QML is a cross-platform file manager written in Bun JavaScript & QML. It's 
 - **Extend the capabilities**: run across platforms, on Windows, Linux and
   Android, wherever a QML runtime and a JS engine do, including [buninu-browser](https://github.com/jjtseng93/buninu-browser)'s QML frontend.
 
+## Running it
+
+Install Bun first, then check that it is available on PATH:
+
+```sh
+npm i -g bun
+bun --version
+```
+
+Start Flea QML with:
+
+```sh
+npx flea-qml
+```
+
+Or, from the root of this repository:
+
+```sh
+bun index.js
+```
+
+The launcher queries Kitty graphics support.
+When available it uses buninu-browser's default terminal frontend; otherwise
+Windows uses `--win32`, and Linux/Android use `--wayland`.
+
+A first argument starting with `--` (except the information options below) bypasses detection and is forwarded unchanged
+to buninu-browser, which decides how to handle it. There is no frontend allowlist:
+
+```sh
+npx flea-qml --casty
+npx flea-qml --win32
+npx flea-qml --wayland
+npx flea-qml --headless
+npx flea-qml --help
+npx flea-qml --version
+npx flea-qml --readme
+```
+
+`--help`/`-h`, `--version`/`-V`, and `--readme` run locally without probing Kitty
+or starting the browser. `--version` also shows the browser version pinned in
+`package.json`. `--readme` always prints coloured ANSI Markdown with
+links, including when its output is redirected.
+
+When launched, Flea automatically spawns
+[buninu-browser](https://github.com/jjtseng93/buninu-browser) to display its QML
+interface. The browser version is pinned in `package.json` under
+`scripts.browser`. The launcher reads the package
+specification from this field, while still choosing npx, bunx or bun x as below.
+Changing this field updates the requested version for all three launch methods;
+clearing a cache does not change the pinned version.
+
+To reinstall cached packages from scratch, see [Clearing package caches](#clearing-package-caches).
+
+The browser receives the absolute, URL-escaped `file://` address of the bundled
+`ui/boot/shell.qml`, including on Windows. Remaining arguments go to the browser.
+Package launch order matches buninu-browser's Casty launcher: npx when both npx
+and Bun are on PATH, then bunx, then `bun x` using Bun on PATH or the running Bun.
+A missing Kitty response falls back after 800 ms; explicit selection skips the
+probe. Wayland requires a running compositor. Other non-Windows platforms also
+fall back to Wayland; no native macOS frontend is selected automatically.
+
+The npm package is public and includes the full project, without a `files`
+allowlist or project ignore rules (npm's mandatory exclusions still apply).
+
+`FLEA_PATH=/some/folder` opens that folder first; for example, from this
+checkout on Linux/Android:
+
+```sh
+FLEA_PATH="$PWD/demos" bun index.js
+```
+
+For development, you can also launch a browser checkout directly from this
+repository root, with a Wayland compositor running:
+
+```sh
+bun ../buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml
+```
+
+## Keyboard shortcuts
+
+These are the implemented bindings for the **default** key preset. Letters are
+case-sensitive (`H` means Shift+H). Listing shortcuts apply when the file list
+has focus, not while typing in a text field. Other presets can change bindings;
+press `?` to view or search the current keymap. A terminal, compositor or browser
+frontend may intercept a shortcut before Flea receives it.
+
+### Navigation and views
+
+| Keys | Action |
+| --- | --- |
+| Up / Down, `k` / `j` | Move through files |
+| Home / End, `g` / `G` | First / last file |
+| PageUp / PageDown | Move by half the visible rows |
+| Left, Backspace, `h` | Parent folder |
+| Right, `l` | Enter a folder or preview a file |
+| Enter | Open the selected item |
+| `H` / `L` | Back / forward in navigation history |
+| `:` | Edit the folder address |
+| Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 | List / columns / grid / dual-pane view |
+| `t` | New Flea tab |
+| Ctrl+Enter | Open the selected folder in a tab |
+| `w`, Ctrl+W | Close the current tab |
+| `[` / `]`, Ctrl+PageUp / Ctrl+PageDown | Previous / next tab |
+| `{` / `}`, Ctrl+Shift+PageUp / Ctrl+Shift+PageDown | Move the current tab left / right |
+| Tab / Shift+Tab | Move focus between available interface areas |
+| Ctrl+B | Toggle the sidebar |
+| `.`, Ctrl+Shift+. | Show / hide hidden files |
+| `s` / `S` | Change sort field / reverse sort order |
+| F4 | Fit list columns to their contents |
+| F5, Ctrl+R | Reload the folder |
+| Ctrl++ / Ctrl+- / Ctrl+0 | Increase / decrease / reset text size (Ctrl+Shift variants also work) |
+| `,`, Ctrl+, | Open settings |
+| `?` | Open the searchable keymap |
+
+### Selection and file operations
+
+| Keys | Action |
+| --- | --- |
+| `v` | Toggle the current file's selection |
+| Shift+Up / Shift+Down, `K` / `J` | Extend the selection |
+| Ctrl+A | Select all |
+| `V` | Invert the selection |
+| `y`, Ctrl+C | Copy selected files |
+| `x`, Ctrl+X | Cut selected files |
+| `p`, Ctrl+V | Paste files into the current folder |
+| `Y` | Copy the current folder's path |
+| Ctrl+Shift+C | Copy selected file paths |
+| `c` / `P` | Open Copy as / Paste as options |
+| `r`, F2 | Rename; multiple selected files open Bulk rename |
+| Ctrl+Shift+N | Create a folder |
+| Delete, `dd` (press `d` twice) | Move to Trash; in Trash, request permanent deletion |
+| Shift+Delete | Request permanent deletion with confirmation |
+| `=`, Alt+= | Calculate selected/current folders' sizes / all folders' sizes |
+| `m`, Menu, Shift+F10 | Open the item's context menu |
+
+### Find and Filter
+
+| Keys | Action |
+| --- | --- |
+| `/` | Filter the current listing by name |
+| `f`, Ctrl+F | Open Find |
+| Ctrl+G | Search file contents; in Find, toggle name/content search |
+| Enter in Find | Start the search |
+| Tab / Shift+Tab in Find | Cycle the search scope |
+| Enter in Filter | Return to the list with the filter applied |
+| Up / Down, PageUp / PageDown in a query | Navigate results |
+| `o` in results | Reveal the current item in its containing folder |
+| Esc in Filter | Close Filter |
+| Esc in Find | Stop a running search; when idle, close Find |
+| Esc in the file list | Dismiss Filter first, then Find on a subsequent press |
+
+Find and Filter keep their own text-editing focus. Left/Right move the caret;
+clicking the query returns focus to its input. When either query owns focus,
+Esc acts on that query rather than the other one.
+
+### Preview and Quick Look
+
+| Keys | Action |
+| --- | --- |
+| Space on a file | Open Quick Look |
+| Space / Esc in Quick Look | Close it (Space does not pause media) |
+| Alt+P | Toggle the preview column |
+| Ctrl+Space | Load the selection's preview |
+| Ctrl+Tab | Focus the preview column; from Quick Look, close Quick Look |
+| `i` | Toggle file facts in the visible preview column |
+| Up / Down, `k` / `j` in Quick Look | Preview the previous / next file |
+| PageUp / PageDown, Ctrl+U / Ctrl+D, `B` / `F` | Scroll the preview by a page |
+| `B` / `F` in the file list | Scroll the preview column by a page |
+| `w` in text/code Quick Look | Toggle line wrapping |
+| `r` in document Quick Look | Switch between rendered document and source |
+| `p` in media Quick Look | Play / pause |
+| `m` in media Quick Look | Mute / unmute |
+| Left / Right in media Quick Look | Seek backward / forward by 5 seconds |
+| Left / Right in PDF preview | Previous / next PDF page |
+| `-` / `+` in image, HTML or PDF Quick Look | Zoom out / in |
+| `0` in image Quick Look | Fit the image |
+| `e` in PDF Quick Look | Toggle expanded view |
+| `y` in Compare Quick Look | Copy the diff patch |
+
+### Menus and dialogs
+
+Use Up/Down (or `k`/`j`) to choose a menu row, Right/`l` to enter a submenu,
+Left/`h` to return, Enter to activate, and Esc to dismiss. In Copy as, `p`, `n`,
+`e`, `f`, `u`, and `s` select path, name, stem, folder path, URI, and shell-quoted
+path respectively. Tab/Shift+Tab move between dialog controls; text fields keep
+normal caret, selection, copy and paste editing.
+
+## Runtime and supported features
+
 The repository aims to be self-contained, needing only buninu-browser to run.
 The backend reads no system database; the one system file it reads is Linux's
 mount table, for a folder's filesystem name. For the clipboard it speaks
@@ -25,52 +214,6 @@ without it previews are plain text. Compare also runs `diff` through bunmsh or
 a system provider, as described below. Some interface
 code carried over from upstream and Omarchy still asks Linux tools such as
 `hyprctl`, `lsblk` and `fc-match`, and does without them where they are missing.
-
-## Where it comes from
-
-`ui/` started as upstream's `ui/`, exported from
-[`thisisgm/flea@73f3c23`](https://github.com/thisisgm/flea/commit/73f3c23971106f6d47f78bd758f783af3e5b5c78)
-(0.4.0 plus 7 commits). Upstream has since moved its window to GPUI and no
-longer launches this interface; this fork keeps it as the frontend. Changes
-so far:
-
-- A row's icon is the emoji the backend sends; language logos give way to it.
-- The interface runs this repository's `src/flea.js` (`ui/js/FleaBin.js`)
-  instead of a `flea` on PATH.
-- Upstream's links to `/usr/share/omarchy/shell` are replaced by a copy of the
-  two Omarchy QML modules the interface imports, `ui/boot/Commons` and
-  `ui/boot/Ui`, from
-  [`omacom/omarchy@3c7027d`](https://github.com/omacom/omarchy/commit/3c7027db2a4fa9fa6a49d7af7f87c27ac48e677d).
-- Markdown formulas are set as MathML by Temml (`src/mathml.js`), and Mermaid
-  diagrams are drawn by the backend (`src/figure.js`: Pele in a Bun Worker, one
-  diagram at a time under a deadline). The HTML preview embeds each diagram as an
-  SVG picture; the block view asks the backend for the same SVG. Upstream's
-  sandboxed quickjs figure helper and its figure cache are not used.
-
-## Layout
-
-| Path | What it is |
-| --- | --- |
-| `ui/` | The QML interface and its JS libraries |
-| `ui/boot/Commons`, `ui/boot/Ui` | Omarchy's `Commons` (theme, colours) and `Ui` (panels, dialogs) modules, where `import qs.Commons` finds them: Quickshell's `qs` is the folder `shell.qml` sits in |
-| `src/flea.js` | The `flea` the interface runs; `--backend` answers `ui/Backend.qml` |
-| `src/` (rest) | The backend: listing, ordering, kinds and emoji, filesystem facts |
-| `docs/protocol.md` | Upstream's description of the backend line protocol |
-| `demos/` | One file for every emoji a row can show, and `math-and-diagrams.md` for formulas and Mermaid |
-
-## Running it
-
-From the repository root, with a Wayland compositor running:
-
-```sh
-bunx buninu-browser --quickshell-wayland -p ui/boot/shell.qml
-```
-
-`FLEA_PATH=/some/folder` opens that folder first; try `FLEA_PATH="$PWD/demos"`.
-
-This needs a buninu-browser whose QML `TapHandler` understands
-`longPressThreshold`, which is newer than 0.9.2. Until that is published, run a
-checkout instead: `bun /path/to/buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml`.
 
 Ported so far: the backend's `list`, `window`, `sort`, `fsinfo`, `peek`,
 `meta`, `code`, `clipSet`, `clipGet`, `clipClear`, `clipWatch`, `collisions`, `mergecollisions`,
@@ -107,6 +250,38 @@ is in an undo journal yet. File tags (`settags`, `tagstates`) are not ported. Co
 metadata records over 1 MiB and malformed or truncated archives are rejected.
 Keyboard hints are enabled by default; an explicitly saved disabled setting is
 preserved.
+
+## Where it comes from
+
+`ui/` started as upstream's `ui/`, exported from
+[`thisisgm/flea@73f3c23`](https://github.com/thisisgm/flea/commit/73f3c23971106f6d47f78bd758f783af3e5b5c78)
+(0.4.0 plus 7 commits). Upstream has since moved its window to GPUI and no
+longer launches this interface; this fork keeps it as the frontend. Changes
+so far:
+
+- A row's icon is the emoji the backend sends; language logos give way to it.
+- The interface runs this repository's `src/flea.js` (`ui/js/FleaBin.js`)
+  instead of a `flea` on PATH.
+- Upstream's links to `/usr/share/omarchy/shell` are replaced by a copy of the
+  two Omarchy QML modules the interface imports, `ui/boot/Commons` and
+  `ui/boot/Ui`, from
+  [`omacom/omarchy@3c7027d`](https://github.com/omacom/omarchy/commit/3c7027db2a4fa9fa6a49d7af7f87c27ac48e677d).
+- Markdown formulas are set as MathML by Temml (`src/mathml.js`), and Mermaid
+  diagrams are drawn by the backend (`src/figure.js`: Pele in a Bun Worker, one
+  diagram at a time under a deadline). The HTML preview embeds each diagram as an
+  SVG picture; the block view asks the backend for the same SVG. Upstream's
+  sandboxed quickjs figure helper and its figure cache are not used.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `ui/` | The QML interface and its JS libraries |
+| `ui/boot/Commons`, `ui/boot/Ui` | Omarchy's `Commons` (theme, colours) and `Ui` (panels, dialogs) modules, where `import qs.Commons` finds them: Quickshell's `qs` is the folder `shell.qml` sits in |
+| `src/flea.js` | The `flea` the interface runs; `--backend` answers `ui/Backend.qml` |
+| `src/` (rest) | The backend: listing, ordering, kinds and emoji, filesystem facts |
+| `docs/protocol.md` | Upstream's description of the backend line protocol |
+| `demos/` | One file for every emoji a row can show, and `math-and-diagrams.md` for formulas and Mermaid |
 
 ## Sidebar places
 
@@ -179,6 +354,28 @@ every path in it exists.
 Text-only Copy as and share links use the QML runtime's clipboard. Query-field
 paste accepts either synchronous Quickshell text or buninu-browser's asynchronous
 host clipboard read. These operations do not require `wl-copy`.
+
+## Clearing package caches
+
+To reinstall cached packages from scratch:
+
+```sh
+# npm 11 or later: list the cache keys and their packages
+npm cache npx ls
+
+# Use the keys from your own listing for flea-qml, buninu-browser or Casty.
+# The package specification (including its version) affects the key.
+npm cache npx rm FLEA_KEY BROWSER_KEY CASTY_KEY
+
+# Or clear all npx packages, including other tools
+npm cache npx rm --force
+
+# For packages launched through bunx or bun x
+bun pm cache rm
+```
+
+With an older npm, delete the npx cache directory: `~/.npm/_npx`
+(Windows: `%LocalAppData%\npm-cache\_npx`).
 
 ## Tests
 

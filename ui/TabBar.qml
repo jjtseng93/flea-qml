@@ -128,7 +128,7 @@ Item {
 
     // A lift captures the tab payload before the pane can change.
     function tabLiftBegan(index) {
-        if (!Tabs.canLift(root.pane)) {
+        if (!Tabs.canLift(root.pane) || (root.tabs && root.tabs.items[index]?.terminalId)) {
             root.dragFrom = -1
             root.dropAt = -1
             return
@@ -397,7 +397,7 @@ Item {
                 readonly property bool current: root.currentIndex === tab.index
                 readonly property Item focusFrame: tabFrame
                 // Every input named, so the label re-reads when a tab opens or the pane navigates.
-                readonly property string title: Tabs.label(
+                readonly property string title: (root.tabs && root.tabs.items[tab.index]?.terminalId ? "Terminal · " : "") + Tabs.label(
                     Tabs.pathAt(root.tabs, root.currentIndex, tab.index, root.path),
                     pane ? pane.home : "")
 
@@ -412,7 +412,7 @@ Item {
                 Flea.DropInto {
                     anchors.fill: parent
                     pane: root.pane
-                    enabled: DragOut.searchTabEnabled(root.pane ? root.pane.searchMode : "", tab.current)
+                    enabled: !(root.tabs && root.tabs.items[tab.index]?.terminalId) && DragOut.searchTabEnabled(root.pane ? root.pane.searchMode : "", tab.current)
                     switchesOnHover: true
                     refuseLoading: DragOut.refuseLoading(root.pane && root.pane.listInFlight, true, tab.current)
                     // The pane's drop path, not its drawn one: a tab selected by the hover switch is

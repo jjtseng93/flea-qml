@@ -368,6 +368,8 @@ function sequenceAction(action, root) {
 
 // Lifted whole from Pane.qml's Keys.onPressed, which had grown past its file's 400-line cap; returns whether the key was consumed.
 function handleKey(event, root, sidebar, field) {
+    // Embedded terminals own ordinary keys; never turn shell typing into file operations.
+    if (root.terminalId && !field && !(sidebar && sidebar.activeFocus)) return false
     if (root.selectionBand) {
         if (event.key === Qt.Key_Escape)
             root.selectionBand.cancel()

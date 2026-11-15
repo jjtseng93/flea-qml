@@ -450,6 +450,18 @@ FocusScope {
     property var history: []
     property var forwardHistory: []
     property var tabs: null
+    property string terminalId: ""
+    onTerminalIdChanged: {
+        if (!terminalId) Qt.callLater(function() {
+            // A hidden WebEngineView no longer owns input. Wait until tab visibility
+            // settles, then return focus to the file list (not the old scope child).
+            if (!root.terminalId) {
+                root.focusView = Focus.LIST
+                root.listArea.forceActiveFocus()
+            }
+        })
+    }
+    readonly property var terminalHost: terminalLoader.item
     property int tabCountNotice: -1
     readonly property bool canGoBack: trashHost.opened || root.recentMode.length > 0 || root.history.length > 0
     readonly property bool canGoUp: root.path.length > 1 || root.recentMode.length > 0 || Nav.climbsFromListing(root)
@@ -852,7 +864,18 @@ FocusScope {
     function openFile(path) { wire.opener.open(path) }
 
     // A terminal in the caller's place or the directory being shown, through flea --terminal.
-    function openTerminal(path) { wire.opener.openTerminal(path || root.path) }
+    function openTerminal(path) {
+        terminalLoader.active = true
+        Tabs.openTerminal(root, path || root.path)
+    }
+    Loader {
+        id: terminalLoader
+        active: false
+        anchors { top: parent.top; left: railHost.right; right: parent.right; bottom: parent.bottom }
+        z: 1
+        source: "TerminalTabs.qml"
+        onLoaded: item.pane = root
+    }
 
     function newWindow() { Quickshell.execDetached(Tabs.freshLaunch([Quickshell.env("FLEA_BIN") || "flea", root.path])) }
 

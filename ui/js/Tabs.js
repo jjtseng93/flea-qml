@@ -42,6 +42,7 @@ function snapshot(pane, path, identity, dropped) {
     var elsewhere = where !== pane.path || Search.live(pane) || dropped === true
     return {
         tabIdentity: identity || ++nextTabIdentity,
+        terminalId: pane.terminalId || "",
         path: where,
         history: pane.history.slice(),
         forwardHistory: (pane.forwardHistory || []).slice(),
@@ -180,6 +181,7 @@ function restoreSelection(pane, selected, follows) {
 }
 
 function apply(pane, item, dropped, cursor) {
+    pane.terminalId = item.terminalId || ""
     // Issue 93: rows from a search dropped onto its scope, or a listing still out, are not the rows this tab left.
     var same = pane.path === item.path && pane.showHidden === item.showHidden && dropped !== true && cursor === undefined && !pane.listInFlight
     if (pane.tabs) pane.tabs.pendingCursorName = cursor === undefined ? null : cursor
@@ -305,6 +307,7 @@ function openNew(pane, where) {
     var items = currentItems(pane, here)
     var index = currentIndex(pane)
     items[index] = snapshot(pane, here, items[index].tabIdentity, dropped)
+    pane.terminalId = ""
     items.push(snapshot(pane, target, undefined, dropped))
     pane.tabs = pack(items, items.length - 1)
     dropCount(pane)
@@ -315,6 +318,17 @@ function openNew(pane, where) {
 
 // Ctrl+Return on the cursor row, the keyboard twin of Tap.tappedTab's middle
 // click: that directory in a new tab, leaving the cursor and selection alone.
+function openTerminal(pane, path) {
+    if (count(pane) >= MAX) { sayCount(pane, "Nine tabs is the most."); return }
+    var id = pane.terminalHost.open(path)
+    if (!id) return
+    openNew(pane, path)
+    pane.terminalId = id
+    var items = pane.tabs.items.slice()
+    items[pane.tabs.index].terminalId = id
+    pane.tabs = pack(items, pane.tabs.index, pane.tabs)
+}
+
 function openCursorTab(pane) {
     var row = pane.rowFor ? pane.rowFor(pane.cursorIndex) : null
     if (!row || !row.d || typeof row.n !== "string") {
@@ -353,6 +367,7 @@ function closeAt(pane, i) {
         return
     }
     var index = currentIndex(pane)
+    if (items[i].terminalId && pane.terminalHost) pane.terminalHost.close(items[i].terminalId)
     items.splice(i, 1)
     var next = index
     if (i < index)

@@ -217,11 +217,7 @@ function isOwnDrag(payload) {
 // A path as a file:// URI. Each component is encoded on its own: encodeURIComponent would escape the
 // separators too, and encodeURI would leave a "#" or a "?" in a filename unescaped.
 function uriFor(path) {
-    var parts = path.split("/")
-    for (var i = 0; i < parts.length; i++) {
-        parts[i] = encodeURIComponent(parts[i])
-    }
-    return "file://" + parts.join("/")
+    return Format.fileUri(path)
 }
 
 // What the drag puts on the wire: the marker naming this drag as Flea's own, which the backend

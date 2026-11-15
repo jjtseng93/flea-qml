@@ -45,7 +45,16 @@ ShellRoot {
 
         // This directory cannot reach ui/js/Format.js through qs:, so its one call is written out.
         function fileUrl(path) {
-            return "file://" + encodeURI(path).replace(/#/g, "%23").replace(/\?/g, "%3F")
+            path = String(path)
+            // Only Windows paths use backslashes as separators; POSIX filenames may contain them.
+            var drive = /^[A-Za-z]:[\\/]/.test(path)
+            var unc = /^\\\\[^\\]/.test(path)
+            if (drive || unc) path = path.replace(/\\/g, "/")
+            var parts = path.split("/")
+            for (var i = 0; i < parts.length; i++) {
+                if (!(drive && i === 0)) parts[i] = encodeURIComponent(parts[i])
+            }
+            return (drive ? "file:///" : path.indexOf("//") === 0 ? "file:" : "file://") + parts.join("/")
         }
 
         // Before the first frame, so the window maps holding its chrome; see AGENTS.md "The first window".

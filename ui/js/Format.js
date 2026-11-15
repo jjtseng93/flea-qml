@@ -94,7 +94,16 @@ function isExecutable(mode) {
 // Shared by Row.qml's iconSource and PreviewMedia.qml's player source: encodeURI leaves # and ?
 // literal, which Qt then reads as a URL fragment or query rather than path bytes.
 function fileUri(path) {
-    return "file://" + encodeURI(path).replace(/#/g, "%23").replace(/\?/g, "%3F")
+    path = String(path)
+    // Only Windows paths use backslashes as separators; POSIX filenames may contain them.
+    var drive = /^[A-Za-z]:[\\/]/.test(path)
+    var unc = /^\\\\[^\\]/.test(path)
+    if (drive || unc) path = path.replace(/\\/g, "/")
+    var parts = path.split("/")
+    for (var i = 0; i < parts.length; i++) {
+        if (!(drive && i === 0)) parts[i] = encodeURIComponent(parts[i])
+    }
+    return (drive ? "file:///" : path.indexOf("//") === 0 ? "file:" : "file://") + parts.join("/")
 }
 
 // "3:05", or "1:03:05" once an hour is on the clock; mm/ss are always two digits, matching a media player's own clock rather than Format.date's prose.

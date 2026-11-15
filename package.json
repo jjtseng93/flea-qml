@@ -31,6 +31,6 @@
   "scripts": {
     "start": "bun index.js",
     "test": "bun test",
-    "browser": "bunx buninu-browser@0.10.4"
+    "browser": "bunx buninu-browser@0.10.5"
   }
 }

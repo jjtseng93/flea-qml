@@ -755,7 +755,11 @@ Rectangle {
         }
     }
 
+    // The block view's diagrams are drawn by a window's backend (ui/FigureService.qml).
+    Component.onDestruction: FigureService.release(backend)
+
     Component.onCompleted: {
+        FigureService.adopt(backend)
         var home = Quickshell.env("HOME")
         var named = Quickshell.env("FLEA_PATH") || ""
         var start = Startup.startPath(ViewState.state, home, named)

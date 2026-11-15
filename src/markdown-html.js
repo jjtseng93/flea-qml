@@ -5,10 +5,13 @@
 // preview applies to raw HTML (ui/js/MdHtml.js, ui/js/MdUrl.js): those tags, those
 // attributes, http(s)/mailto/relative links, and only pictures inside the document's
 // folder, which are embedded as data: URLs so the page loads nothing. A remote picture is
-// a note naming its host. The page carries no script and no resource reference.
+// a note naming its host. Mermaid fences are drawn by src/figure.js and embedded as SVG
+// pictures (data: URLs in <img>, where an SVG runs nothing and loads nothing), sharing the
+// pictures' budget. The page carries no script and no resource reference.
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, extname, resolve, sep } from "node:path";
 import { texToMathML, cleanMathML } from "./mathml.js";
+import { renderDiagram } from "./figure.js";
 
 /** The largest Markdown source converted, as the QML preview's maxBytes default. */
 export const MARKDOWN_LIMIT = 1 << 20;
@@ -16,6 +19,9 @@ export const MARKDOWN_LIMIT = 1 << 20;
 // pictures share 1 MB beside the at most 1 MB of text.
 const IMAGE_LIMIT = 1 << 20;
 const IMAGES_TOTAL = 1 << 20;
+// Diagrams drawn for one page; past this a fence stays source, so a page of broken diagrams
+// cannot hold the backend for a deadline each.
+export const DIAGRAMS_PER_PAGE = 32;
 
 // Tags re-emitted with the attributes below; any other tag is dropped and its content kept.
 const ALLOWED = new Set(("a b strong i em u s del strike sub sup kbd code br small mark span p div h1 h2 h3 h4 h5 h6 hr " +
@@ -107,9 +113,8 @@ export function classifyImage(raw, folder, budget) {
  * escaped, everything else dropped (DROP_CONTENT with its content, other tags keeping
  * theirs). Nothing of the source survives as markup except what is emitted here.
  */
-export function cleanHtml(source, folder) {
+export function cleanHtml(source, folder, budget = { left: IMAGES_TOTAL }) {
   const out = [];
-  const budget = { left: IMAGES_TOTAL };
   let hidden = 0;
   new HTMLRewriter().on("*", {
     element(el) {
@@ -165,10 +170,13 @@ const OPEN = "", CLOSE = "";
 
 /**
  * Sets formulas aside: $$…$$ and $…$ (TeX) and raw <math>…</math> (MathML), outside code
- * fences and code spans. Returns the text with markers and the formulas they stand for.
+ * fences and code spans; and Mermaid fences (```mermaid, as the block view picks them: the
+ * info string's first word, any case), each as a paragraph of its own. Returns the text with
+ * markers, the formulas they stand for, and the diagrams' sources.
  */
 export function holdFormulas(source) {
   const formulas = [];
+  const diagrams = [];
   const hold = (formula) => `${OPEN}${formulas.push(formula) - 1}${CLOSE}`;
   const lines = String(source).replace(/[]/g, "�").split("\n");
   const kept = [];
@@ -189,19 +197,37 @@ export function holdFormulas(source) {
       .replace(/(^|[^\\$])\$(?=\S)([^$\n]*?\S)\$(?!\d)/g, (_, before, tex) => before + hold({ tex, display: false }));
     kept.push(text.replace(/(\d+)/g, (_, index) => spans[Number(index)]));
   };
+  // A diagram's lines, with the fence's own indent taken off each, as CommonMark reads code.
+  let diagram = null;
+  const holdDiagram = () => {
+    kept.push("", `${OPEN}d${diagrams.push(diagram.lines.join("\n")) - 1}${CLOSE}`, "");
+    diagram = null;
+  };
   for (const line of lines) {
-    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
-    if (fence) {
+    const opening = /^(\s{0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    const marker = opening?.[2];
+    if (diagram) {
+      if (marker && marker[0] === diagram.fence[0] && marker.length >= diagram.fence.length && !opening[3].trim()) holdDiagram();
+      else diagram.lines.push(line.replace(new RegExp(`^ {0,${diagram.indent}}`), ""));
+    } else if (fence) {
       kept.push(line);
       if (marker && marker[0] === fence[0] && marker.length >= fence.length && !line.trim().slice(marker.length).trim()) fence = null;
     } else if (marker) {
       flush();
-      fence = marker;
-      kept.push(line);
+      // A backtick fence's info string holds no backtick (CommonMark), so ```mermaid` is not one.
+      const info = opening[3].trim();
+      if (/^mermaid(\s|$)/i.test(info) && !(marker[0] === "`" && info.includes("`")))
+        diagram = { fence: marker, indent: opening[1].length, lines: [] };
+      else {
+        fence = marker;
+        kept.push(line);
+      }
     } else prose.push(line);
   }
   flush();
-  return { text: kept.join("\n"), formulas };
+  // An unclosed fence runs to the end, as an unclosed code block does.
+  if (diagram) holdDiagram();
+  return { text: kept.join("\n"), formulas, diagrams };
 }
 
 // A formula's MathML, or its source as escaped text when it is refused.
@@ -231,17 +257,48 @@ export function pageStyle(theme = {}) {
     `blockquote{margin:0;padding-left:12px;border-left:3px solid ${muted};color:${muted}}` +
     `table{border-collapse:collapse}td,th{border:1px solid ${muted};padding:2px 8px}hr{border:0;border-top:1px solid ${muted}}` +
     `.remote{display:inline-block;border:1px dashed ${muted};color:${muted};padding:2px 6px}.alt{color:${muted}}` +
-    `math[display=block]{display:block;margin:6px 0}.formula-source{color:${muted}}img{max-width:100%}`;
+    `math[display=block]{display:block;margin:6px 0}.formula-source{color:${muted}}img{max-width:100%}` +
+    `.diagram{margin:8px 0}.diagram-error{margin:-4px 0 8px;color:${muted};font-size:.9em}`;
 }
 
-/** One complete, passive page for a Markdown source in `folder`. */
-export function markdownPage(source, folder, theme = {}) {
+// A diagram as a picture, or its source as a code block with the reason it was not drawn.
+// `drawn` is renderDiagram's answer; none (a page built without drawing) leaves the source.
+function diagramHtml(source, drawn, budget) {
+  if (drawn?.svg !== undefined) {
+    const bytes = Buffer.byteLength(drawn.svg);
+    if (bytes <= budget.left) {
+      budget.left -= bytes;
+      return `<div class="diagram"><img alt="Mermaid diagram" src="data:image/svg+xml;base64,${Buffer.from(drawn.svg).toString("base64")}"></div>`;
+    }
+    drawn = { error: "over the page's picture budget" };
+  }
+  const code = `<pre><code>${escapeText(source.replaceAll("&", "&amp;"))}</code></pre>`;
+  return drawn?.error ? `${code}<p class="diagram-error">Diagram not drawn · ${escapeText(drawn.error.replaceAll("&", "&amp;"))}</p>` : code;
+}
+
+/**
+ * One complete, passive page for a Markdown source in `folder`. `drawn` holds renderDiagram's
+ * answer for each Mermaid fence in order (see markdownHtml); a fence without one stays source.
+ */
+export function markdownPage(source, folder, theme = {}, drawn = []) {
   if (Buffer.byteLength(String(source)) > MARKDOWN_LIMIT) throw Error("Markdown preview exceeds size limit");
-  const { text, formulas } = holdFormulas(source);
+  const { text, formulas, diagrams } = holdFormulas(source);
   const html = Bun.markdown.html(text, { tables: true, strikethrough: true, tasklists: true });
-  const body = cleanHtml(html, folder)
+  // Diagrams take their share of the picture budget first, in document order; pictures the rest.
+  const budget = { left: IMAGES_TOTAL };
+  const figures = diagrams.map((diagram, index) => diagramHtml(diagram, drawn[index], budget));
+  const body = cleanHtml(html, folder, budget)
+    .replace(new RegExp(`(?:<p>)?${OPEN}d(\\d+)${CLOSE}(?:</p>)?`, "g"), (_, index) => figures[Number(index)] ?? "")
     .replace(new RegExp(`${OPEN}(\\d+)${CLOSE}`, "g"), (_, index) => formulas[Number(index)] ? formulaHtml(formulas[Number(index)]) : "");
   return `<!doctype html><meta charset="utf-8"><style>${pageStyle(theme)}</style>${body}`;
+}
+
+/** Draws a source's Mermaid fences under `theme`, in order, the first DIAGRAMS_PER_PAGE of them. */
+export async function drawDiagrams(source, theme = {}) {
+  const { diagrams } = holdFormulas(source);
+  return Promise.all(diagrams.map((diagram, index) => index < DIAGRAMS_PER_PAGE
+    ? renderDiagram(diagram, theme)
+    : Promise.resolve({ error: `more than ${DIAGRAMS_PER_PAGE} diagrams on the page` })));
 }
 
 /** The backend's answer to one `markdownhtml` request for the file at `request.path`. */
@@ -251,7 +308,9 @@ export async function markdownHtml(request) {
     const path = String(request.path ?? "");
     if (!path || statSync(path).size > MARKDOWN_LIMIT) return answer;
     const source = await Bun.file(path).text();
-    return { ...answer, state: "ready", html: markdownPage(source, dirname(resolve(path)), request.theme ?? {}) };
+    const theme = request.theme ?? {};
+    const drawn = await drawDiagrams(source, theme);
+    return { ...answer, state: "ready", html: markdownPage(source, dirname(resolve(path)), theme, drawn) };
   } catch {
     return answer;
   }

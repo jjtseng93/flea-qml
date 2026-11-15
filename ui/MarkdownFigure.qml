@@ -1,6 +1,6 @@
 import QtQuick
 
-// One rendered figure: the helper's SVG at its aspect ratio within the pane width, or fenced source when rendering fails.
+// One rendered figure: the backend's SVG (src/figure.js) at its aspect ratio within the pane width, or fenced source when rendering fails.
 import "js/FigureDate.js" as FigureDate
 
 Item {
@@ -23,13 +23,13 @@ Item {
     property int bodyPx: Theme.font.body
     // The body font's x-height at bodyPx: a formula draws its ex at this height, so maths and prose letters stand level.
     property real xHeight: regularMetrics.xHeight
-    // The helper receives the x-height in hundredths of a pixel, so a font that settles late changes the request.
+    // The request carries the x-height in hundredths of a pixel, so a font that settles late changes the request.
     readonly property int xHeightRounding: 100
 
     // A diagram sizes each label from the font's advance of every printable ASCII character, regular and bold; maths sends none.
     readonly property int advanceFirst: 32
     readonly property int advanceLast: 126
-    // The helper receives the advances in thousandths of an em, so a font that settles late changes the request.
+    // The request carries the advances in thousandths of an em, so a font that settles late changes the request.
     readonly property int advanceRounding: 1000
     // The advance of each character from the first to the last, read through the metrics' own font so a font change re-runs the table.
     function advanceTable(metrics) {

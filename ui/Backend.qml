@@ -114,6 +114,7 @@ Item {
     signal htmlResult(var message)
     // Sample input: {"t":"markdownhtml","slot":"look","token":9,"state":"ready","html":"<!doctype html>..."}
     signal markdownHtmlResult(var message)
+    signal figureResult(var message)
     property int codeToken: 0
     // The unified diff of two files, or the reason there is none, answered late with the token askCompare returned.
     signal compareResult(var message)
@@ -497,6 +498,14 @@ Item {
     }
 
     // A Markdown file as one passive page for WebPreview; theme holds the page's #rrggbb colours and body size.
+    // One Mermaid diagram (src/figure.js); the answer comes back as figureResult with this id.
+    property int figureSeq: 0
+    function askFigure(source, theme) {
+        root.figureSeq += 1
+        root.send({ c: "figure", id: root.figureSeq, source: source, theme: theme })
+        return root.figureSeq
+    }
+
     function askMarkdownHtml(slot, path, theme) {
         root.codeToken += 1
         root.send({ c: "markdownhtml", token: root.codeToken, slot: slot, path: path, theme: theme })

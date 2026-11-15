@@ -119,6 +119,8 @@ function route(root, message) {
         root.htmlResult(message)
     } else if (message.t === "markdownhtml") {
         root.markdownHtmlResult(message)
+    } else if (message.t === "figure") {
+        root.figureResult(message)
     } else if (message.t === "compare") {
         root.compareResult(message)
     } else if (message.t === "shebang") {

@@ -10,6 +10,7 @@ import { code } from "./code.js";
 import { compare } from "./compare.js";
 import { html } from "./html.js";
 import { markdownHtml } from "./markdown-html.js";
+import { renderDiagram } from "./figure.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
 import { dirsize, dirsizeCancel, dirsizeInit, forgetSizes } from "./dirsize.js";
@@ -240,6 +241,12 @@ const handlers = {
       htmlJobs.delete(slot);
       send({t:"html",slot,token:request.token,state:"failed",html:"",total:0});
     });
+  },
+  // One Mermaid diagram for the block view's figures (ui/FigureService.qml), drawn by src/figure.js;
+  // the answer names the request's id and carries either the SVG or the reason there is none.
+  figure: request => {
+    renderDiagram(request.source, request.theme ?? {}).then(answer =>
+      send({ t: "figure", id: request.id, svg: answer.svg ?? "", error: answer.svg === undefined ? answer.error ?? "render failed" : "" }));
   },
   // A Markdown file as one passive page for a sandboxed web view (src/markdown-html.js);
   // a newer request on the same slot drops the older one's reply.

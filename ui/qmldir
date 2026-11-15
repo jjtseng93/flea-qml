@@ -54,7 +54,6 @@ MarkdownTableScroll 1.0 MarkdownTableScroll.qml
 MarkdownTableWheel 1.0 MarkdownTableWheel.qml
 MarkdownFigure 1.0 MarkdownFigure.qml
 singleton FigureService 1.0 FigureService.qml
-FigureStore 1.0 FigureStore.qml
 PreviewPdf 1.0 PreviewPdf.qml
 PreviewSwap 1.0 PreviewSwap.qml
 PreviewImage 1.0 PreviewImage.qml

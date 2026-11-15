@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell.Io
 import "." as Flea
 import "js/CodeRuns.js" as CodeRuns
-import "js/FigureWarm.js" as FigureWarm
 import "js/Markdown.js" as Markdown
 import "js/MarkdownPrepared.js" as Prepared
 
@@ -104,16 +103,15 @@ Item {
     readonly property Item sourceItem: sourceList.list
     // Only the active file in Rendered view may request figures.
     readonly property bool figuresArmed: root.active && root.shownView !== Markdown.SOURCE
-    // A parsed document that may ask for figures starts the helper at once, so it is warm when the first one is asked for.
-    readonly property var warmBlocks: root.figuresArmed && root.blocksReady && file.loaded && !root.tooLarge ? Markdown.figuresIn(root.blockList, []) : []
-    readonly property bool hasFigures: root.warmBlocks.length > 0
-    // An unplaced figure, made only for a document with figures, whose theme is the one every figure here is asked under.
+    // The theme the web page's diagrams are drawn under (src/figure.js): an unplaced figure reads the
+    // body font's advance tables, so each label is sized from the font that draws it.
     Loader {
         id: themeProbe
-        active: root.hasFigures
+        active: root.useWeb
         sourceComponent: Flea.MarkdownFigure {
             visible: false
             askArmed: false
+            kind: "mermaid"
             display: true
             bgHex: root.hexOf(Theme.color.background)
             fgHex: root.inkHex
@@ -123,18 +121,9 @@ Item {
             fontFamily: Theme.font.family
             bodyPx: root.bodyPx
         }
+        // A page asked before the probe existed carried no advance tables; it is asked again with them.
+        onLoaded: root.askWeb()
     }
-    // The warm query's keys and kinds, naming exactly the cache keys the figures' asks will use; null until the probe exists.
-    function warmedQuery(blocks, themes) {
-        function keyOf(kind, source, theme) {
-            return FigureService.cacheKeyOf(kind, source, theme, true);
-        }
-        return FigureWarm.query(blocks, themes, keyOf);
-    }
-    // The warm query, so the helper starts warm when figures are on screen; null until the probe exists.
-    readonly property var warmRequest: root.hasFigures && themeProbe.item ? root.warmedQuery(root.warmBlocks,
-        { math: themeProbe.item.themeOfKind("math"), mermaid: themeProbe.item.themeOfKind("mermaid") }) : null
-    onWarmRequestChanged: FigureService.warm(root.warmRequest ? root.warmRequest.keys : [], root.warmRequest ? root.warmRequest.kinds : [])
     // Parse sequence numbers reject replies for an older file.
     property var blockList: []
     property int parseSeq: 0
@@ -617,9 +606,12 @@ Item {
         if (!root.useWeb || !root.active || root.path === "" || root.backend === null
                 || typeof root.backend.askMarkdownHtml !== "function")
             return
+        var figure = themeProbe.item ? themeProbe.item.hexTheme() : null
         root.webToken = root.backend.askMarkdownHtml("markdown-" + root.slot, root.path, {
             foreground: root.inkHex, background: root.hexOf(Theme.color.background), muted: root.mutedHex,
-            surface: root.surfaceHex, accent: root.accentHex, bodyPx: root.bodyPx
+            surface: root.surfaceHex, accent: root.accentHex, bodyPx: root.bodyPx,
+            font: Theme.font.family,
+            advances: figure ? figure.advances : [], boldAdvances: figure ? figure.boldAdvances : []
         })
     }
     onUseWebChanged: root.askWeb()

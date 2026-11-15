@@ -71,22 +71,6 @@ function deepBlocks() {
     return [{ type: "deep", limit: NESTING_LIMIT }]
 }
 
-// Every figure block in document order, top level and held by a quote or a list item at any depth, pushed onto out.
-function figuresIn(blocks, out) {
-    for (var i = 0; i < blocks.length; i++) {
-        var block = blocks[i]
-        if (block.type === "figure")
-            out.push(block)
-        else if (block.type === "quote" && block.parts !== undefined)
-            figuresIn(block.parts, out)
-        else if (block.type === "list" && block.parts !== undefined)
-            for (var k = 0; k < block.parts.length; k++)
-                if (block.parts[k])
-                    figuresIn(block.parts[k], out)
-    }
-    return out
-}
-
 // The Source view lays out chunks of whole lines about this many characters long, so a screenful of a large file costs a few chunks.
 var SOURCE_CHUNK_CHARS = 4096
 // No chunk is longer than this: a line that runs past it is cut at its last space past SOURCE_CHUNK_CHARS, or at the limit when it has none.

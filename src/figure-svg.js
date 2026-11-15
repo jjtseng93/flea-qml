@@ -1,15 +1,7 @@
-// Maths (MathJax) and diagrams (Pele) through a pure ES module shared by node and quickjs-ng.
+// Diagram SVG from Pele (src/vendor/mermaid.mjs), made safe and themed for a passive page or Qt SVG.
+// Pure functions: src/figure-thread.js runs them in a Bun Worker beside the bundle.
 
-// Requests carry {id, kind, source, display, theme}; answers carry {id, svg} or {id, error}; FigureService caches by kind, source, display and theme.
-
-export var MATH_LIMIT = 4096;
 export var MERMAID_LIMIT = 32768;
-// MathJax uses a 16 px body when the theme supplies no body size.
-var DEFAULT_BODY_PX = 16;
-// MathJax's TeX SVG sizes one ex at 442 thousandths of an em.
-var EX_PER_EM = 0.442;
-// Keep converted SVG dimensions to two decimal places.
-var PX_ROUNDING_FACTOR = 100;
 
 // A start or end tag whole, a quoted value holding ">" included; the words between two tags are never inside one.
 var TAG = /<[^<>"']*(?:(?:"[^"]*"|'[^']*')[^<>"']*)*>/g;
@@ -29,7 +21,7 @@ function decodeReferences(text) {
     });
 }
 
-// The corpus vocabulary, the formulas' and diagrams' output and every style attribute the post-pass writes; anything else refuses.
+// The corpus vocabulary, the diagrams' output and every style attribute the post-pass writes; anything else refuses.
 var ELEMENTS = ["a", "circle", "desc", "ellipse", "g", "line", "path", "polygon", "rect", "svg", "text", "title", "tspan"];
 var ATTRIBUTES = ["class", "cx", "cy", "d", "fill", "fill-opacity", "focusable", "font-family", "font-size", "font-style",
     "font-weight", "height", "href", "id", "letter-spacing", "opacity", "pointer-events", "points", "preserveAspectRatio", "r", "role",
@@ -527,32 +519,12 @@ export function postMermaid(svg, t) {
     return out;
 }
 
-export function postMath(svg, t) {
-    if (svg.indexOf("merror") >= 0 || svg.indexOf("data-mjx-error") >= 0)
-        throw new Error("formula did not render");
-    var out = inAttributes(svg, function (value) { return value.split("currentColor").join(t.fg); });
-    // MathJax's TeX SVG has 442 units per ex; a formula draws its ex at the body x-height the pane measured, or the em rule when none came.
-    var exPx = t.exPx > 0 ? t.exPx : (t.bodyPx || DEFAULT_BODY_PX) * EX_PER_EM;
-    out = out.replace(/(-?\d+(?:\.\d+)?)ex/g, function (m, v) {
-        var px = Math.round(parseFloat(v) * exPx * PX_ROUNDING_FACTOR) / PX_ROUNDING_FACTOR;
-        return String(px) + "px";
-    });
-    var bad = checkSafe(out);
-    if (bad)
-        throw new Error("unsafe formula: " + bad);
-    return out;
-}
-
-// Render through the two bundle entry points in apis, returning SVG or throwing a reason the caller puts in {id, error}.
-export function renderFigure(kind, source, display, theme, apis) {
-    if (kind !== "math" && kind !== "mermaid")
+// A diagram's SVG through the bundle's entry point in `api`, or an Error whose message the caller shows.
+export function renderFigure(kind, source, display, theme, api) {
+    if (kind !== "mermaid")
         throw new Error("unknown figure kind");
-    if (kind === "math" && source.length > MATH_LIMIT)
-        throw new Error("formula over 4 KiB");
-    if (kind === "mermaid" && source.length > MERMAID_LIMIT)
+    if (source.length > MERMAID_LIMIT)
         throw new Error("diagram over 32 KiB");
-    if (kind === "math")
-        return postMath(apis.texToSvg(source, !!display), theme);
     // The bundle takes the whole theme: its colour roles, its font and body size, and the font's own advance tables, so every label is sized from the font that is drawn.
-    return postMermaid(apis.mermaidToSvg(source, theme), theme);
+    return postMermaid(api.mermaidToSvg(source, theme), theme);
 }

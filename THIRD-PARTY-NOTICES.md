@@ -11,6 +11,9 @@ work by others, each under its own licence, kept beside it in this tree.
 | [Pele](https://github.com/obsidianmd/pele) 1.6.0 | `src/vendor/pele.js`, official npm `dist/pele.js`, unchanged (see [source and wrapper notes](docs/pele.md)) | MIT | [src/vendor/LICENSES/MIT-pele.txt](src/vendor/LICENSES/MIT-pele.txt) |
 | [Mermaid](https://github.com/mermaid-js/mermaid) documentation examples, via Pele and Flea | `test/fixtures/pele-parity.json` | MIT | [src/vendor/LICENSES/MIT-mermaid.txt](src/vendor/LICENSES/MIT-mermaid.txt) |
 | [Temml](https://github.com/ronkok/Temml) 0.14.0, Ron Kok | `src/vendor/temml.mjs`: the npm package's `dist/temml.mjs`, unchanged (SHA-256 `09e55a0c364d35b8ef66be49486b90884240a7e66c463a825e096faf27b0d59d`) | MIT | [src/vendor/LICENSES/MIT-temml.txt](src/vendor/LICENSES/MIT-temml.txt) |
+| [KaTeX](https://github.com/KaTeX/KaTeX), Khan Academy and contributors | inherited implementation within `src/vendor/temml.mjs` | MIT | [MIT-katex.txt](src/vendor/LICENSES/MIT-katex.txt), [historical licence](src/vendor/LICENSES/MIT-katex-2015.txt) |
+| [Perseus](https://github.com/Khan/perseus), Khan Academy, via KaTeX | `findEndOfMath` within `src/vendor/temml.mjs` | MIT | [MIT-perseus.txt](src/vendor/LICENSES/MIT-perseus.txt); [provenance limits](docs/temml.md#katex-and-perseus) |
+| [React](https://github.com/facebook/react/tree/v0.3.0), Facebook | `hyphenate` and `escape` adaptations within `src/vendor/temml.mjs` | Apache-2.0, as credited by Temml | [Apache-2.0.txt](src/vendor/LICENSES/Apache-2.0.txt); [historical sources](docs/temml.md#react-utilities) |
 | [mhchem](https://mhchem.github.io/MathJax-mhchem/) 3.3.0 (The MathJax Consortium, Martin Hensel) and Kolen Cheung's MathJax extension, as adapted inside Temml | within `src/vendor/temml.mjs` | Apache-2.0 | [src/vendor/LICENSES/Apache-2.0.txt](src/vendor/LICENSES/Apache-2.0.txt) |
 | [Wayland](https://gitlab.freedesktop.org/wayland/wayland) `wayland.xml`, Kristian Høgsberg, Intel Corporation, Collabora | `src/wayland/protocols/` | MIT | inside the file |
 | [wayland-protocols](https://gitlab.freedesktop.org/wayland/wayland-protocols) `ext-data-control-v1.xml` and [wlr-protocols](https://gitlab.freedesktop.org/wlroots/wlr-protocols) `wlr-data-control-unstable-v1.xml`, Simon Ser, Ivan Molodetskikh, Neal Gompa | `src/wayland/protocols/` | MIT-style | inside each file |
@@ -21,3 +24,6 @@ work by others, each under its own licence, kept beside it in this tree.
 [LICENSE](LICENSE)); the XML files are unchanged.
 
 The language marks drawn from simple-icons remain their owners' trademarks.
+
+See [Temml source and inherited notices](docs/temml.md) for the verified
+distribution checksum, historical references and attribution limits.

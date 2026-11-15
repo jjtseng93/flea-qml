@@ -70,7 +70,10 @@ function confirmTitle(snapshot) {
 
 function confirmBody(snapshot, scope) {
     if (!filled(snapshot)) return ""
-    return snapshot.all ? Ops.deleteAllLine(snapshot.count, Format.size(snapshot.bytes || 0)) : Ops.deleteScopeLine(scope, snapshot.count)
+    var body = snapshot.all ? Ops.deleteAllLine(snapshot.count, Format.size(snapshot.bytes || 0)) : Ops.deleteScopeLine(scope, snapshot.count)
+    if (snapshot.count === 1 && typeof snapshot.name === "string" && snapshot.name.length > 0)
+        body = "“" + snapshot.name + "”\n\n" + body
+    return body
 }
 
 // Where m opens: the cursor row's menu when no row is marked or the only mark is the cursor row, the marked rows' menu otherwise, the whole-Trash menu when nothing is listed.

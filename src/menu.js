@@ -8,7 +8,7 @@
 // waiting.
 import {trashRecord,forgetTrashRecord} from './trash-record.js';
 import { constants, lstatSync, readdirSync, rmSync } from "node:fs";
-import { dirname, join, resolve, isAbsolute } from "node:path";
+import { basename, dirname, join, resolve, isAbsolute } from "node:path";
 
 const CHANGED = "Selected items changed; reopen the menu.";
 
@@ -112,7 +112,7 @@ export function menuaction(request, send, listing, stamp) {
       held.review = reviewTrees(held.paths);
       if (!unchanged(held)) throw new Error(CHANGED);
       held.token = ++deleteTokens;
-      return answer({ ok: true, token: held.token, count: held.paths.length, bytes: held.review.bytes, partial: false });
+      return answer({ ok: true, token: held.token, count: held.paths.length, name: held.paths.length === 1 ? basename(held.paths[0]) : "", bytes: held.review.bytes, partial: false });
     } catch (error) { return answer({ ok: false, error: error.message }); }
   }
   if (op === "checkDelete") {

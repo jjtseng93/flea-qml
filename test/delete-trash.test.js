@@ -1,7 +1,7 @@
 import {test,expect,afterAll} from 'bun:test';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,renameSync,symlinkSync,lstatSync,rmSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,basename} from 'node:path';
 import {menuaction} from '../src/menu.js';
 import {trashOne,trash} from '../src/trash.js';
 const root=mkdtempSync(join(tmpdir(),'flea-mutations-'));
@@ -17,7 +17,7 @@ function fixture() {
 }
 test('permanent delete requires a prepared token and deletes reviewed tree once',()=>{
  const {path,call}=fixture();expect(call('checkDelete').valid).toBe(false);expect(call('delete').ok).toBe(false);
- const {token}=call('prepareDelete');expect(call('checkDelete',{token}).valid).toBe(true);
+ const prepared=call('prepareDelete');expect(prepared.name).toBe(basename(path));const {token}=prepared;expect(call('checkDelete',{token}).valid).toBe(true);
  call('delete',{token});expect(existsSync(path)).toBe(false);expect(call('delete',{token}).ok).toBe(false);
 });
 test('new descendants invalidate confirmation before any removal',()=>{

@@ -280,6 +280,7 @@ function handleTrashBrowse(request, send) {
       token: review.token,
       all: request.emptyTrash === true || request.all === true,
       count: review.items.length,
+      name: review.items.length === 1 ? (review.items[0].original.split(/[\\/]/).pop() || review.items[0].name) : "",
       bytes: tree.bytes,
       partial: false,
     });

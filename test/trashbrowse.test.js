@@ -14,7 +14,7 @@ test('Trash list, restore, collisions and single-use deletion',()=>{
  writeFileSync(a.original,'new');expect(call('restore',{uris:[a.uri],identities:[a.identity]}).failed).toBe(1);
  expect(readFileSync(a.original,'utf8')).toBe('new');rmSync(a.original);
  expect(call('restore',{uris:[a.uri],identities:[a.identity]}).done).toBe(1);expect(readFileSync(a.original,'utf8')).toBe('payload');
- const b=item('b');const {token}=call('prepare',{uris:[b.uri],identities:[b.identity]});
+ const b=item('b');const prepared=call('prepare',{uris:[b.uri],identities:[b.identity]});expect(prepared.name).toBe('b');const {token}=prepared;
  expect(call('check',{token}).valid).toBe(true);expect(call('delete',{token}).done).toBe(1);expect(call('delete',{token}).ok).toBe(false);
 });
 test('cancel and failed replacement reviews invalidate deletion tokens',()=>{

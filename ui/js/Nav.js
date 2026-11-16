@@ -2,7 +2,6 @@
 
 .import "DirSizes.js" as DirSizes
 .import "Filter.js" as Filter
-.import "Kinds.js" as Kinds
 .import "Thumbs.js" as Thumbs
 .import "Search.js" as Search
 .import "ColumnMenu.js" as ColumnMenu
@@ -228,19 +227,14 @@ function openableRow(pane) {
     return row
 }
 
-// Enter on the cursor row: a directory navigates, an archive opens Flea's own view, anything else goes to the opener.
+// Enter on the cursor row: directories navigate; all files use the external opener.
+// Archive inspection stays on the Space/Quick Look preview route.
 function openCursor(pane, opener) {
     var row = openableRow(pane)
     if (!row) return
     var path = pane.join(Search.baseOf(pane), row.n)
     if (row.d) {
         pane.open(path)
-        return
-    }
-    // Handing an archive on opens another file manager, and this is ui/Preview.qml's own classifier; an AppImage is a program first, so it asks on the run card.
-    if (Kinds.quickLookKind(row.i, path) === Kinds.ARCHIVE && !/\.appimage$/i.test(row.n)) {
-        pane.quickLook().open(path, row.i, row.s, pane.kindNames[row.k] || "",
-            pane.thumbState && pane.thumbState.file ? Thumbs.fileFor(pane.thumbState, pane.cursorIndex) : "")
         return
     }
     opener.open(path)

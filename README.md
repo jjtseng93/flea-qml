@@ -38,6 +38,8 @@ bunx buninu --local
 
 ```sh
 npx flea-qml
+
+# bunx flea-qml
 ```
 
 Or, from the root of this repository:
@@ -46,12 +48,13 @@ Or, from the root of this repository:
 bun index.js
 ```
 
-The launcher queries Kitty graphics support.
-When available it uses buninu-browser's default terminal frontend; otherwise
-Windows uses `--win32`, and Linux/Android use `--wayland`.
+- The launcher queries Kitty graphics support.
+- When available it uses buninu-browser's default terminal frontend (--casty)
+- If Kitty Graphics is not available after 800ms
+  * Windows: `--win32`
+  * Linux/Android/Other: `--wayland`
 
-A first argument starting with `--` (except the information options below) bypasses detection and is forwarded unchanged
-to buninu-browser, which decides how to handle it. There is no frontend allowlist:
+- The first argument selects frontend for buninu-browser and bypasses Kitty detection:
 
 ```sh
 npx flea-qml --casty
@@ -63,45 +66,38 @@ npx flea-qml --version
 npx flea-qml --readme
 ```
 
-`--help`/`-h`, `--version`/`-V`, and `--readme` run locally without probing Kitty
-or starting the browser. `--version` also shows the browser version pinned in
-`package.json`. `--readme` always prints coloured ANSI Markdown with
-links, including when its output is redirected.
+- >= 2nd arguments go to the browser
 
-When launched, Flea automatically spawns
-[buninu-browser](https://github.com/jjtseng93/buninu-browser) to display its QML
-interface. The browser version is pinned in `package.json` under
-`scripts.browser`. The launcher reads the package
-specification from this field, while still choosing npx, bunx or bun x as below.
-Changing this field updates the requested version for all three launch methods;
-clearing a cache does not change the pinned version.
+- Early exit flags:
+  * `--help`/`-h`: CLI usage
+  * `--version/-V`: Shows flea-qml version & buninu-browser version pinned in `package.json`
+  * `--readme` always prints coloured ANSI Markdown with links, including when its output is redirected.
 
-To reinstall cached packages from scratch, see [Clearing package caches](#clearing-package-caches).
+---
 
-The browser receives the absolute, URL-escaped `file://` address of the bundled
-`ui/boot/shell.qml`, including on Windows. Remaining arguments go to the browser.
-Package launch order matches buninu-browser's Casty launcher: npx when both npx
-and Bun are on PATH, then bunx, then `bun x` using Bun on PATH or the running Bun.
-A missing Kitty response falls back after 800 ms; explicit selection skips the
-probe. Wayland requires a running compositor. Other non-Windows platforms also
-fall back to Wayland; no native macOS frontend is selected automatically.
+### What the launcher starts
+- Spawns [buninu-browser](https://github.com/jjtseng93/buninu-browser) to display its QML interface
+  * file:///path/to/ui/boot/shell.qml
+- Reads browser version pinned in `package.json` under `scripts.browser`
+- Order of runner: `npx`, `bunx`, then `bun x`
+- To reinstall cached packages (buninu-browser & @drxiaozhi/casty), see [Clearing package caches](#clearing-package-caches)
 
-The npm package is public and includes the full project, without a `files`
-allowlist or project ignore rules (npm's mandatory exclusions still apply).
+### Advanced usage
 
-`FLEA_PATH=/some/folder` opens that folder first; for example, from this
-checkout on Linux/Android:
+- `FLEA_PATH=/some/folder` opens that folder first
+- For example, from this checkout in the Buninu userspace:
 
 ```sh
-FLEA_PATH="$PWD/demos" bun index.js
+env FLEA_PATH="$PWD/demos" bunx flea-qml
 ```
 
-For development, you can also launch a browser checkout directly from this
-repository root, with a Wayland compositor running:
+For development, you can also launch a browser checkout directly from this repository root:
 
 ```sh
 bun ../buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml
 ```
+
+Replace wayland with your selected frontend
 
 ## Keyboard shortcuts
 

@@ -17,9 +17,22 @@ WebEngineView {
     settings.localContentCanAccessRemoteUrls: false
     settings.localContentCanAccessFileUrls: false
 
+    // loadHtml uses about:blank in Qt and about:srcdoc in buninu-browser.
+    function isDocumentFragment(target) {
+        var link = String(target)
+        if (link.charAt(0) === "#") return true
+        var hash = link.indexOf("#")
+        if (hash < 0) return false
+        var base = link.slice(0, hash)
+        var current = String(view.url).split("#")[0]
+        return current !== "" ? base === current
+            : base === "about:srcdoc" || base === "about:blank"
+    }
+
     onNavigationRequested: function (request) {
         if (request.navigationType !== WebEngineNavigationRequest.LinkClickedNavigation)
             return
+        if (view.isDocumentFragment(request.url)) return
         request.reject()
         view.linkActivated(String(request.url))
     }

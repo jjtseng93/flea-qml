@@ -17,7 +17,7 @@ const body = (markdown) => markdownPage(markdown, docs).replace(/^[\s\S]*?<\/sty
 
 test("Markdown becomes headings, lists, tables, code and task boxes", () => {
   const html = body("# Title\n\n- **bold** and *it*\n- `code`\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nlet x = 1 < 2;\n```\n\n- [x] done\n- [ ] todo\n");
-  expect(html).toContain("<h1>Title</h1>");
+  expect(html).toContain('<h1 id="title">Title</h1>');
   expect(html).toContain("<strong>bold</strong>");
   expect(html).toContain("<table>");
   expect(html).toContain("let x = 1 &lt; 2;");
@@ -57,8 +57,8 @@ test("active content, raw-text elements and foreign markup never survive", () =>
 test("only the allowed attributes stay; links keep http, https, mailto and relative targets", () => {
   const html = body('<p align="center" onclick="alert(1)" style="color:red" class="c" id="i">x</p>\n\n' +
     '[ok](https://example.com) [mail](mailto:a@b.c) [rel](other.md) [js](javascript:alert(1)) <a href="jav&#x61;script:alert(1)">e</a> <a href="data:text/html,x">d</a>');
-  expect(html).toContain('<p align="center">x</p>');
-  expect(html).not.toMatch(/onclick|style=|class="c"|id="i"/);
+  expect(html).toContain('<p align="center" id="i">x</p>');
+  expect(html).not.toMatch(/onclick|style=|class="c"/);
   expect(html).toContain('href="https://example.com"');
   expect(html).toContain('href="mailto:a@b.c"');
   expect(html).toContain('href="other.md"');
@@ -102,4 +102,44 @@ test("the backend answer reads the file and refuses one over the limit", async (
   writeFileSync(big, "x".repeat(MARKDOWN_LIMIT + 1));
   expect((await markdownHtml({ path: big, token: 4 })).state).toBe("failed");
   expect((await markdownHtml({ path: join(docs, "missing.md"), token: 5 })).state).toBe("failed");
+});
+
+
+test("heading anchors and escaped explicit IDs survive the passive preview", () => {
+  const html = body("[Jump](#hello-world)\n\n## Hello World\n\n## Hello World\n");
+  expect(html).toContain('href="#hello-world"');
+  expect(html).toContain('<h2 id="hello-world">');
+  expect(html).toContain('<h2 id="hello-world-1">');
+  expect(cleanHtml(`<p id='x" onclick="alert(1)'>safe</p>`, docs))
+    .toBe('<p id="x&quot; onclick=&quot;alert(1)">safe</p>');
+});
+
+test('Unicode TOC fragments match Chinese and mixed headings, including duplicates', () => {
+  const html = body('[目錄](#目錄)\n\n## 目錄\n\n## Hello 世界\n\n## 目錄\n\n## café\n');
+  expect(html).toContain('<h2 id="目錄">目錄</h2>');
+  expect(html).toContain('<h2 id="hello-世界">Hello 世界</h2>');
+  expect(html).toContain('<h2 id="目錄-1">目錄</h2>');
+  expect(html).toContain('<h2 id="café">café</h2>');
+  expect(html).toContain('href="#%E7%9B%AE%E9%8C%84"');
+});
+
+test('heading IDs and fragment text cannot inject active markup or attributes', () => {
+  const html = body(`## 中文 <img src=x onerror="alert(1)"> <script>alert(2)</script>
+
+<p id='x" onclick="alert(3)'>safe</p>
+
+[fragment](#javascript:alert%284%29)
+
+<a href="javascript:alert(5)#中文">bad</a>`);
+  const attributes = [];
+  const tags = [];
+  new HTMLRewriter().on('*', {element(el) {
+    tags.push(el.tagName);
+    for (const [key, value] of el.attributes) attributes.push([key, value]);
+  }}).transform(html);
+  expect(tags).not.toContain('script');
+  expect(tags).not.toContain('iframe');
+  expect(attributes.some(([key]) => /^on/i.test(key))).toBe(false);
+  expect(attributes.some(([key,value]) => key === 'href' && /^javascript:/i.test(value))).toBe(false);
+  expect(attributes.some(([key,value]) => key === 'href' && value.startsWith('#javascript:'))).toBe(true);
 });

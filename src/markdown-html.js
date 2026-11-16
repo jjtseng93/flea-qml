@@ -32,7 +32,7 @@ const ALLOWED = new Set(("a b strong i em u s del strike sub sup kbd code br sma
 const DROP_CONTENT = new Set(("script style iframe object embed template noscript svg math textarea title xmp " +
   "plaintext noembed noframes select option head").split(" "));
 const VOID = new Set(["br", "hr", "img", "source", "input"]);
-const GLOBAL_ATTRIBUTES = new Set(["align", "alt", "width", "height", "title", "colspan", "rowspan"]);
+const GLOBAL_ATTRIBUTES = new Set(["id", "align", "alt", "width", "height", "title", "colspan", "rowspan"]);
 const STRIKE_AS = { del: "s", strike: "s" };
 const IMAGE_TYPES = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp", ".avif": "image/avif" };
 
@@ -276,6 +276,32 @@ function diagramHtml(source, drawn, budget) {
   return drawn?.error ? `${code}<p class="diagram-error">Diagram not drawn · ${escapeText(drawn.error.replaceAll("&", "&amp;"))}</p>` : code;
 }
 
+// Bun's current heading slugger discards non-ASCII letters. Keep its HTML
+// renderer, but repair generated IDs so Unicode tables of contents can resolve.
+function unicodeHeadingIds(source, html) {
+  const ids = new Map();
+  const used = new Set();
+  Bun.markdown.render(source, {
+    heading(text, meta) {
+      const plain = text.replace(/<[^>]*>/g, "");
+      let base = /[^\x00-\x7f]/.test(plain)
+        ? plain.toLowerCase().replace(/[^\p{L}\p{M}\p{N}_\s-]/gu, "").replace(/\s/g, "-")
+        : meta.id;
+      let id = base, suffix = 0;
+      while (used.has(id)) id = base + "-" + (++suffix);
+      used.add(id);
+      ids.set(meta.id, id);
+      return "";
+    },
+  }, { tables: true, strikethrough: true, tasklists: true, headings: { ids: true } });
+  return new HTMLRewriter().on("h1,h2,h3,h4,h5,h6", {
+    element(el) {
+      const old = el.getAttribute("id");
+      if (ids.has(old)) el.setAttribute("id", ids.get(old));
+    },
+  }).transform(html);
+}
+
 /**
  * One complete, passive page for a Markdown source in `folder`. `drawn` holds renderDiagram's
  * answer for each Mermaid fence in order (see markdownHtml); a fence without one stays source.
@@ -283,7 +309,7 @@ function diagramHtml(source, drawn, budget) {
 export function markdownPage(source, folder, theme = {}, drawn = []) {
   if (Buffer.byteLength(String(source)) > MARKDOWN_LIMIT) throw Error("Markdown preview exceeds size limit");
   const { text, formulas, diagrams } = holdFormulas(source);
-  const html = Bun.markdown.html(text, { tables: true, strikethrough: true, tasklists: true });
+  const html = unicodeHeadingIds(text, Bun.markdown.html(text, { tables: true, strikethrough: true, tasklists: true, headings: { ids: true } }));
   // Diagrams take their share of the picture budget first, in document order; pictures the rest.
   const budget = { left: IMAGES_TOTAL };
   const figures = diagrams.map((diagram, index) => diagramHtml(diagram, drawn[index], budget));

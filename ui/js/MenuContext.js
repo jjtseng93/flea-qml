@@ -62,7 +62,7 @@ function listingContext(root, flyoutAction, includeHidden, environment) {
         hiddenActions: includeHidden === true ? [] : environment.hiddenActions.filter(function(id) { return id !== flyoutAction }),
         // ExtThumbs: the class row's presence and label read these, never "this drive".
         storageClass: root.storageClass, thumbPreview: environment.thumbPreview,
-        updateVersion: environment.updateVersion, hasFolderSort: root.hasFolderSort
+        hasFolderSort: root.hasFolderSort
     }
 }
 

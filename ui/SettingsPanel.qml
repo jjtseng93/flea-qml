@@ -124,11 +124,8 @@ Item {
             if (holder && holder.keymapSheet) holder.keymapSheet.open(holder)
             return
         }
-        // About's two web routes carry their own destination; ui/js/SettingsAbout.js names both.
+        // Project links come from the installed package.json.
         if (row.url !== undefined) { Qt.openUrlExternally(row.url); return }
-        // Two About actions with a live state: Update Flea's value shows a check and the footer what a launch did, and Make Flea the default runs flea instead of writing ui.json.
-        if (row.id === "updateFlea") { UpdateCheck.activate(root.focusHolder); return }
-        if (row.id === "makeDefault") { DefaultClaim.toggle(); return }
         if (row.id.indexOf("column:") === 0) { ViewState.toggleColumn(row.id.substring(7)); return }
         if (row.kind === "check" && root.section !== "menus") {
             ViewState.changeSetting(row.id, !row.on)

@@ -113,9 +113,6 @@ var state = {
       "openAgent"
     ]
   },
-  "updates": {
-    "autoCheck": true
-  },
   "plugins": {},
   "stateVersion": 4
 }

@@ -785,7 +785,6 @@ Rectangle {
             view.ensureUnlockHost().openForDevice(unlockDevice, view.currentPane.sidebar)
         if (view.dualMode) view.focusPane(view.focusSide)
         trashSweep.start()
-        UpdateCheck.startPolling()
         // Last, behind the listing request, and still before ui/boot/shell.qml creates the window and reads this body's colour.
         Glass.launch()
     }

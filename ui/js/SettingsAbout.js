@@ -1,97 +1,35 @@
 .pragma library
-.import "Update.js" as Update
-.import "MakeDefault.js" as MakeDefault
 
-// The Settings panel's About section: what is installed, the one updater, and where help lives; it came out of ui/js/Settings.js whole when the Updates group grew.
-
-// The two rows that leave Flea for a web page carry their destination, so ui/SettingsPanel.qml opens whatever a row names.
-var ISSUES_URL = "https://github.com/thisisgm/flea/issues"
-var SPONSORS_URL = "https://github.com/sponsors/thisisgm"
-
-// state.about is ui/AboutFacts.qml's facts, the updater's status and the default's claim among them; state.data is ui.json.
+// About describes this installed package, never an unrelated executable on PATH.
+function label(value) { return typeof value === "string" ? value : "" }
+function webUrl(value) {
+    var url = label(value)
+    return /^https?:\/\//i.test(url) ? url : ""
+}
+function packageFacts(text) {
+    var pkg = JSON.parse(text)
+    if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) throw new Error("Invalid package.json")
+    var repository = typeof pkg.repository === "string" ? pkg.repository : (pkg.repository || {}).url
+    repository = label(repository).replace(/^git\+/, "").replace(/\.git$/, "")
+    return {
+        name: label(pkg.name), version: label(pkg.version), description: label(pkg.description),
+        author: typeof pkg.author === "string" ? pkg.author : label((pkg.author || {}).name),
+        license: label(pkg.license), homepage: webUrl(pkg.homepage), repository: webUrl(repository),
+        issues: webUrl(typeof pkg.bugs === "string" ? pkg.bugs : (pkg.bugs || {}).url)
+    }
+}
 function rows(state) {
     var facts = state.about || {}
     var out = [
-        { kind: "hero", label: "Flea", value: "A file manager for Omarchy" },
+        { kind: "hero", label: facts.name || "flea-qml", value: facts.description || "" },
         { kind: "fact", label: "Version", value: facts.version || "Not reported" },
-        { kind: "fact", label: "Built", value: facts.built || "Not recorded in this build" },
-        { kind: "fact", label: "Installed from", value: facts.source || "Not reported" },
-        { kind: "fact", label: "Package", value: facts.package || "Not reported" },
-        { kind: "fact", label: "License", value: "MIT, © 2026 GM" },
-        { kind: "group", label: "Language" },
-        { kind: "fact", label: "Language", glyph: "globe", value: "English" },
-        { kind: "group", label: "Updates" }
+        { kind: "fact", label: "Author", value: facts.author || "Not reported" },
+        { kind: "fact", label: "License", value: facts.license || "Not reported" },
+        { kind: "action", id: "keyboardSheet", label: "Help 使用方法", glyph: "keyboard", value: "?" }
     ]
-    out = out.concat(updateRows(facts.update || Update.idle(), state.data))
-    out.push({ kind: "group", label: "This computer" })
-    // Rule 5: the identity is in the tail, so a handler too long for the row loses its head instead.
-    out.push({ kind: "fact", label: "File manager", glyph: "folder", elide: "head", value: facts.handler || "Not reported" })
-    out = out.concat(MakeDefault.rows(facts.handler, facts.claim))
-    out.push({ kind: "action", id: "keyboardSheet", label: "Keyboard sheet", glyph: "keyboard", value: "?" })
-    out.push({ kind: "action", id: "reportIssue", label: "Report an issue", glyph: "network", value: "Open", url: ISSUES_URL })
-    // SettingsGrammar rule 6: a brand is never given a generic glyph, and the mark set holds no GitHub reproduction.
-    out.push({ kind: "action", id: "support", label: "Support Flea", value: "GitHub Sponsors", url: SPONSORS_URL })
+    if (facts.error) out.push({ kind: "hint", label: facts.error })
+    if (facts.homepage) out.push({ kind: "action", id: "homepage", label: "Homepage", value: "Open", url: facts.homepage })
+    if (facts.repository) out.push({ kind: "action", id: "repository", label: "Source code", value: "Open", url: facts.repository })
+    if (facts.issues) out.push({ kind: "action", id: "reportIssue", label: "Report an issue", value: "Open", url: facts.issues })
     return out
-}
-
-// Omarchy installs and Flea may check and launch: the row's value is the check, its chevron says Enter acts, and the note explains the states that need it.
-function updateRows(update, data) {
-    var out = [
-        { kind: Update.isFact(update) ? "fact" : "action", id: "updateFlea", label: "Update Flea", glyph: "download",
-          value: Update.value(update), role: Update.role(update), inert: !Update.acts(update) },
-        { kind: "check", id: "updates.autoCheck", label: "Check automatically", caption: "when About opens, every 6 h",
-          on: autoCheck(data) }
-    ]
-    var note = Update.note(update)
-    if (note !== null)
-        out.push({ kind: "hint", label: note[0], role: note[1] })
-    return out
-}
-
-// On until switched off, the default src/uischema.rs ships for updates.autoCheck.
-function autoCheck(data) {
-    return ((data || {}).updates || {}).autoCheck !== false
-}
-
-// The signed repository package, src/update.rs's OPR_PACKAGE.
-var PACKAGES = { opr: "flea" }
-
-// Installed from, one sentence per kind src/update.rs derives, so this row and the Update Flea row name one source.
-var SOURCES = { opr: "Omarchy Package Repository",
-                local: "Local package", unowned: "Not from a package" }
-
-// src/update.rs kind_for, over pacman -Qqo's owner ("" when no package owns Flea).
-function installKind(owner, signed) {
-    if (!owner)
-        return "unowned"
-    if (owner === PACKAGES.opr && signed)
-        return "opr"
-    return "local"
-}
-
-function installedFrom(owner, signed) {
-    return SOURCES[installKind(owner, signed)]
-}
-
-// pacman -Qi under LC_ALL=C, read the way src/update.rs package_info reads it; "" for a query that failed.
-// Sample input: "Name            : flea\nVersion         : 0.3.4-1\nBuild Date      : Wed Sep 23 12:40:50 2026\nValidated By    : None\n"
-function packageFacts(text) {
-    var facts = { package: "", built: "", signed: false }
-    var lines = String(text || "").split("\n")
-    for (var i = 0; i < lines.length; i++) {
-        var cut = lines[i].indexOf(":")
-        if (cut < 0)
-            continue
-        var key = lines[i].substring(0, cut).trim(), value = lines[i].substring(cut + 1).trim()
-        if (key === "Name")
-            facts.package = value
-        else if (key === "Version")
-            facts.package = facts.package.length > 0 ? facts.package + " " + value : value
-        else if (key === "Build Date")
-            facts.built = value
-        // One or more methods separated by two spaces, such as "SHA-256 Sum  Signature".
-        else if (key === "Validated By")
-            facts.signed = value.split(/\s+/).indexOf("Signature") >= 0
-    }
-    return facts
 }

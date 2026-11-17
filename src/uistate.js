@@ -55,7 +55,6 @@ const DEFAULTS = {
     hidden: ["delete", "openTerminal", "placeMenu", "runScript", "moveto", "copyto", "properties", "permissions",
       "copyAs", "pasteAs", "invertSelection", "extThumbs", "run", "openAsText", "openAgent"],
   },
-  updates: { autoCheck: true },
   plugins: {},
   stateVersion: 4,
 };
@@ -132,7 +131,6 @@ const SCHEMA = {
   keys: word("default", "vim", "mac", "windows"),
   display: group({ textSize: group({ mode: r("textSize") }), hyprlandIcons: bool }),
   menu: group({ hidden: r("ids") }),
-  updates: group({ autoCheck: bool }),
   plugins: r("plugins"),
   [STATE_VERSION]: r("version"),
 };

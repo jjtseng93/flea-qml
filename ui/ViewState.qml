@@ -198,9 +198,6 @@ QtObject {
     readonly property bool trashAutoEmpty: root.state.trashAutoEmpty === true
     readonly property int trashSweptOn: root.state.trashSweptOn || 0
 
-    // Settings > About's "Check automatically", `updates.autoCheck` in src/uischema.rs, on until switched off.
-    readonly property bool updateAutoCheck: (root.state.updates || ({})).autoCheck !== false
-
     // Only a successful sweep records its day, so failures retry on the next launch.
     function recordTrashSweep(day) {
         root.changeKey("trashSweptOn", day)

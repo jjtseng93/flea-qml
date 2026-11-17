@@ -113,7 +113,6 @@ var INVENTORY = [
     ["toggleLangMarks", "Show code icons", "code", "FB", "view"],
     ["extThumbs", "Show thumbnails", "image", "B", "view"],
     ["settings", "Settings", "sliders", "B", "settings"],
-    ["updateFlea", "Update Flea", "download", "B", "settings"],
     ["restoreAll", "Restore all", "undo", "T", "restore"],
     ["emptyTrash", "Empty Trash", "trash", "T", "empty"]
 ]
@@ -256,12 +255,6 @@ function availableEntry(e, p, kind) {
         if (e.disabled && p.dropboxRefreshing !== true) e.errored = true
     }
     if (e.action === "sort") e.submenu = sortEntries(p.hasFolderSort === true)
-    // Present only while a check has found a newer build, whose version rides the hint slot beside the status square.
-    if (e.action === "updateFlea") {
-        if (!p.updateVersion) return false
-        e.hint = p.updateVersion
-        e.hintSquare = true
-    }
     if (e.action === "toggleHidden") {
         var hidden = hiddenRow(p.showHidden)
         e.label = hidden.label

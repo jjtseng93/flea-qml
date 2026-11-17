@@ -6,6 +6,7 @@ import "." as Flea
 import "js/Eject.js" as Eject
 import "js/Mounts.js" as Mounts
 import "js/Places.js" as Places
+import "js/KeyName.js" as KeyName
 import "js/PlaceMenu.js" as PlaceMenu
 import "js/RailMenu.js" as RailMenu
 import "js/RailKeys.js" as RailKeys
@@ -514,6 +515,19 @@ Item {
                 id: placesHeading
                 visible: root.homeEntries.length + root.trashEntries.length > 0
                 text: "PLACES 位置"
+                width: Math.max(0, rail.width - 2 * Style.spacing.rowPaddingX)
+                rightPadding: sidebarHint.implicitWidth + Theme.spacing.gap
+                elide: Text.ElideRight
+                Text {
+                    id: sidebarHint
+                    anchors.right: parent.right
+                    anchors.baseline: parent.baseline
+                    text: KeyName.keyFor("sidebar")
+                    textFormat: Text.PlainText
+                    color: Theme.color.muted
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.font.caption * 0.6
+                }
             }
             Repeater {
                 id: homeLeadRepeater

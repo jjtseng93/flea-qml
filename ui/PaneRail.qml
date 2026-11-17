@@ -23,7 +23,7 @@ Item {
     readonly property bool hidden: root.overlay ? !root.revealed : ViewState.railHidden
     // An overlay owes the pane no width, so the listing never reflows as the rail comes and goes.
     // This item is that width, and the rail itself draws past it.
-    readonly property real inset: root.overlay ? 0 : rail.width
+    readonly property real inset: root.overlay || root.hidden ? 0 : rail.width
     // Zero whenever the rail is withdrawn, though an auto-hide Sidebar stays built through the slide and after it.
     readonly property real railWidth: root.hidden ? 0 : rail.width
     readonly property var item: root.hidden ? null : rail.item
@@ -89,8 +89,6 @@ Item {
     }
     // The pointer has rested on the edge for the dwell, and stays so until it leaves the strip.
     property bool edgeShown: false
-    // The Sidebar is built by the first strip entry or Tab and then kept, so later reveals spawn nothing and keep cursor and scroll.
-    property bool built: false
     readonly property bool dragHere: dragReveal.containsDrag || root.rowDragOver(rail.item)
     readonly property bool pointerWanted: root.edgeShown || root.over || root.menuHere || root.releasing || root.dragHere
     readonly property bool focusWanted: root.pane !== null && root.pane.focusView === Focus.RAIL
@@ -106,11 +104,10 @@ Item {
         if (root.wanted) { settle.stop(); root.revealed = true }
         else if (root.revealed) settle.restart()
     }
-    onRevealedChanged: if (root.revealed) root.built = true
     // Tab out has no pointer to wait for, so the rail slides away at once; the pointer on the rail keeps it up through pointerWanted.
     onFocusWantedChanged: if (!root.focusWanted && !root.pointerWanted && root.revealed) { settle.stop(); root.revealed = false }
     // The switch itself is a fresh start either way: nothing is revealed until the pointer asks.
-    onOverlayChanged: { dwell.stop(); root.edgeShown = false; root.built = false; root.revealed = false }
+    onOverlayChanged: { dwell.stop(); root.edgeShown = false; root.revealed = false }
 
     anchors { top: parent.top; bottom: parent.bottom }
     width: root.inset
@@ -136,10 +133,9 @@ Item {
         HoverHandler {
             id: edge
             enabled: root.overlay
-            // Entering also builds the Sidebar, so the dwell covers the build; a rail already up needs no dwell.
+            // A rail already shown needs no dwell.
             onHoveredChanged: {
                 if (!edge.hovered) { dwell.stop(); root.edgeShown = false; return }
-                root.built = true
                 if (root.revealed) root.edgeShown = true
                 else dwell.restart()
             }
@@ -163,9 +159,9 @@ Item {
         // The slide moves x only, so the rail's width and rows never change with the motion; visible drops when the hide slide ends.
         x: root.overlay ? (root.slide - 1) * width : 0
         width: item && !root.held ? item.implicitWidth : 0
-        visible: !root.held && (!root.overlay || root.slide > 0)
+        visible: !root.held && (root.overlay ? root.slide > 0 : !root.hidden)
+        // Build at startup even when hidden; dual panes still share their owning rail.
         active: root.pane !== null && !root.pane.listOnly && root.pane.sharedSidebar === null
-                && (root.overlay ? (root.built || root.releaseHold) : (!root.hidden || root.releaseHold))
         // A Sidebar that went for another reason took its release with it, so there is nothing left to hold.
         onItemChanged: if (item === null) root.releaseHold = false
         sourceComponent: Flea.Sidebar {
@@ -173,7 +169,7 @@ Item {
             backend: root.pane.backend
             navigationPane: root.pane.railPane
             service: root.service
-            polling: !root.overlay || root.revealed
+            polling: !root.hidden
             focused: root.pane.railPane.focusView === Focus.RAIL
             trashActive: root.pane.railPane.trash.browsing
             onOpened: function(path) { RailKeys.openFrom(root.pane.railPane, path, sidebar) }
@@ -194,16 +190,15 @@ Item {
             onReleasingChanged: root.holdRelease(sidebar.releasing)
         }
         // Disabled with the Sidebar, so an unload under the pointer clears it; a handler inside the Sidebar dies without reporting.
-        HoverHandler { id: railHover; enabled: rail.active && !root.held }
+        HoverHandler { id: railHover; enabled: rail.visible }
     }
 
     // The rail's Sidebar renders the window-long service below; the service's answers
     // route once by origin in ui/WindowBody.qml, so this file carries no Connections of its
     // own and a dual-view open cannot fire twice.
 
-    // Ctrl+E from a listing with the rail hidden. The rail Loader above unloads the Sidebar with
-    // its DeviceMounts poll, eject verdict state and releaseChosen, so the key has nothing to read
-    // and nothing to release through. It spins this transient instead: the same DeviceMounts
+    // Ctrl+E from a listing with the rail hidden. Its retained Sidebar stops polling,
+    // so cached device verdicts cannot be used for releasing a volume. It spins this transient instead: the same DeviceMounts
     // component the rail uses, never a second poller, alive only for this flow. Its first listing
     // resolves the holding volume through the same Mounts.holding and Mounts.railMenu verdict and
     // releases through the same RailMenu.release and devices.eject path with the same messages;

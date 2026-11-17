@@ -1,3 +1,4 @@
+import "js/DesktopIntegration.js" as DesktopIntegration
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -36,6 +37,7 @@ QtObject {
     }
 
     function retag() {
+        if (!DesktopIntegration.enabled) return
         if (root.busy) {
             root.rerun.restart()
             return
@@ -43,12 +45,14 @@ QtObject {
         root.clients.running = true
     }
     function probe(addresses) {
+        if (!DesktopIntegration.enabled) return
         if (addresses.length === 0)
             return
         root.props.command = ["sh", "-c", GlassTag.PROBE, "sh"].concat(addresses)
         root.props.running = true
     }
     function apply(text) {
+        if (!DesktopIntegration.enabled) return
         var plan = GlassTag.plan(text, root.mode, root.usesDefault, root.tagged)
         root.tagged = plan.tagged
         if (plan.pairs.length === 0)

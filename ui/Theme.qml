@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "js/DesktopIntegration.js" as DesktopIntegration
 import QtQuick
 import qs.Commons
 import qs.Commons as Commons
@@ -428,14 +429,14 @@ Singleton {
     }
     // The Hyprland singleton is only touched inside Hyprland, so a headless run has no socket to join.
     Connections {
-        target: Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") !== null ? Hyprland : null
+        target: DesktopIntegration.enabled && Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") !== null ? Hyprland : null
         function onRawEvent(event) { root.hyprEvent(event.name, event.data) }
     }
 
     // Read once, not watched: the Display section reports the compositor's scale and Flea owns no
     // control that could change it, so there is nothing here for a poll to keep in step with.
     Process {
-        running: true
+        running: DesktopIntegration.enabled
         command: ["hyprctl", "monitors", "-j"]
         stdout: StdioCollector {
             waitForEnd: true
@@ -450,7 +451,7 @@ Singleton {
     // test, StdioCollector text is a property whose call throws, and the query is Style.qml's own.
     Process {
         id: motionQuery
-        running: !Quickshell.env("FLEA_REDUCED_MOTION")
+        running: DesktopIntegration.enabled && !Quickshell.env("FLEA_REDUCED_MOTION")
         command: ["hyprctl", "-j", "getoption", "animations:enabled"]
         stdout: StdioCollector {
             waitForEnd: true

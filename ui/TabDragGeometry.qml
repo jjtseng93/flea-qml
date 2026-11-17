@@ -1,3 +1,4 @@
+import "js/DesktopIntegration.js" as DesktopIntegration
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -16,6 +17,7 @@ Item {
         root.token = lift
         root.rect = null
         root.strip = band
+        if (!DesktopIntegration.enabled) return
         // An old query drains before the latest token starts its own query.
         if (query.running || !root.queryDrained)
             return

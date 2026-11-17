@@ -1,4 +1,5 @@
 pragma Singleton
+import "js/DesktopIntegration.js" as DesktopIntegration
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -103,7 +104,7 @@ QtObject {
     }
 
     function startTagger() {
-        if (!root.inHyprland) return
+        if (!DesktopIntegration.enabled || !root.inHyprland) return
         if (!root.tagger) root.tagger = Qt.createComponent("GlassTagger.qml").createObject(root, {
             mode: Qt.binding(function () { return root.mode }),
             usesDefault: Qt.binding(function () { return root.usesDefault })

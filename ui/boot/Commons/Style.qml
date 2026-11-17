@@ -1,4 +1,5 @@
 pragma Singleton
+import "../../js/DesktopIntegration.js" as DesktopIntegration
 import QtQuick
 import qs.Commons as Commons
 import Quickshell
@@ -367,12 +368,14 @@ QtObject {
   }
 
   function refresh() {
+    if (!DesktopIntegration.enabled) return
     hyprctlProc.running = true
     gapsOutProc.running = true
     animationsProc.running = true
   }
 
   function scheduleRefresh() {
+    if (!DesktopIntegration.enabled) return
     refreshTimer.restart()
   }
 
@@ -488,7 +491,7 @@ QtObject {
   // A reload is when the animations toggle, a theme or the user's own config
   // lands, and Hyprland only announces it once the new values are in effect.
   property Connections hyprlandEvents: Connections {
-    target: Hyprland
+    target: DesktopIntegration.enabled ? Hyprland : null
     function onRawEvent(event) {
       if (event && String(event.name) === "configreloaded") root.refresh()
     }
@@ -507,6 +510,7 @@ QtObject {
   // set <name>` rewrites ~/.config/fontconfig/fonts.conf and restarts the
   // shell, but rerun on file change anyway so manual edits propagate too.
   function resolveFontFamily() {
+    if (!DesktopIntegration.enabled) return
     fcMatchProc.running = true
   }
 
@@ -523,8 +527,9 @@ QtObject {
   }
 
   property FileView fontconfigFile: FileView {
-    path: Quickshell.env("HOME") + "/.config/fontconfig/fonts.conf"
-    watchChanges: true
+    path: DesktopIntegration.enabled ? Quickshell.env("HOME") + "/.config/fontconfig/fonts.conf" : ""
+    preload: DesktopIntegration.enabled
+    watchChanges: DesktopIntegration.enabled
     printErrors: false
     onFileChanged: root.resolveFontFamily()
     onLoaded: root.resolveFontFamily()
@@ -546,12 +551,13 @@ QtObject {
   // reloads its config when sourced files change, then hyprctl reflects
   // the new effective value.
   property FileView windowNoGapsToggle: FileView {
-    path: Quickshell.env("HOME") + "/.local/state/omarchy/toggles/hypr/window-no-gaps.lua"
-    watchChanges: true
+    path: DesktopIntegration.enabled ? Quickshell.env("HOME") + "/.local/state/omarchy/toggles/hypr/window-no-gaps.lua" : ""
+    preload: DesktopIntegration.enabled
+    watchChanges: DesktopIntegration.enabled
     printErrors: false
-    onFileChanged: refreshTimer.restart()
-    onLoaded: refreshTimer.restart()
-    onLoadFailed: refreshTimer.restart()
+    onFileChanged: root.scheduleRefresh()
+    onLoaded: root.scheduleRefresh()
+    onLoadFailed: root.scheduleRefresh()
   }
 
   Component.onCompleted: {

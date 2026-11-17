@@ -10,6 +10,7 @@ Item {
     // flea-qml: the row's icon; an emoji one marks the bar instead of the Markdown glyph.
     property string iconName: ""
     property string path: ""
+    property var sourceText: null
     property int size: 0
     property string view: "rendered"
     property int maxBytes: 1048576
@@ -69,6 +70,7 @@ Item {
         active: root.active
         view: root.view
         path: root.path
+        sourceText: root.sourceText
         size: root.size
         maxBytes: root.maxBytes
         truncate: root.truncate

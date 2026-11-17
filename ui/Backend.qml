@@ -506,9 +506,11 @@ Item {
         return root.figureSeq
     }
 
-    function askMarkdownHtml(slot, path, theme) {
+    function askMarkdownHtml(slot, path, theme, sourceText) {
         root.codeToken += 1
-        root.send({ c: "markdownhtml", token: root.codeToken, slot: slot, path: path, theme: theme })
+        var request = { c: "markdownhtml", token: root.codeToken, slot: slot, path: path, theme: theme }
+        if (typeof sourceText === "string") request.source = sourceText
+        root.send(request)
         return root.codeToken
     }
 

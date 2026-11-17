@@ -8,6 +8,7 @@ Item {
 
     // The whole text, empty while Rendered shows; a save changes it, so the lines are asked again.
     property string text: ""
+    property bool fromText: false
     property string path: ""
     // True on network and phone storage, where the backend is never given the path.
     property bool truncate: false
@@ -120,7 +121,7 @@ Item {
                 backend: root.backend
                 slot: root.slot
                 path: root.path
-                fromText: root.truncate || !root.engine
+                fromText: root.fromText || root.truncate || !root.engine
                 text: root.text
                 active: root.active && !root.tooLarge
                 numbered: true

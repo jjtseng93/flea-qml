@@ -11,6 +11,10 @@ Item {
 
     property bool active: false
     property string path: ""
+    // null reads a file; a string (including empty) previews memory without opening path.
+    property var sourceText: null
+    readonly property bool sourceLoaded: root.sourceText !== null || file.loaded
+    onSourceTextChanged: { root.pointFile(); root.askParse(); root.askWeb() }
     property real size: 0
     readonly property alias viewport: body
     property bool externalScrollBars: false
@@ -151,25 +155,25 @@ Item {
     readonly property bool blocksReady: root.appliedSeq === root.parseSeq && !root.parsing
     readonly property bool sourceRefused: root.shownView === Markdown.SOURCE && sourceList.refused
     readonly property bool loading: root.active && !root.sourceRefused && !root.readFailed && !root.tooLarge && root.parseError === ""
-        && (!file.loaded || !root.blocksReady || root.coloursWaiting)
+        && (!root.sourceLoaded || !root.blocksReady || root.coloursWaiting)
     readonly property string status: {
         if (root.sourceRefused) return sourceList.status
         if (root.tooLarge) return "This file is too large to preview."
         if (root.readFailed || root.parseError !== "") return "This file could not be read."
-        return root.blocksReady && file.loaded && !root.coloursWaiting ? "ready" : "loading"
+        return root.blocksReady && root.sourceLoaded && !root.coloursWaiting ? "ready" : "loading"
     }
     readonly property string lineLabel: Markdown.countLine(Markdown.lineCount(root.rawText))
     // The bar's line count reads only once there is a file behind it, never "0 lines" first.
-    readonly property bool contentReady: file.loaded && root.blocksReady
+    readonly property bool contentReady: root.sourceLoaded && root.blocksReady
         && !root.sourceRefused && !root.tooLarge && !root.readFailed && root.parseError === ""
     // Visible Source rows and fences hold the first screen until their colours arrive.
     readonly property bool sourceWaiting: root.shownView === Markdown.SOURCE && !sourceList.firstScreen
     readonly property bool coloursWaiting: root.fenceWaits > 0 || root.sourceWaiting
     // A first screen is drawn: blocks are in the list, the head of a parse still running or a whole list, and the swap counts either as shown.
-    readonly property bool firstScreen: root.sourceRefused || (file.loaded && root.parseError === "" && root.blockList.length > 0 && !root.coloursWaiting)
+    readonly property bool firstScreen: root.sourceRefused || (root.sourceLoaded && root.parseError === "" && root.blockList.length > 0 && !root.coloursWaiting)
     // True when the reader has settled with nothing to put in the frame, the way PreviewLines.blank reads.
     readonly property bool blank: root.tooLarge
-        || (root.active && !root.readFailed && file.loaded && root.rawText.length === 0)
+        || (root.active && !root.readFailed && root.sourceLoaded && root.rawText.length === 0)
 
     // What the Source text holds, so a suite sees that Rendered lays none out.
     readonly property int sourceChars: sourceList.laidChars
@@ -226,6 +230,7 @@ Item {
         // The first event opens the window and the rest land inside it: a restart would starve a file written without pause.
         onFileChanged: if (!reloadCoalesce.running) reloadCoalesce.start()
         onLoaded: {
+            if (root.sourceText !== null) return
             root.loadedText = file.text()
             // Only the first read of a path blocks; a reload after a save never does, whatever the file grew to.
             file.blockLoading = false
@@ -236,6 +241,7 @@ Item {
             root.askWeb()
         }
         onLoadFailed: {
+            if (root.sourceText !== null) return
             root.loadedText = ""
             file.blockLoading = false
             root.keepScroll = false
@@ -246,6 +252,12 @@ Item {
 
     // One step moves the path and the blocking flag together, since a read inside the path change takes the flag as it stands then.
     function pointFile() {
+        if (root.sourceText !== null) {
+            file.path = ""
+            root.loadedText = String(root.sourceText)
+            root.readFailed = false
+            return
+        }
         var want = (root.active && !root.tooLarge) ? root.path : ""
         // A pane built before the path moved sees the last file's path, which an open that named its file must not read first.
         if ((want === file.path) || (want !== "" && root.blockPath !== "" && want !== root.blockPath))
@@ -377,7 +389,7 @@ Item {
     }
     // Link ink and code chrome are parsed into the runs, so a theme change reparses the loaded file.
     function reparseForTheme() {
-        if (!root.active || !file.loaded)
+        if (!root.active || !root.sourceLoaded)
             return
         root.askWeb()
         root.askParse()
@@ -510,13 +522,13 @@ Item {
 
     // Resolve images before Qt sees text: remote images become placeholders; only files beside the document load.
     function askParse() {
-        if (!root.active || root.tooLarge || !file.loaded) {
+        if (!root.active || root.tooLarge || !root.sourceLoaded) {
             root.parseError = ""
             root.dropParse()
             return
         }
         // Read the file's own text: onLoaded can run before the rawText binding has caught up.
-        var text = file.text()
+        var text = root.sourceText !== null ? String(root.sourceText) : file.text()
         var dir = Markdown.dirOf(root.path)
         if (root.askedAny && text === root.askedText && dir === root.askedDir
                 && root.chromeHex === root.askedChrome && root.inkHex === root.askedInk) {
@@ -577,6 +589,7 @@ Item {
     // Only the shown Source (a too-deep one too) asks for lines, a screen at a time: an unseen 1 MiB Source held the UI thread 100 ms.
     Flea.MarkdownSource {
         id: sourceList
+        fromText: root.sourceText !== null
         anchors.fill: parent
         visible: root.shownView === Markdown.SOURCE && (root.parseError === "" || root.sourceRefused)
         text: root.shownView === Markdown.SOURCE ? root.rawText : ""
@@ -585,7 +598,7 @@ Item {
         backend: root.backend
         slot: root.slot
         active: root.active && root.shownView === Markdown.SOURCE
-            && (file.loaded || root.tooLarge || root.readFailed || (sourceList.engine && !root.truncate))
+            && (root.sourceLoaded || root.tooLarge || root.readFailed || (sourceList.engine && !root.truncate))
         tooLarge: root.tooLarge
         readFailed: root.readFailed
         wrap: root.wrap
@@ -612,7 +625,7 @@ Item {
             surface: root.surfaceHex, accent: root.accentHex, bodyPx: root.bodyPx,
             font: Theme.font.family,
             advances: figure ? figure.advances : [], boldAdvances: figure ? figure.boldAdvances : []
-        })
+        }, root.sourceText)
     }
     onUseWebChanged: root.askWeb()
     Connections {

@@ -26,6 +26,7 @@ Item {
     // shell.qml wires the pane in: the archive pane asks the backend about the cursor row and nothing else here reads it.
     property var pane: null
     property string path: ""
+    property var markdownText: null
     property string iconName: ""
     property string kindName: ""
     property real size: 0
@@ -337,7 +338,15 @@ Item {
     function toggleExpand() { if (root.isPdf && pdfLoader.item) pdfLoader.item.toggleExpand() }
 
     // Space opens on the cursor row; this is immediate, follow() below is the held-key j/k path.
+    function openMarkdown(path, text) {
+        followSettle.stop()
+        root.markdownText = String(text)
+        root.markdownSource = false
+        root.show(path, "text-markdown", String(text).length, "Markdown", "", -1)
+    }
+
     function open(newPath, newIcon, newSize, newKind, newThumb) {
+        root.markdownText = null
         followSettle.stop()
         root.lastMoveKey = newPath + "\n" + newIcon + "\n" + newSize + "\n" + newKind
         root.lastMoveAt = Date.now()
@@ -375,6 +384,7 @@ Item {
 
     // The picture is taken now, so the settled load below changes the panes under it.
     function follow(newPath, newIcon, newSize, newKind, newThumb) {
+        root.markdownText = null
         var key = newPath + "\n" + newIcon + "\n" + newSize + "\n" + newKind
         // Pending covers a repeat; a settled revisit of the shown target stays put, anything else reloads.
         var now = Date.now()
@@ -435,6 +445,7 @@ Item {
         stripHideTimer.stop()
         root.active = false
         root.kind = ""
+        root.markdownText = null
         root.markdownSource = false
         root.markdownCloseFocus = false
         root.inlineMarkdownPath = ""
@@ -799,6 +810,7 @@ Item {
                 active: root.isDocument
                 source: root.isHtml ? "HtmlPane.qml" : "MarkdownPane.qml"
                 onLoaded: {
+                    if (!root.isHtml) item.sourceText = Qt.binding(function () { return root.markdownText })
                     item.blockPath = Qt.binding(function () { return root.inlineMarkdownPath })
                     item.iconName = Qt.binding(function () { return root.iconName })
                     item.path = Qt.binding(function () { return root.path })

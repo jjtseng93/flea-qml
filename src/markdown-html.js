@@ -327,13 +327,15 @@ export async function drawDiagrams(source, theme = {}) {
     : Promise.resolve({ error: `more than ${DIAGRAMS_PER_PAGE} diagrams on the page` })));
 }
 
-/** The backend's answer to one `markdownhtml` request for the file at `request.path`. */
+/** Render request.source when supplied, otherwise read request.path. The path also anchors relative images. */
 export async function markdownHtml(request) {
   const answer = { t: "markdownhtml", slot: request.slot ?? "", token: request.token, state: "failed", html: "" };
   try {
     const path = String(request.path ?? "");
-    if (!path || statSync(path).size > MARKDOWN_LIMIT) return answer;
-    const source = await Bun.file(path).text();
+    const inline = typeof request.source === "string";
+    if (!path || (!inline && statSync(path).size > MARKDOWN_LIMIT)) return answer;
+    const source = inline ? request.source : await Bun.file(path).text();
+    if (Buffer.byteLength(source) > MARKDOWN_LIMIT) return answer;
     const theme = request.theme ?? {};
     const drawn = await drawDiagrams(source, theme);
     return { ...answer, state: "ready", html: markdownPage(source, dirname(resolve(path)), theme, drawn) };

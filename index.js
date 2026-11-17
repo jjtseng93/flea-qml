@@ -71,13 +71,27 @@ export async function detectKitty(input = process.stdin, output = process.stdout
 }
 
 export async function main(args = Bun.argv.slice(2)) {
+  if (args[0] === '--dump-config' || args[0] === '--dump-config-raw') {
+    const {readState} = await import('./src/uistore.js');
+    const config = readState();
+    if (args[0] === '--dump-config-raw') {
+      process.stdout.write(JSON.stringify(config, null, 2) + '\n');
+    } else {
+      const {inspect} = await import('node:util');
+      // Explicit colours even with pipes, redirection, NO_COLOR or TERM=dumb.
+      process.stdout.write(inspect(config, {
+        colors:true, depth:null, maxArrayLength:null, maxStringLength:null,
+      }) + '\n');
+    }
+    return 0;
+  }
   if (args[0] === '--readme') {
     process.stdout.write(Bun.markdown.ansi(await Bun.file(new URL('./README.md', import.meta.url)).text(), {hyperlinks:true}));
     return 0;
   }
   if (['-h','--help'].includes(args[0])) {
     console.log(`Usage: flea-qml [BROWSER_FRONTEND] [BROWSER_ARGS...]\n\nAutomatically probes Kitty graphics; otherwise Windows uses --win32,\nother platforms (including Linux/Android) use --wayland. The first argument\nis passed unchanged to buninu-browser and overrides detection (for example
---casty, --win32, --wayland or --headless). Requires Bun on PATH. Remaining arguments go unchanged\nto buninu-browser after the absolute file URL of ui/boot/shell.qml.\n\n  --readme       Print the README as coloured ANSI Markdown\n  --version, -V  Print the package version\n  --help, -h     Show this help`);
+--casty, --win32, --wayland or --headless). Requires Bun on PATH. Remaining arguments go unchanged\nto buninu-browser after the absolute file URL of ui/boot/shell.qml.\n\n  --dump-config      Print merged settings with ANSI colours (always)\n  --dump-config-raw  Print merged settings as JSON\n  --readme       Print the README as coloured ANSI Markdown\n  --version, -V  Print the package version\n  --help, -h     Show this help`);
     return 0;
   }
   if (['-V','--version'].includes(args[0])) {console.log(`flea-qml ${info.version}\n${browserPackage()} (pinned)`);return 0;}

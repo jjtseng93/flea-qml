@@ -311,6 +311,7 @@ Loader {
         // application launches through the same registry op the dialog submits, and the tail row is
         // the only way into the dialog, which stays the one place a default is written.
         if (action.indexOf("openWith:") === 0) {
+            if (!Menu.OPEN_WITH_ENABLED) return
             var chosen = action.substring("openWith:".length)
             if (chosen === Menu.OPEN_WITH_OTHER) { root.show("openWith"); return }
             root.launchingId = requestId
@@ -332,6 +333,7 @@ Loader {
     }
     function show(action) {
         pendingAction = ""
+        if (action === "openWith" && !Menu.OPEN_WITH_ENABLED) return
         if (action === "rename") {
             Ops.startRename(pane, requestId, pendingRenameIndex, pendingRenameStill ? 0 : undefined)
             pendingRenameIndex = -1
@@ -450,7 +452,7 @@ Loader {
                     else root.show(root.pendingAction)
                 }
                 // Multi-selection has no registry: the backend refuses it, so discovery stays single-item.
-                if (root.ready && message.count === 1 && root.pane.contextMenu().opened && root.pane.contextMenu().hasRow)
+                if (Menu.shouldQueryApplications(root.ready, message.count, root.pane.contextMenu().opened, root.pane.contextMenu().hasRow))
                     // No installed flag: the flyout draws the registry alone, and asking for the
                     // whole catalogue here walked every applications directory on every right-click.
                     root.pane.backend.send({c: "menuaction", op: "applications", id: root.requestId})

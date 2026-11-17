@@ -34,6 +34,15 @@ function clamp(point, size, bounds) {
 // The flyout's tail row, which is the only way into the dialog; ui/PaneMenuActions.qml reads it.
 var OPEN_WITH_OTHER = "__another__"
 
+// UI capability switch: the JS backend does not implement application discovery
+// yet. Set true to restore the existing registry query, flyout and dialog path.
+// This is not a saved preference; ordinary Open remains available.
+var OPEN_WITH_ENABLED = false
+
+function shouldQueryApplications(ready, count, opened, hasRow) {
+    return OPEN_WITH_ENABLED && ready && count === 1 && opened && hasRow
+}
+
 // The file menu's rename row over two or more selected rows, one whole template.
 var RENAME_MANY = "Rename %1 items\u2026"
 
@@ -217,6 +226,7 @@ function availableEntry(e, p, kind) {
     // in the hint slot, the registry order follows it, and the tail row sits under its own
     // separator with the app-window glyph. The row self-hides when the registry names nothing.
     if (e.action === "openWith") {
+        if (!OPEN_WITH_ENABLED) return false
         if (p.openWithLoaded === true && !(p.openWithApps || []).length) return false
         var apps = p.openWithApps || []
         var rows = apps.map(function (app) {

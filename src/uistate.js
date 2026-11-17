@@ -391,3 +391,19 @@ export function patched(current, patch) {
 
 /** The file's own text for a document, two-space indented with a final newline. */
 export const render = (state) => `${JSON.stringify(state, null, 2)}\n`;
+
+// Persist only deviations. Recurse through schema groups, not user maps: a map entry
+// may intentionally contain an empty object, false, or a value equal to another default.
+export function overrides(state, baseline = defaults(), schema = SCHEMA) {
+  const out = {};
+  for (const [key, value] of Object.entries(state)) {
+    if (key === STATE_VERSION) { out[key] = value; continue; }
+    if (schema[key]?.kind === "group" && isObject(value) && isObject(baseline[key])) {
+      const nested = overrides(value, baseline[key], schema[key].schema);
+      if (Object.keys(nested).length) out[key] = nested;
+    } else if (JSON.stringify(value) !== JSON.stringify(baseline[key])) {
+      out[key] = structuredClone(value);
+    }
+  }
+  return out;
+}

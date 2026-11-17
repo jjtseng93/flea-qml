@@ -8,7 +8,7 @@
 import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, unlinkSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { defaults, fromFile, fromViewJson, isUiDocument, patched, render } from "./uistate.js";
+import { defaults, fromFile, fromViewJson, isUiDocument, patched, render, overrides } from "./uistate.js";
 
 const STATE_NOT_WRITTEN = "the state file was not written";
 const LOCK_STALE_MS = 30_000,
@@ -145,10 +145,10 @@ function write(paths, state) {
       replace(backup, text);
     }
   }
-  replace(paths.file, render(state));
+  replace(paths.file, render(overrides(state)));
 }
 
-/** Merges one caller patch under the lock and returns the document now on disk. */
+/** Merges one caller patch under the lock and returns the complete effective settings (disk stores only overrides). */
 export function updateState(patch, paths = storePaths()) {
   try {
     mkdirSync(dirname(paths.file), { recursive: true, mode: 0o700 });

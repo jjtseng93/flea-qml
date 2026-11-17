@@ -1,4 +1,5 @@
 .pragma library
+.import "UiDefaults.js" as UiDefaults
 
 // ui/ViewState.qml's one-writer bookkeeping: saved/inflight/pending are patch bytes, pinned by tests/js/uistate.js.
 
@@ -7,12 +8,12 @@ function fromFile(text) {
     try {
         var found = JSON.parse(text)
         if (found && typeof found === "object" && !Array.isArray(found)) {
-            return { state: found, unreadable: false }
+            return { state: withDefaults(found, UiDefaults.state), unreadable: false }
         }
     } catch (e) {
         // A hand edit this cannot parse, which is the ordinary way in and is not an error here.
     }
-    return { state: {}, unreadable: text.length > 0 }
+    return { state: withDefaults({}, UiDefaults.state), unreadable: text.length > 0 }
 }
 
 // The one sentence for a ui.json that could not be read when favorites were refreshed, said by this module and by ViewState.
@@ -435,4 +436,17 @@ function isGroup(value) {
 // src/uischema.rs Rule::LastTabs takes exactly paths plus index together.
 function isWholeKey(key) {
     return key === "lastTabs"
+}
+
+// Expand sparse persisted settings before any UI binding reads them.
+function withDefaults(found, defaults) {
+    var out = JSON.parse(JSON.stringify(defaults))
+    Object.keys(found).forEach(function (key) {
+        var value = found[key]
+        var next = value && typeof value === "object" && !Array.isArray(value)
+            && out[key] && typeof out[key] === "object" && !Array.isArray(out[key])
+            ? withDefaults(value, out[key]) : value
+        Object.defineProperty(out, key, { value: next, enumerable: true, writable: true, configurable: true })
+    })
+    return out
 }

@@ -65,8 +65,9 @@ Item {
     readonly property var homeLead: root.homeEntries.slice(0, 1)
     readonly property var homeRest: root.homeEntries.slice(1)
     readonly property var recentEntries: RailPlaces.recentEntries
-    readonly property var placesEntries: root.homeLead.concat(root.recentEntries, root.homeRest, root.trashEntries, root.userFavouriteEntries, root.tagRows)
+    readonly property var placesEntries: root.homeLead.concat(root.recentEntries, root.homeRest, root.trashEntries, root.userFavouriteEntries, root.tagRows, root.helpEntries)
     // The TAGS section (ui/TagRailSection.qml) is built once the setting is on and a tag is in use, since it ships off; its rows end the places group.
+    readonly property var helpEntries: [{ label: "Help 使用方法", path: "flea:help", kind: "help", group: "help", glyph: "❓" }]
     property var tagSection: null
     readonly property var tagRows: root.tagSection !== null && root.placesState.showTags === true ? root.tagSection.entries : []
     readonly property bool tagsListed: root.placesState.showTags === true && root.navigationPane !== null && root.navigationPane.tagState !== null
@@ -391,6 +392,7 @@ Item {
         root.cursorIndex = index
         var entry = root.entries[index]
         if (!entry) return
+        if (entry.kind === "help") { root.focusOnOpen = false; root.navigationPane.keymapSheet.open(root.navigationPane); return }
         if (entry.kind === "favourite") { root.openFavourite(entry.favouriteIndex); return }
         if (entry.kind === "home") { root.opened(entry.path); return }
         if (entry.kind === "recent") { root.readRecent(); return }
@@ -602,10 +604,22 @@ Item {
             Item {
                 id: netGap
                 // The TAGS section lives inside this gap, so its rows end the places group by construction.
-                visible: root.networkEntries.length > 0 || (root.tagSection !== null && root.placesState.showTags === true)
+                visible: root.tagSection !== null && root.placesState.showTags === true
                 width: rail.width
-                height: ((root.tagSection !== null && root.placesState.showTags === true) ? root.tagSection.height : 0) + (root.networkEntries.length > 0 ? Style.spacing.panelGap : 0)
+                height: (root.tagSection !== null && root.placesState.showTags === true) ? root.tagSection.height : 0
             }
+
+            SidebarRow {
+                id: helpRow
+                index: root.placesEntries.length - 1
+                modelData: root.helpEntries[0]
+                cursor: root.cursorDrawn && index === root.cursorIndex
+                highlighted: index === root.highlightedIndex
+                focused: root.focused
+                onActivated: function(idx) { root.activate(idx) }
+            }
+
+            Item { width: rail.width; height: root.networkEntries.length > 0 ? Style.spacing.panelGap : 0 }
 
             // Self-hides with its list below when gio, the bookmarks file and Dropbox all have nothing to say.
             Item {
@@ -722,6 +736,8 @@ Item {
         rest -= root.userFavouriteEntries.length
         if (rest < root.tagRows.length) return root.tagSection.itemAt(rest)
         rest -= root.tagRows.length
+        if (rest === 0) return helpRow
+        rest -= root.helpEntries.length
         if (rest < root.networkEntries.length)
             return netRepeater.itemAt(rest)
         rest -= root.networkEntries.length

@@ -601,7 +601,7 @@ Rectangle {
         }
     }
 
-    // The keymap sheet ? opens, over the whole window as the convert popup is.
+    // Lazy README help reader; the resulting chapter opens in the existing Quick Look.
     Loader {
         id: keymapSheet
         z: 2

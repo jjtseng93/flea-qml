@@ -28,7 +28,7 @@ Item {
     readonly property bool isHint: root.kind === "hint"
     readonly property bool isFooter: root.isHint && root.row.footer === true
     readonly property bool isFavourite: root.kind === "favourite"
-    readonly property Item favouriteItem: favourite
+    readonly property Item favouriteItem: favourite.item
     readonly property bool isHero: root.kind === "hero"
     readonly property bool isKeyPreview: root.kind === "keyPreview"
     readonly property bool isLock: root.kind === "lock"
@@ -122,43 +122,61 @@ Item {
         }
     }
 
-    Flea.SettingsFavourite {
+    Loader {
         id: favourite
         anchors.fill: parent
-        visible: root.isFavourite
-        row: root.row
-        onActivated: root.activated()
-        onMoved: function (to) { root.favouriteMoved(to) }
-        onRemoved: root.favouriteRemoved()
+        active: root.isFavourite
+        sourceComponent: Component {
+            Flea.SettingsFavourite {
+                anchors.fill: parent
+                row: root.row
+                onActivated: root.activated()
+                onMoved: function (to) { root.favouriteMoved(to) }
+                onRemoved: root.favouriteRemoved()
+            }
+        }
     }
 
-    Column {
+    Loader {
         id: hero
-        visible: root.isHero
+        active: root.isHero
         anchors.centerIn: parent
-        spacing: Theme.spacing.gap
-        Flea.FleaMark {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: Theme.markSize * 2
-            height: width
-            color: Theme.color.accent
-        }
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: root.row.label || ""
-            font.family: Theme.font.family
-            font.pixelSize: Theme.font.body
-            font.bold: true
-            color: Theme.color.foreground
-            textFormat: Text.PlainText
-        }
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: root.row.value || ""
-            font.family: Theme.font.family
-            font.pixelSize: Theme.font.caption
-            color: Theme.color.foreground
-            textFormat: Text.PlainText
+        width: Math.max(0, root.width - 2 * Theme.spacing.rowPaddingX)
+        sourceComponent: Component {
+            Column {
+                width: Math.max(0, root.width - 2 * Theme.spacing.rowPaddingX)
+                spacing: Theme.spacing.gap
+                Loader {
+                    x: (parent.width - width) / 2
+                    width: Theme.markSize * 2
+                    height: width
+                    active: root.isHero
+                    sourceComponent: Component { Flea.FleaMark { anchors.fill: parent; color: Theme.color.accent } }
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.row.label || ""
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.font.body
+                    font.bold: true
+                    color: Theme.color.foreground
+                    textFormat: Text.PlainText
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.row.value || ""
+                    font.family: Theme.font.family
+                    font.pixelSize: Theme.font.caption
+                    color: Theme.color.foreground
+                    textFormat: Text.PlainText
+                }
+            }
         }
     }
 
@@ -216,50 +234,81 @@ Item {
         width: Theme.markSize
         height: Theme.markSize
 
-        Flea.Glyph {
+        Loader {
             anchors.fill: parent
-            visible: root.row.glyph !== undefined && root.row.mark === undefined
-            name: root.row.glyph !== undefined ? root.row.glyph : "file"
-            color: root.isUrgent ? Theme.color.error : Theme.color.mutedFrame
+            active: root.row.glyph !== undefined && root.row.mark === undefined
+            sourceComponent: Component {
+                Flea.Glyph {
+                    anchors.fill: parent
+                    name: root.row.glyph !== undefined ? root.row.glyph : "file"
+                    color: root.isUrgent ? Theme.color.error : Theme.color.mutedFrame
+                }
+            }
         }
 
-        Flea.TailscaleMark {
-            anchors.centerIn: parent
-            visible: root.row.mark === "tailscale"
-            iconSize: Theme.markSize
-            color: Theme.color.mutedFrame
+        Loader {
+            anchors.fill: parent
+            active: root.row.mark === "tailscale"
+            sourceComponent: Component {
+                Flea.TailscaleMark {
+                    anchors.centerIn: parent
+                    iconSize: Theme.markSize
+                    color: Theme.color.mutedFrame
+                }
+            }
         }
 
-        Flea.DropboxMark {
-            anchors.centerIn: parent
-            visible: root.row.mark === "dropbox"
-            iconSize: Theme.markSize
-            color: Theme.color.mutedFrame
+        Loader {
+            anchors.fill: parent
+            active: root.row.mark === "dropbox"
+            sourceComponent: Component {
+                Flea.DropboxMark {
+                    anchors.centerIn: parent
+                    iconSize: Theme.markSize
+                    color: Theme.color.mutedFrame
+                }
+            }
         }
 
-        Flea.LocalSendMark {
-            anchors.centerIn: parent
-            visible: root.row.mark === "localsend"
-            iconSize: Theme.markSize
-            color: Theme.color.mutedFrame
+        Loader {
+            anchors.fill: parent
+            active: root.row.mark === "localsend"
+            sourceComponent: Component {
+                Flea.LocalSendMark {
+                    anchors.centerIn: parent
+                    iconSize: Theme.markSize
+                    color: Theme.color.mutedFrame
+                }
+            }
         }
 
-        Flea.HyprlandMark {
-            anchors.centerIn: parent
-            visible: root.row.mark === "hyprland"
-            iconSize: Theme.markSize
-            color: Theme.color.mutedFrame
+        Loader {
+            anchors.fill: parent
+            active: root.row.mark === "hyprland"
+            sourceComponent: Component {
+                Flea.HyprlandMark {
+                    anchors.centerIn: parent
+                    iconSize: Theme.markSize
+                    color: Theme.color.mutedFrame
+                }
+            }
         }
 
         // The shelf is Flea's own destination, so its switch carries Flea's own mark, the way ui/MenuRow.qml draws the row it governs.
-        Flea.FleaMark {
-            anchors.centerIn: parent
-            visible: root.row.mark === "flea"
-            width: Theme.markSize
-            height: Theme.markSize
-            color: Theme.color.mutedFrame
+        Loader {
+            anchors.fill: parent
+            active: root.row.mark === "flea"
+            sourceComponent: Component {
+                Flea.FleaMark {
+                    anchors.centerIn: parent
+                    width: Theme.markSize
+                    height: Theme.markSize
+                    color: Theme.color.mutedFrame
+                }
+            }
         }
     }
+
 
     // A ruler is the row above it continued, so it starts at that row's label column, as a hint
     // does: HANDOFF rules 3 and 8, nothing is indented and a hint sits under its control's label.

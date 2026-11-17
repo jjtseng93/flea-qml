@@ -12,8 +12,6 @@ Flickable {
     property var values: ({})
     property int cursor: 0
     property string side: "pane"
-    // The idle walk that builds the sections nobody has shown yet.
-    readonly property alias walk: idleBuild
     readonly property real compactHeight: sections.count > 0 && sections.itemAt(0) ? sections.itemAt(0).implicitHeight : 0
 
     signal activated(int index)
@@ -27,6 +25,7 @@ Flickable {
     readonly property Item current: sections.count > 0
         ? sections.itemAt(root.section === "columns" ? Settings.SECTIONS.length : Settings.sectionIndex(root.section)) : null
 
+    onValuesChanged: if (root.current) root.current.snapshot = root.values
     onContentYChanged: inspection.restart()
     onSectionChanged: inspection.restart()
     onVisibleChanged: if (visible) inspection.restart()
@@ -119,24 +118,7 @@ Flickable {
             root.contentY = Math.max(0, Math.min(root.contentHeight - root.height, bottom - root.height))
     }
 
-    // The first open builds View and the open section only; from the pane's creation this walk builds one more section per 150 ms tick, and a section shown sooner builds when shown.
-    Timer {
-        id: idleBuild
-        interval: 150
-        repeat: true
-        running: true
-        property int next: 1
-        onTriggered: {
-            while (idleBuild.next < sections.count && sections.itemAt(idleBuild.next).built)
-                idleBuild.next++
-            if (idleBuild.next >= sections.count) {
-                idleBuild.stop()
-                return
-            }
-            sections.itemAt(idleBuild.next).built = true
-        }
-    }
-
+    // Build a section only when visited; retain it for fast reopening.
     Repeater {
         id: sections
         // Keep View's measurement intact while its Columns subpage is open.
@@ -149,14 +131,15 @@ Flickable {
             readonly property alias rows: rowItems
             // View always, because compactHeight reads it; a built section is never torn down.
             property bool built: false
+            property var snapshot: ({})
             width: root.width
             visible: modelData.id === root.section
-            onVisibleChanged: if (visible) built = true
-            Component.onCompleted: if (visible || index === 0) built = true
+            onVisibleChanged: if (visible) { snapshot = root.values; built = true }
+            Component.onCompleted: if (visible || index === 0) { snapshot = root.values; built = true }
 
             Repeater {
                 id: rowItems
-                model: column.built ? Settings.rows(column.modelData.id, root.values) : []
+                model: column.built ? Settings.rows(column.modelData.id, column.snapshot) : []
 
                 delegate: Flea.SettingsRow {
                     required property var modelData

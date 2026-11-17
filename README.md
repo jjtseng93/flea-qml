@@ -179,82 +179,126 @@ Replace wayland with your selected frontend
 - `} / Ctrl-Shft-PgDn`: Move tab → 移動分頁
 - `Ctrl-b`: Toggle PLACES 顯示/隱藏位置欄
 
-| `s` / `S` | Change sort field / reverse sort order |
-| F4 | Fit list columns to their contents |
-| F5, Ctrl+R | Reload the folder |
-| Ctrl++ / Ctrl+- / Ctrl+0 | Increase / decrease / reset text size (Ctrl+Shift variants also work) |
-| `,`, Ctrl+, | Open settings |
-| `?` | Open the searchable keymap |
-
-Enter on an ordinary file invokes `xdg-open` from PATH on every platform,
-including Windows. Install or provide an `xdg-open` command there; Flea does not
-substitute a platform-specific opener. Folders navigate inside Flea and archives
-open the built-in preview (except AppImage). Space uses the built-in preview.
+- `s`: Change sort field 更換排序欄位
+- `S`: Reverse sort 反轉排序
+- `F4`: Fit columns 自動調整欄寬
+- `F5 / Ctrl-r`: Reload 重新載入
+- `Ctrl-+ / Ctrl-- / Ctrl-0`
+  * Larger / Smaller / Reset text
+  * 放大 / 縮小 / 重設文字
+  * Also with Shift 也可加按 Shift
+- `, / Ctrl-,`: Settings 設定
 
 ### Selection and file operations
+### 選取與檔案操作
 
-| Keys | Action |
-| --- | --- |
-| `v` | Toggle the current file's selection |
-| Shift+Up / Shift+Down, `K` / `J` | Extend the selection |
-| Ctrl+A | Select all |
-| `V` | Invert the selection |
-| `y`, Ctrl+C | Copy selected files |
-| `x`, Ctrl+X | Cut selected files |
-| `p`, Ctrl+V | Paste files into the current folder |
-| `Y` | Copy the current folder's path |
-| Ctrl+Shift+C | Copy selected file paths |
-| `c` / `P` | Open Copy as / Paste as options |
-| `r`, F2 | Rename; multiple selected files open Bulk rename |
-| Ctrl+Shift+N | Create a folder |
-| Delete, `dd` (press `d` twice) | Move to Trash; in Trash, request permanent deletion |
-| Shift+Delete | Request permanent deletion with confirmation |
-| `=`, Alt+= | Calculate selected/current folders' sizes / all folders' sizes |
-| `m`, Menu, Shift+F10 | Open the item's context menu |
+- `v`: Toggle selection 切換選取
+- `Shift-↑ / Shift-↓` or `K / J`
+  * Extend selection 延伸選取
+- `Ctrl-a`: Select all 全選
+- `V`: Invert selection 反向選取
+- `y / Ctrl-c`: Copy files 複製檔案
+- `x / Ctrl-x`: Cut files 剪下檔案
+- `p / Ctrl-v`: Paste files 貼上檔案
+  * Into this folder 貼到當前目錄
+- `Y`: Copy folder path 複製目錄路徑
+- `Ctrl-Shift-c`: Copy file paths
+  * 複製選取檔案的路徑
+- `c`: Copy as options 複製方式
+- `P`: Paste as options 貼上方式
+- `r / F2`: Rename 重新命名
+  * Multiple files: Bulk rename
+  * 多選時：批次重新命名
+- `Ctrl-Shift-n`: New folder 新目錄
+- `Delete / dd`: Move to Trash
+  * 移到垃圾桶；`dd` 為連按兩次 d
+  * In Trash: Confirm deletion
+  * 在垃圾桶內：確認永久刪除
+- `Shift-Delete`: Confirm deletion
+  * 確認永久刪除
+- `=`: Measure folder sizes
+  * 計算選取或當前目錄大小
+- `Alt-=`: Measure all folder sizes
+  * 計算列表中所有目錄大小
+- `m / Menu / Shift-F10`
+  * Context menu 內容選單
 
 ### Find and Filter
+### 尋找與篩選
 
-| Keys | Action |
-| --- | --- |
-| `/` | Filter the current listing by name |
-| `f`, Ctrl+F | Open Find |
-| Ctrl+G | Search file contents; in Find, toggle name/content search |
-| Enter in Find | Start the search |
-| Tab / Shift+Tab in Find | Cycle the search scope |
-| Enter in Filter | Return to the list with the filter applied |
-| Up / Down, PageUp / PageDown in a query | Navigate results |
-| `o` in results | Reveal the current item in its containing folder |
-| Esc in Filter | Close Filter |
-| Esc in Find | Stop a running search; when idle, close Find |
-| Esc in the file list | Dismiss Filter first, then Find on a subsequent press |
+- `/`: Filter names 依名稱篩選
+- `f / Ctrl-f`: Find 尋找
+- `Ctrl-g`: Find file contents
+  * 搜尋檔案內容
+  * In Find: Toggle name/content
+  * 尋找框內：切換名稱／內容搜尋
+- `Enter` in Find 在尋找框內
+  * Start search 開始搜尋
+- `Tab / Shift-Tab` in Find
+  * Change scope 切換搜尋範圍
+- `Enter` in Filter 在篩選框內
+  * Apply and focus list
+  * 保留篩選並回到列表
+- `↑ / ↓ / PageUp / PageDown`
+  * In queries: Browse results
+  * 搜尋框內：瀏覽結果
+- `o` in results 在結果列表內
+  * Reveal in folder 開啟所在目錄
+- `Esc` in Filter 在篩選框內
+  * Close Filter 關閉篩選
+- `Esc` in Find 在尋找框內
+  * Searching: Stop 搜尋中：停止
+  * Idle: Close 閒置時：關閉
+- `Esc` in the list 在檔案列表內
+  * Close Filter, then Find
+  * 先關篩選，再按一次關尋找
 
-Find and Filter keep their own text-editing focus. Left/Right move the caret;
-clicking the query returns focus to its input. When either query owns focus,
-Esc acts on that query rather than the other one.
+- Query focus 搜尋框焦點
+  * Left/Right move the caret
+  * 左右鍵移動文字游標
+  * Click the query to edit again
+  * 點擊搜尋框即可繼續編輯
+  * Esc acts on the focused query
+  * Esc 優先處理有焦點的搜尋框
 
 ### Preview and Quick Look
+### 預覽與快速檢視
 
-| Keys | Action |
-| --- | --- |
-| Space on a file | Open Quick Look |
-| Space / Esc in Quick Look | Close it (Space does not pause media) |
-| Alt+P | Toggle the preview column |
-| Ctrl+Space | Load the selection's preview |
-| Ctrl+Tab | Focus the preview column; from Quick Look, close Quick Look |
-| `i` | Toggle file facts in the visible preview column |
-| Up / Down, `k` / `j` in Quick Look | Preview the previous / next file |
-| PageUp / PageDown, `B` / `F` | Scroll the preview by a page |
-| `B` / `F` in the file list | Scroll the preview column by a page |
-| `w` in text/code Quick Look | Toggle line wrapping |
-| `r` in document Quick Look | Switch between rendered document and source |
-| `p` in media Quick Look | Play / pause |
-| `m` in media Quick Look | Mute / unmute |
-| Left / Right in media Quick Look | Seek backward / forward by 5 seconds |
-| Left / Right in PDF preview | Previous / next PDF page |
-| `-` / `+` in image, HTML or PDF Quick Look | Zoom out / in |
-| `0` in image Quick Look | Fit the image |
-| `e` in PDF Quick Look | Toggle expanded view |
-| `y` in Compare Quick Look | Copy the diff patch |
+- `Space / Esc`: Close Quick Look
+  * 關閉快速檢視，不是暫停播放
+- `Ctrl-Space`: Load preview
+  * 載入選取項目的預覽
+- `Ctrl-Tab`: Focus preview column
+  * 將焦點移到預覽欄
+  * In Quick Look: Close it
+  * 在快速檢視內：關閉快速檢視
+- `i`: Compact / Full file facts
+  * 切換精簡／完整檔案資訊
+- `↑ / ↓` or `k / j` in Quick Look
+  * Previous / Next file
+  * 快速檢視：上一個／下一個檔案
+- `PageUp / PageDown` or `B / F`
+  * Scroll preview by a page
+  * 將預覽向上／向下捲動一頁
+  * List: B/F scroll preview column
+  * 列表內：B/F 捲動右側預覽欄
+- `w`: Wrap text/code 文字／程式換行
+- `r`: Document / Source
+  * 文件預覽／原始碼切換
+- `p`: Play / Pause 播放／暫停
+- `m`: Mute / Unmute 靜音／恢復聲音
+- `← / →` in media 在影音預覽內
+  * Seek back/forward 5 seconds
+  * 倒退／快轉 5 秒
+- `← / →` in PDF 在 PDF 預覽內
+  * Previous / Next page 上／下一頁
+- `- / +`: Zoom out / in 縮小／放大
+  * Images, HTML and PDF
+  * 適用於圖片、HTML 與 PDF
+- `0`: Fit image 圖片符合視窗
+- `e`: Expand PDF 展開／收合 PDF
+- `y` in Compare 在比較預覽內
+  * Copy diff patch 複製差異 patch
 
 ### Extracting archives
 

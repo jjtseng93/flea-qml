@@ -54,21 +54,27 @@ bun index.js
   * Windows: `--win32`
   * Linux/Android/Other: `--wayland`
 
-- The first argument selects frontend for buninu-browser and bypasses Kitty detection:
+- The first argument selects frontend for buninu-browser and bypasses Kitty detection
+- >= 2nd arguments go to the browser
 
 ```sh
+# Frontends
 npx flea-qml --casty
 npx flea-qml --win32
 npx flea-qml --wayland
 npx flea-qml --headless
+
+# Information
 npx flea-qml --help
 npx flea-qml --version
 npx flea-qml --readme
+npx flea-qml --dump-config
+npx flea-qml --dump-config-raw
 ```
 
-- >= 2nd arguments go to the browser
-
 - Early exit flags:
+  * `--dump-config`: Prints complete effective settings (defaults merged with saved overrides), always with ANSI colours, including through pipes. Exits without launching the browser or saving settings.
+  * `--dump-config-raw`: Prints the same settings as plain JSON for scripts or redirection.
   * `--help`/`-h`: CLI usage
   * `--version/-V`: Shows flea-qml version & buninu-browser version pinned in `package.json`
   * `--readme` always prints coloured ANSI Markdown with links, including when its output is redirected.
@@ -99,35 +105,80 @@ bun ../buninu-browser/index.js --quickshell-wayland -p ui/boot/shell.qml
 
 Replace wayland with your selected frontend
 
-## Keyboard shortcuts
+## How to use
+## 使用方法
 
-These are the implemented bindings for the **default** key preset. Letters are
-case-sensitive (`H` means Shift+H). Listing shortcuts apply when the file list
-has focus, not while typing in a text field. Other presets can change bindings;
-press `?` to view or search the current keymap. A terminal, compositor or browser
-frontend may intercept a shortcut before Flea receives it.
+- The below is the **default** key preset
+- 以下為 `預設` 鍵盤對應
 
-### Navigation and views
+- Letter shortcuts only apply when the file list has focus
+- 字母快捷鍵只有在焦點在檔案列表時可用
 
-| Keys | Action |
-| --- | --- |
-| Up / Down, `k` / `j` | Move through files |
-| Home / End, `g` / `G` | First / last file |
-| PageUp / PageDown | Move by half the visible rows |
-| Left, Backspace, `h` | Parent folder |
-| Right, `l` | Enter a folder or preview a file |
-| Enter | Open the selected item |
-| `H` / `L` | Back / forward in navigation history |
-| `:` | Edit the folder address |
-| Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 | List / columns / grid / dual-pane view |
-| `t` | New Flea tab |
-| Ctrl+Enter | Open the selected folder in a tab |
-| `w`, Ctrl+W | Close the current tab |
-| `[` / `]`, Ctrl+PageUp / Ctrl+PageDown | Previous / next tab |
-| `{` / `}`, Ctrl+Shift+PageUp / Ctrl+Shift+PageDown | Move the current tab left / right |
-| Tab / Shift+Tab | Move focus between available interface areas |
-| Ctrl+B | Toggle the sidebar |
-| `.`, Ctrl+Shift+. | Show / hide hidden files |
+- Press `?` or click `Help` to show help
+- 按下 `?` 或是按下 `使用方法` 顯示幫助
+
+### Core operations
+### 核心操作
+
+- `↑/k`: Cursor up 遊標向上
+- `↓/j`: Cursor down 遊標向下
+- `←/h`: Parent folder 上一層目錄
+  * Also `←Backspace` 也可用 `←退格`
+- `→/l`: Child folder 下一層目錄
+
+---
+
+- `Space/→/l`: Preview file 預覽檔案
+  * Preview: In Flea 預覽：在Flea裏面
+- `Enter`: Open file 開啟檔案
+  * Open: Externally 開啟：外部程式
+
+---
+
+- `Shift-h/H`: History back 返回/上一頁
+- `Shift-l/L`: History forward 前進/下一頁
+- `t`: New tab 新分頁
+- `[ / Ctrl-PageUp`: Prev tab 上一分頁
+- `] / Ctrl-PageDown`: Next tab 下一分頁
+- `Ctrl-w`: Close current tab 關閉目前分頁
+- `Ctrl-t`: New Terminal tab 新終端機分頁
+
+---
+
+- `Ctrl-1`: List view 列表檢視
+  * Places / File list
+  * 位置 / 檔案列表
+- `Ctrl-2`: Column view 多欄檢視
+  * Places / Parent folder / Current Folder / Preview
+  * 位置 / 上一層目錄 / 當前目錄 / 預覽
+  * `Alt-p`: Toggle preview 顯示/隱藏預覽
+- `Ctrl-3`: Grid view 格狀檢視
+  * Places / File grids
+  * 位置 / 檔案格子
+- `Ctrl-4`: Dual view 雙欄檢視
+  * Places / Folder1 / Folder2
+  * 位置 / 目錄1 / 目錄2
+  
+---
+
+- `Tab/Shift-Tab`: Move focus 移動焦點
+- `. / Ctrl-h`
+  * Toggle hidden files (. prefixed)
+  * 顯示/隱藏 隱藏檔 (.開頭)
+
+### Advanced operations
+### 進階操作
+
+- `Home`: First file/folder 第一個檔案/目錄
+- `End`: Last file/folder 最後一個檔案/目錄
+- `PageUp`: Scroll up 捲動向上
+- `PageDown`: Scroll up 捲動向下
+- `:`: Edit address 編輯地址
+- `Ctrl+Enter`: Open in new tab 新分頁開啟
+- `{ / Ctrl-Shft-PgUp`: Move tab ← 移動分頁
+- `} / Ctrl-Shft-PgDn`: Move tab → 移動分頁
+- `Ctrl-b`: Toggle PLACES 顯示/隱藏位置欄
+
 | `s` / `S` | Change sort field / reverse sort order |
 | F4 | Fit list columns to their contents |
 | F5, Ctrl+R | Reload the folder |

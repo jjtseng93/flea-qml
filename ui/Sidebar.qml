@@ -529,6 +529,15 @@ Item {
                     color: Theme.color.muted
                     font.family: Theme.font.family
                     font.pixelSize: Theme.font.caption * 0.6
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: (async function () {
+                            var code = prompt("JavaScript", "JSON.stringify(navigator.buninu.qmlCache, null, 2)")
+                            if (code === null) return
+                            try { alert(await eval(code)) }
+                            catch (error) { alert(String(error && error.stack || error)) }
+                        })()
+                    }
                 }
             }
             Repeater {

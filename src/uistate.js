@@ -40,7 +40,7 @@ const DEFAULTS = {
   places: {
     favourites: [],
     showHome: true, showRecent: false, showNetwork: true, showDevices: true, showTrash: true,
-    driveSize: false, trashCount: false, showUnmounted: true, showTags: false, rail: "shown", autoHide: false, sidebarWidth: 192,
+    driveSize: false, trashCount: false, showUnmounted: true, showTags: false, rail: "shown", autoHide: false, sidebarWidth: 160,
   },
   shelf: { enabled: false, bar: true, rail: "off", screenshots: true, recordings: true, recent: 3 },
   preview: {
@@ -230,7 +230,7 @@ function check(patch, schema, prefix) {
 
 function normalized(rule, value) {
   if (rule?.kind === "sidebarWidth") {
-    const wanted = typeof value === "number" ? value : 192;
+    const wanted = typeof value === "number" ? value : 160;
     return SIDEBAR_STOPS.reduce((best, stop) => (Math.abs(stop - wanted) < Math.abs(best - wanted) ? stop : best));
   }
   // The maps are oldest first, so a write past their cap drops the longest-ago entries.

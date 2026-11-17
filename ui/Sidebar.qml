@@ -513,7 +513,7 @@ Item {
             RailHeading {
                 id: placesHeading
                 visible: root.homeEntries.length + root.trashEntries.length > 0
-                text: "PLACES"
+                text: "PLACES 位置"
             }
             Repeater {
                 id: homeLeadRepeater

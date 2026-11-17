@@ -116,7 +116,7 @@ function replace(body, oldUri, newUri, label) {
 
 var WIDTH_STOPS = [160, 192, 224, 256]
 function sidebarWidth(value) {
-    if (typeof value !== "number" || !isFinite(value)) return 192
+    if (typeof value !== "number" || !isFinite(value)) return 160
     var nearest = WIDTH_STOPS[0]
     for (var i = 1; i < WIDTH_STOPS.length; i++) {
         if (Math.abs(WIDTH_STOPS[i] - value) < Math.abs(nearest - value)) nearest = WIDTH_STOPS[i]

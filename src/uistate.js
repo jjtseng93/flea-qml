@@ -28,7 +28,7 @@ const DEFAULTS = {
   openMode: "double",
   clickRename: true,
   openFoldersWhileDragging: false,
-  // flea-qml: on by default, so menus show their keys and flyout letters; upstream starts it off.
+  // Always on; accept old boolean settings but normalize them to true.
   keyHints: true,
   startIn: "home",
   startFolder: "",
@@ -105,7 +105,7 @@ const SCHEMA = {
   openMode: word("double", "single"),
   clickRename: bool,
   openFoldersWhileDragging: bool,
-  keyHints: bool,
+  keyHints: r("alwaysTrue"),
   startIn: word("home", "last", "folder"),
   startFolder: r("place"),
   lastPath: r("place"),
@@ -158,7 +158,8 @@ const pluginEntryFits = (entry, patch) =>
 
 function fits(rule, v) {
   switch (rule.kind) {
-    case "bool": return typeof v === "boolean";
+    case "bool":
+    case "alwaysTrue": return typeof v === "boolean";
     case "word": return rule.words.includes(v);
     case "count": return isWhole(v) && v >= rule.low && v <= rule.high;
     case "group": return isObject(v);
@@ -229,6 +230,7 @@ function check(patch, schema, prefix) {
 }
 
 function normalized(rule, value) {
+  if (rule?.kind === "alwaysTrue") return true;
   if (rule?.kind === "sidebarWidth") {
     const wanted = typeof value === "number" ? value : 160;
     return SIDEBAR_STOPS.reduce((best, stop) => (Math.abs(stop - wanted) < Math.abs(best - wanted) ? stop : best));

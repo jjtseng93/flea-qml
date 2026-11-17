@@ -164,7 +164,7 @@ function focusable(row) {
     return row.kind === "check" || row.kind === "choice" || row.kind === "action" || row.kind === "favourite"
 }
 
-// state: { textSize, hidden, keyHints, preset, baseSize, monitorScale, cornerRadius, presetKeys }
+// state: { textSize, hidden, preset, baseSize, monitorScale, cornerRadius, presetKeys }
 function rows(section, state) {
     if (section === "columns")
         return columnRows(state)
@@ -181,7 +181,7 @@ function rows(section, state) {
     if (section === "display")
         return displayRows(state)
     if (section === "menus")
-        return menuRows(state.hidden, state.keyHints)
+        return menuRows(state.hidden)
     return keyRows(state)
 }
 
@@ -230,7 +230,7 @@ function scaleLabel(scale) {
 }
 
 // The one row of this section that is not a menu action: it governs how every menu row is drawn rather than whether it exists, so it sits in its own group and never in MENU_GROUPS.
-function menuRows(hidden, keyHints) {
+function menuRows(hidden) {
     var out = []
     for (var g = 0; g < MENU_GROUPS.length; g++) {
         var group = MENU_GROUPS[g]
@@ -246,12 +246,6 @@ function menuRows(hidden, keyHints) {
                        on: !isHidden(hidden, group.ids[i]) })
         }
     }
-    out.push({ kind: "group", label: "Shortcuts" })
-    out.push({ kind: "check", id: "keyHints", label: "Show keyboard hints", glyph: "keyboard",
-               on: keyHints === true })
-    // HANDOFF rule 8: one short line. The switch's own label says what it draws, so the hint keeps
-    // only the part it cannot: turning it off binds nothing differently.
-    out.push({ kind: "hint", label: "Every key stays bound either way." })
     out.push({ kind: "group", label: "Always shown" })
     for (var l = 0; l < LOCKED.length; l++)
         out.push({ kind: "lock", id: LOCKED[l], label: label(LOCKED[l]), glyph: GLYPHS[LOCKED[l]] })

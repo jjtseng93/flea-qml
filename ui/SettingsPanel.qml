@@ -47,7 +47,6 @@ Item {
         saveStatus: ViewState.saveStatus,
         textSize: ViewState.textSize,
         hidden: ViewState.menuHidden,
-        keyHints: ViewState.keyHints,
         preset: ViewState.keysPreset,
         baseSize: Theme.baseSize,
         monitorScale: Theme.monitorScale,
@@ -136,9 +135,7 @@ Item {
             return
         }
         // Menu checks share their visibility writer; other sections write their own leaves.
-        if (row.id === "keyHints")
-            ViewState.toggleKeyHints()
-        else if (row.kind === "check")
+        if (row.kind === "check")
             ViewState.toggleMenuAction(row.id)
         else
             root.stepRowValue(index, 1)

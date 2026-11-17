@@ -74,12 +74,8 @@ QtObject {
                                       .filter(function (id) { return id !== "shelf" })
                                       .concat(root.shelfEnabled ? [] : ["shelf"])
 
-    // The Menus section's "Show keyboard hints" row, `keyHints` in src/uischema.rs. It draws the key
-    // beside every menu row and the tip under an empty directory, and it binds no key of its own:
-    // every chord answers whether this is on or off.
-    // flea-qml: on unless the state file says false, matching src/uistate.js's default of true;
-    // upstream reads === true because its default is off.
-    readonly property bool keyHints: root.state.keyHints !== false
+    // Shortcut hints are always visible, including with legacy keyHints:false settings.
+    readonly property bool keyHints: true
 
     // Code icons default on; only a saved boolean false disables them, matching schema healing.
     readonly property bool langMarks: root.state.langMarks !== false
@@ -280,10 +276,6 @@ QtObject {
         if (ids.indexOf("shelf") >= 0)
             root.changeLeaf("shelf", { enabled: Settings.masterState(root.menuHidden, ids) !== "all" })
         root.setMenuHidden(Settings.toggleMaster(root.menuHidden, ids))
-    }
-
-    function toggleKeyHints() {
-        root.changeKey("keyHints", !root.keyHints)
     }
 
     function setKeysPreset(name) {

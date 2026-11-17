@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import vm from "node:vm";
-import { defaults, overrides, fromFile, isUiDocument } from "../src/uistate.js";
+import { defaults, overrides, fromFile, isUiDocument, patched } from "../src/uistate.js";
 import { updateState, readState } from "../src/uistore.js";
 
 test("QML default expansion matches backend and preserves explicit false and empty arrays", () => {
@@ -17,6 +17,7 @@ test("QML default expansion matches backend and preserves explicit false and emp
   expect(result.places.showHome).toBe(false);
   expect(result.places.sidebarWidth).toBe(160);
   expect(result.menu.hidden).toEqual([]);
+  expect(ctx.fromFile('{"keyHints":false}').state.keyHints).toBe(true);
 });
 
 test("writes only deviations, restores defaults, merges concurrent patches, preserves unknowns", () => {
@@ -49,4 +50,11 @@ test("unspecified values follow future defaults while explicit overrides remain"
   expect({...future, ...saved}.density).toBe("comfortable");
   expect({...future, ...saved}.hidden).toBe(true);
   expect(overrides({...base, places:{...base.places, sidebarWidth:192}}).places.sidebarWidth).toBe(192);
+});
+
+test("keyboard hints cannot be disabled by legacy state or a new patch", () => {
+  expect(fromFile('{"keyHints":false}').keyHints).toBe(true);
+  const state = patched(defaults(), {keyHints:false});
+  expect(state.keyHints).toBe(true);
+  expect(overrides(state).keyHints).toBeUndefined();
 });

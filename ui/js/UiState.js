@@ -8,7 +8,9 @@ function fromFile(text) {
     try {
         var found = JSON.parse(text)
         if (found && typeof found === "object" && !Array.isArray(found)) {
-            return { state: withDefaults(found, UiDefaults.state), unreadable: false }
+            var state = withDefaults(found, UiDefaults.state)
+            state.keyHints = true
+            return { state: state, unreadable: false }
         }
     } catch (e) {
         // A hand edit this cannot parse, which is the ordinary way in and is not an error here.

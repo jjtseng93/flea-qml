@@ -395,7 +395,7 @@ Item {
         }
 
         Flea.Glyph {
-            visible: root.hasSteps || root.kind === "action" && root.row.inert !== true
+            visible: root.hasSteps
             width: visible ? Theme.markSize : 0
             height: Theme.markSize
             name: "chevron-right"
@@ -406,6 +406,18 @@ Item {
                 gesturePolicy: TapHandler.ReleaseWithinBounds
                 onTapped: root.stepped(1)
             }
+        }
+
+        Text {
+            visible: root.kind === "action" && root.row.inert !== true
+            width: visible ? Theme.markSize : 0
+            height: Theme.markSize
+            text: "↩️"
+            font.family: Theme.font.family
+            font.pixelSize: Theme.font.body
+            textFormat: Text.PlainText
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
         }
 
         // A locked row draws the lock mark where the box would be, so the section stays a complete

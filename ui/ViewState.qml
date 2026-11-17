@@ -340,7 +340,11 @@ QtObject {
             root.run(next.start)
     }
 
+    property int writerSerial: 0
+    property int settleSerial: 0
+
     function run(patch) {
+        root.writerSerial += 1
         patcher.command = FleaBin.command(Quickshell.env("FLEA_BIN"), Quickshell.env("BUNINU_BUN"), Quickshell.shellDir, ["--ui-state", patch])
         patcher.running = true
     }
@@ -387,6 +391,7 @@ QtObject {
         // A half-landed settle is still pending, so starting over it would lose the half already here.
         if (UiState.settleBusy(settler.running, root.settleMode, root.settleAnswer))
             return
+        root.settleSerial += 1
         root.settleMode = mode
         root.settleRevision = root.writeRevision
         root.settleAnswer = {}
@@ -509,6 +514,9 @@ QtObject {
     // leaves a key owed forever: the owed keys the settled document disagrees with are dropped once,
     // said once in the status line, so a later valid write applies again in the same process.
     function wrote(exitCode) {
+        root.writerSerial += 1
+        if (exitCode !== 0 && writerErrors.text.trim().length > 0)
+            console.warn("flea: could not save settings: " + writerErrors.text.trim())
         // Taken out before the patch below is built, so a writer queued behind this one launches with
         // what is still owed and not with the settings this one has just stored.
         root.saveStatus = exitCode === 0 ? "Saved"
@@ -539,14 +547,11 @@ QtObject {
 
     property var writer: Process {
         id: patcher
+        stderr: StdioCollector { id: writerErrors; waitForEnd: true }
         onExited: function (exitCode, exitStatus) { root.wrote(exitCode) }
-        // Measured on Quickshell 0.3.1: a Process that cannot start its program emits no exited at
-        // all, only running going false, and a real exit clears the book before its own false
-        // arrives, so this fires for the writer that never ran and never for one that did.
-        onRunningChanged: {
-            if (!patcher.running && root.writeBook.inflight.length > 0)
-                root.wrote(2)
-        }
+        // Both signal orders are valid. Defer the no-exit fallback so running=false
+        // cannot report a successful process as a spawn failure.
+        onRunningChanged: UiState.writerStopped(root, patcher, function (callback) { Qt.callLater(callback) })
     }
 
     property var settler: Process {
@@ -555,8 +560,7 @@ QtObject {
         onExited: function (exitCode, exitStatus) { root.settleLanded({ code: exitCode }) }
         // A settler that never started raises no exited, only running going false; the joined halves tell it from a real exit the way the writer's own rule does.
         onRunningChanged: {
-            if (root.settleMode.length > 0 && UiState.neverRan(root.settleAnswer, settler.running))
-                root.settleLanded(UiState.NEVER_RAN)
+            UiState.settlerStopped(root, settler, function (callback) { Qt.callLater(callback) })
             // onExited may land both halves while running is true; the idle transition resumes its queued work.
             if (!settler.running && root.settleMode.length === 0)
                 root.settleNext()

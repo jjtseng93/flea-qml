@@ -450,3 +450,22 @@ function withDefaults(found, defaults) {
     })
     return out
 }
+
+// A stopped notification can precede exited. Never let a deferred failure belong
+// to a later process, even when that process is saving the same patch.
+function writerStopped(root, process, defer) {
+    if (process.running || !root.writeBook.inflight.length) return
+    var serial = root.writerSerial
+    defer(function () {
+        if (serial === root.writerSerial && !process.running && root.writeBook.inflight.length)
+            root.wrote(2)
+    })
+}
+function settlerStopped(root, process, defer) {
+    if (process.running || !root.settleMode.length) return
+    var serial = root.settleSerial
+    defer(function () {
+        if (serial === root.settleSerial && root.settleMode.length && neverRan(root.settleAnswer, process.running))
+            root.settleLanded(NEVER_RAN)
+    })
+}

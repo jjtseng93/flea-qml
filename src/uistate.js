@@ -48,7 +48,7 @@ const DEFAULTS = {
     thumbNetwork: false, thumbPhone: false, thumbUsb: true,
     ctrlZoom: true, volume: 100, width: 0, tracks: [], wrap: false,
   },
-  previewFacts: "compact",
+  previewFacts: "full",
   keys: "default",
   display: { textSize: { mode: "system" }, hyprlandIcons: false },
   menu: {

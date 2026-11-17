@@ -86,7 +86,7 @@ var state = {
     "tracks": [],
     "wrap": false
   },
-  "previewFacts": "compact",
+  "previewFacts": "full",
   "keys": "default",
   "display": {
     "textSize": {

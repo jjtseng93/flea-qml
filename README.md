@@ -90,6 +90,7 @@ npx flea-qml --dump-config-raw
 
 ### Advanced usage
 
+- Compiled QML cache defaults to `--cache=js`; see [Compiled QML cache](#compiled-qml-cache) for details.
 - `FLEA_PATH=/some/folder` opens that folder first
 - For example, from this checkout in the Buninu userspace:
 
@@ -478,6 +479,20 @@ every path in it exists.
 Text-only Copy as and share links use the QML runtime's clipboard. Query-field
 paste accepts either synchronous Quickshell text or buninu-browser's asynchronous
 host clipboard read. These operations do not require `wl-copy`.
+
+## Compiled QML cache
+
+Compiled local QML caching defaults to `--cache=js`.
+To additionally cache Bun bytecode:
+
+```sh
+npx flea-qml --casty --cache=bytecode
+npx flea-qml --wayland --cache=bytecode
+```
+
+The launcher puts cache flags after Casty's `--` separator automatically;
+Wayland and headless receive them directly. This requires a pinned
+buninu-browser release that includes QML caching.
 
 ## Clearing package caches
 

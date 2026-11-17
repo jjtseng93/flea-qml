@@ -1,6 +1,6 @@
 import {test,expect} from 'bun:test';
 import {EventEmitter} from 'node:events';
-import {browserPackage,browserCommand,selectFrontend,detectKitty,entryURL} from '../index.js';
+import {browserPackage,browserCommand,browserArguments,selectFrontend,detectKitty,entryURL} from '../index.js';
 import {fileURLToPath} from 'node:url';
 import info from '../package.json';
 import {isAbsolute} from 'node:path';
@@ -47,5 +47,21 @@ test('version flags report the package and pinned browser versions', async()=>{
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL('../index.js', import.meta.url)), flag], {stdout:'pipe',stderr:'pipe'});
   expect(await new Response(child.stdout).text()).toBe(`flea-qml ${info.version}\n${browserPackage()} (pinned)\n`);
   expect(await child.exited).toBe(0);
+ }
+});
+
+test('cache defaults reach Casty and Win32 after their browser separator',()=>{
+ for(const frontend of ['--casty','--win32']) {
+  expect(browserArguments({frontend,args:[]})).toEqual([frontend,entryURL,'--','--cache=js']);
+  expect(browserArguments({frontend,args:['--no-shortcuts','--','--window-size=800,600']})).toEqual([frontend,entryURL,'--no-shortcuts','--','--cache=js','--window-size=800,600']);
+  expect(browserArguments({frontend,args:['--cache=bytecode']})).toEqual([frontend,entryURL,'--','--cache=bytecode']);
+  expect(browserArguments({frontend,args:['--','--cache=bytecode']})).toEqual([frontend,entryURL,'--','--cache=bytecode']);
+ }
+});
+test('Wayland and headless receive cache flags directly and retain explicit overrides',()=>{
+ for(const frontend of ['--wayland','--headless']) {
+  expect(browserArguments({frontend,args:[]})).toEqual([frontend,entryURL,'--cache=js']);
+  expect(browserArguments({frontend,args:['--window-size=800,600']})).toEqual([frontend,entryURL,'--cache=js','--window-size=800,600']);
+  expect(browserArguments({frontend,args:['--cache=bytecode']})).toEqual([frontend,entryURL,'--cache=bytecode']);
  }
 });

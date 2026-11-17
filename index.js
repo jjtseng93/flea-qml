@@ -30,6 +30,21 @@ export function selectFrontend(args, kitty, platform = process.platform) {
   return {frontend:kitty ? '--casty' : platform === 'win32' ? '--win32' : '--wayland', args};
 }
 
+// Casty owns arguments before --; Wayland/headless consume engine flags directly.
+export function browserArguments(selection, url = entryURL) {
+  const {frontend, args} = selection;
+  const isCache = arg => arg === '--cache' || arg.startsWith('--cache=');
+  if (frontend === '--casty' || frontend === '--win32') {
+    const separator = args.indexOf('--');
+    const own = separator < 0 ? args : args.slice(0, separator);
+    const engine = separator < 0 ? [] : args.slice(separator + 1);
+    const explicit = [...own.filter(isCache), ...engine.filter(isCache)];
+    return [frontend, url, ...own.filter(arg => !isCache(arg)), '--',
+      ...(explicit.length ? [] : ['--cache=js']), ...own.filter(isCache), ...engine];
+  }
+  return [frontend, url, ...(args.some(isCache) ? [] : ['--cache=js']), ...args];
+}
+
 // An actual inline graphics query, not a TERM-name guess. Restore stdin before
 // launching the child, and preserve input unrelated to the query response.
 export async function detectKitty(input = process.stdin, output = process.stdout, timeout = 800) {
@@ -91,7 +106,7 @@ export async function main(args = Bun.argv.slice(2)) {
   }
   if (['-h','--help'].includes(args[0])) {
     console.log(`Usage: flea-qml [BROWSER_FRONTEND] [BROWSER_ARGS...]\n\nAutomatically probes Kitty graphics; otherwise Windows uses --win32,\nother platforms (including Linux/Android) use --wayland. The first argument\nis passed unchanged to buninu-browser and overrides detection (for example
---casty, --win32, --wayland or --headless). Requires Bun on PATH. Remaining arguments go unchanged\nto buninu-browser after the absolute file URL of ui/boot/shell.qml.\n\n  --dump-config      Print merged settings with ANSI colours (always)\n  --dump-config-raw  Print merged settings as JSON\n  --readme       Print the README as coloured ANSI Markdown\n  --version, -V  Print the package version\n  --help, -h     Show this help`);
+--casty, --win32, --wayland or --headless). Requires Bun on PATH. The launcher defaults to --cache=js. Use --cache=bytecode to override.\nCasty/Win32 cache flags go after --; Wayland/headless receive them directly.\nOther arguments keep their order after the absolute file URL of ui/boot/shell.qml.\n\n  --dump-config      Print merged settings with ANSI colours (always)\n  --dump-config-raw  Print merged settings as JSON\n  --readme       Print the README as coloured ANSI Markdown\n  --version, -V  Print the package version\n  --help, -h     Show this help`);
     return 0;
   }
   if (['-V','--version'].includes(args[0])) {console.log(`flea-qml ${info.version}\n${browserPackage()} (pinned)`);return 0;}
@@ -106,7 +121,7 @@ export async function main(args = Bun.argv.slice(2)) {
     }
   }
   const selection = selectFrontend(args, kitty);
-  const browserArgs = [selection.frontend, entryURL, ...selection.args];
+  const browserArgs = browserArguments(selection);
   const child = Bun.spawn({cmd:browserCommand(browserArgs),stdio:['inherit','inherit','inherit']});
   const handlers = ['SIGINT','SIGTERM','SIGHUP'].map(signal => {
     const handler = () => {try {child.kill(signal);} catch {}};

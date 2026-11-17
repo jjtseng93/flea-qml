@@ -9,7 +9,6 @@ import { fsinfo } from "./fsinfo.js";
 import { code } from "./code.js";
 import { compare } from "./compare.js";
 import { html } from "./html.js";
-import { markdownHtml } from "./markdown-html.js";
 import { renderDiagram } from "./figure.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
@@ -32,6 +31,9 @@ import { Listing, directoryFacts } from "./listing.js";
 import { SORT_KEYS } from "./order.js";
 import { lstatSync } from "node:fs";
 import { basename, dirname, join, resolve, isAbsolute } from "node:path";
+
+// Listing and state startup do not need the Markdown/Temml preview engine.
+const markdownHtml = request => import("./markdown-html.js").then(module => module.markdownHtml(request));
 
 // FLEA_BACKEND_LOG=/some/file appends every request and answer there, for debugging.
 const trace = process.env.FLEA_BACKEND_LOG ? (await import("node:fs")).appendFileSync.bind(null, process.env.FLEA_BACKEND_LOG) : null;

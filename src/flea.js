@@ -1,7 +1,6 @@
 // flea-qml's `flea`: the one program ui/ runs for everything it asks of the outside, through
 // ui/js/FleaBin.js as `bun src/flea.js ARGS`. Upstream's equivalent is the `flea` binary's
 // src/main.rs, whose other modes (--open, --run, --favourites, ...) are not ported yet.
-import { runBackend } from "./backend.js";
 import { readState, updateState } from "./uistore.js";
 import { render } from "./uistate.js";
 
@@ -31,7 +30,7 @@ function uiState(rest) {
 }
 
 const [mode, ...rest] = args;
-if (mode === "--backend") runBackend();
+if (mode === "--backend") (await import("./backend.js")).runBackend();
 else if (mode === "--ui-state") process.exit(uiState(rest));
 else {
   console.error(`flea-qml: not implemented yet: ${args.join(" ") || "(no arguments)"}`);

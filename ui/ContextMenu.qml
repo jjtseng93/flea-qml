@@ -215,6 +215,13 @@ Item {
         root.cursor = root.stepCursor(root.cursor, delta)
     }
 
+    function jumpEdge(last) {
+        if (root.submenuOpen)
+            root.submenuCursor = Menu.edgeRow(root.submenuEntries, last)
+        else
+            root.cursor = Menu.edgeRow(root.entries, last)
+    }
+
     function firstRow() {
         return root.stepCursor(-1, 1)
     }
@@ -683,6 +690,10 @@ Item {
                 } else
                     root.close()
                 event.accepted = true
+                return
+            }
+            if (action === "cursorFirst" || action === "cursorLast") {
+                root.jumpEdge(action === "cursorLast")
                 return
             }
             if (action === "cursorDown") {

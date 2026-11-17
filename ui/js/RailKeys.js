@@ -57,6 +57,10 @@ function act(action, root, sidebar, event) {
     // A cursor key leaves the mark for the rows, even on the first or last row where the cursor stays.
     if (action.indexOf("cursor") === 0) sidebar.markFocused = false
     switch (action) {
+    case "home":
+        Nav.openPlace(root, root.home)
+        root.focusView = "list"
+        return
     case "cursorDown": sidebar.cursorIndex = Math.min(sidebar.entries.length - 1, sidebar.cursorIndex + 1); return
     case "cursorUp": sidebar.cursorIndex = Math.max(0, sidebar.cursorIndex - 1); return
     // The sheet advertises g and G as first and last row, and the rail is a cursored list too, so

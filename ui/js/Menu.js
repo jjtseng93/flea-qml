@@ -19,6 +19,12 @@ function stepRow(rows, from, delta) {
     return from
 }
 
+// Home/End return no selection if this level contains no actionable rows.
+function edgeRow(rows, last) {
+    var index = stepRow(rows, last ? rows.length : -1, last ? -1 : 1)
+    return index >= 0 && index < rows.length ? index : -1
+}
+
 // Flip at the far edge first, then shift only when neither side fits.
 function clamp(point, size, bounds) {
     var start = point + size <= bounds ? point : point - size

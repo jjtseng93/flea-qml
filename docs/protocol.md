@@ -407,9 +407,10 @@ Re-sorts the current listing by `by` and answers a `listed` line. The orders are
   under one shared 250 ms budget for the whole sort, and that walk is part of the pass,
   so its time lands in `read` too. `read` is that pass in milliseconds and `sort`
   is the sort, so the two costs stay readable apart on the wire.
-- `"kind"` compares MIME type strings obtained from filenames, with
-  `application/octet-stream` for an unknown name and `inode/directory` for a folder.
-  Files with equal kind order by extension, none first with the Finder comparison, then by name; folders keep name order.
+- flea-qml: `"mode"` pays the same metadata pass and compares the `rwxr-xr-x` text the Mode
+  column shows, as `"kind"` compares its text, then the name.
+- `"kind"` (flea-qml) compares the Kind text each row shows, such as `Image JPG` or `Document PDF`
+  (src/kinds.js), then the name; folders keep name order.
   It does not read file contents or run a metadata pass; `read` is `0.0`.
 
 `foldersFirst` defaults to `true`: folders remain before files in both directions.

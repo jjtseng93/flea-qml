@@ -2,7 +2,7 @@
 .import "UserDirs.js" as UserDirs
 
 // Owned here so Backend.qml loads no sort closure at startup.
-var ORDERS = ["name", "size", "mtime", "kind"]
+var ORDERS = ["name", "size", "mtime", "kind", "mode"]
 
 // Written only on a user sort in that folder, read once per listing, oldest first.
 

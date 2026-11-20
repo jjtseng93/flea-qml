@@ -751,7 +751,7 @@ Item {
                         if (leaves[l].id === action) { root.chooseSub(leaves[l].id); return }
                     }
                 }
-                // flea-qml: n s t x pick an order ascending and N S T X descending, by the typed letter.
+                // flea-qml: n s t m x pick an order ascending and N S T M X descending, by the typed letter.
                 if (opener && opener.action === "sort" && event.text.length === 1) {
                     var orders = root.submenuEntries
                     for (var o = 0; o < orders.length; o++)

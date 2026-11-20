@@ -42,3 +42,23 @@ test("the Kind order compares exactly the Kind each row shows", () => {
     expect(descending.slice(1).map(([, kind]) => kind)).toEqual(ascending.slice(1).map(([, kind]) => kind).reverse());
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("the Mode order compares the rwx text each row shows, like every other order", async () => {
+  const { permissionText } = await import("../src/order.js");
+  expect(permissionText(0o755)).toBe("rwxr-xr-x");
+  expect(permissionText(0o4755)).toBe("rwxr-xr-x"); // the column shows the low nine bits only
+  const dir = mkdtempSync(join(tmpdir(), "flea-mode-"));
+  try {
+    const modes = { "a.txt": 0o644, "b.txt": 0o600, "c.txt": 0o755, "d.txt": 0o444 };
+    for (const [name, mode] of Object.entries(modes)) { writeFileSync(join(dir, name), "x"); chmodSync(join(dir, name), mode); }
+    const listing = new Listing(dir, Object.keys(modes).map((name) => ({ name, dir: false, link: false })));
+    const shown = (desc) => {
+      listing.sort({ by: "mode", desc, foldersFirst: true });
+      return listing.window(0, 10).rows.map((row) => permissionText(row.p));
+    };
+    const ascending = shown(false);
+    expect(ascending).toEqual([...ascending].sort((a, b) => a.localeCompare(b, "en")));
+    expect(ascending).toEqual(["r--r--r--", "rw-------", "rw-r--r--", "rwxr-xr-x"]);
+    expect(shown(true)).toEqual([...ascending].reverse());
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

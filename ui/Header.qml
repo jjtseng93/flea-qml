@@ -144,6 +144,9 @@ Item {
         visible: (root.recent ? root.cols.location : root.cols.mode) && !root.underStrip
         width: root.recent ? (root.cols.location ? Theme.column.location : 0) : root.cols.mode ? (root.dragKey === "mode" ? root.dragPreview : Theme.column.mode) : 0
         text: root.recent ? "Location" : root.title(root.label("權限", "Mode"), "mode")
+        elide: Text.ElideRight
+
+        TapHandler { enabled: root.sortable && !root.recent; onTapped: root.sortRequested("mode") }
     }
 
     PanelSectionHeader {

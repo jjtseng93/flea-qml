@@ -61,9 +61,16 @@ function extensionOrder(a, b) {
   return finderCompare(encoder.encode(ea), encoder.encode(eb));
 }
 
-export const SORT_KEYS = new Set(["name", "size", "mtime", "date", "kind", "extension"]);
+/** The Mode column's text, as ui/js/Format.js permissions draws it: the low nine bits as rwx or -. */
+export function permissionText(mode) {
+  let out = "";
+  for (let i = 0; i < 9; i++) out += mode & (1 << (8 - i)) ? "rwx"[i % 3] : "-";
+  return out;
+}
+
+export const SORT_KEYS = new Set(["name", "size", "mtime", "date", "mode", "kind", "extension"]);
 /** Orders that read every row's lstat first; the rest work on names alone. */
-export const NEEDS_STAT = new Set(["size", "mtime", "date"]);
+export const NEEDS_STAT = new Set(["size", "mtime", "date", "mode"]);
 
 /**
  * Sorts rows in place. `row.dir` and `row.name` are always there; `row.st` is there for every row
@@ -82,6 +89,9 @@ export function sortRows(rows, { by = "name", desc = false, foldersFirst = true,
         ? (a, b) => (a.trash ? Date.parse(a.trash.deleted)||0 : a.st?.mtimeMs ?? 0) - (b.trash ? Date.parse(b.trash.deleted)||0 : b.st?.mtimeMs ?? 0)
         : by === "kind"
           ? (a, b) => (a.dir || b.dir ? 0 : finderCompare(encoder.encode(a.kind ?? ""), encoder.encode(b.kind ?? "")))
+          // flea-qml: the "rwxr-xr-x" text the Mode column shows, compared as Kind compares its text.
+          : by === "mode"
+            ? (a, b) => finderCompare(encoder.encode(permissionText(a.st?.mode ?? 0)), encoder.encode(permissionText(b.st?.mode ?? 0)))
           : by === "extension"
             ? (a, b) => (a.dir || b.dir ? 0 : extensionOrder(a, b))
             : () => 0;

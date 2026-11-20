@@ -13,16 +13,17 @@ test("Sort by offers every order in both directions, lower-case letter ascending
   const rows = Menu.sortEntries(false, "name", false);
   expect(rows.map((r) => [r.id, r.keyHint])).toEqual([
     ["name:asc", "n"], ["name:desc", "N"], ["size:asc", "s"], ["size:desc", "S"],
-    ["mtime:asc", "t"], ["mtime:desc", "T"], ["kind:asc", "x"], ["kind:desc", "X"],
+    ["mtime:asc", "t"], ["mtime:desc", "T"], ["kind:asc", "x"], ["kind:desc", "X"], ["mode:asc", "m"], ["mode:desc", "M"],
   ]);
   expect(rows[0].label).toBe("Name, A to Z");
   expect(rows[3].label).toBe("Size, largest first");
   expect(rows[5].label).toBe("Time modified, newest first");
   expect(rows[6].label).toBe("Kind (extension), A to Z");
+  expect(rows[8].label).toBe("Mode, A to Z");
   // Each letter stands in its own label, so the menu can draw it bold.
   for (const row of rows) expect(row.label.toLowerCase()).toContain(row.keyHint.toLowerCase());
   // The bold letter sits in the order's name, not in a later word that shares the letter.
-  expect(rows.map((r) => r.mark)).toEqual(["N", "N", "S", "S", "T", "T", "x", "x"]);
+  expect(rows.map((r) => r.mark)).toEqual(["N", "N", "S", "S", "T", "T", "x", "x", "M", "M"]);
 });
 
 test("the order in force carries the check mark, and only it", () => {

@@ -417,13 +417,14 @@ function loneChoice(action, id, forRail, forHeader, hasRow, openedIdentity, sele
 
 // The Sort by flyout, built from ui/js/Sort.js's own ORDERS so it can only ever offer an order the
 // backend really produces; a fourth key would earn a refusal instead of a listing.
-var SORT_LABELS = { name: "Name", size: "Size", mtime: "Time modified", kind: "Kind (extension)" }
+var SORT_LABELS = { name: "Name", size: "Size", mtime: "Time modified", mode: "Mode", kind: "Kind (extension)" }
 // flea-qml: every order offers both directions. The letter picks it ascending and the same letter
-// upper case descending: n name, s size, t time modified, x kind (extension). Each letter is in its
+// upper case descending: n name, s size, t time modified, m mode, x kind (extension). Each letter is in its
 // label, so it is the one drawn bold.
 var SORT_DIRECTIONS = { name: ["A to Z", "Z to A"], size: ["smallest first", "largest first"],
-    mtime: ["oldest first", "newest first"], kind: ["A to Z", "Z to A"] }
-var SORT_LETTERS = { name: "n", size: "s", mtime: "t", kind: "x" }
+    mtime: ["oldest first", "newest first"], mode: ["A to Z", "Z to A"],
+    kind: ["A to Z", "Z to A"] }
+var SORT_LETTERS = { name: "n", size: "s", mtime: "t", mode: "m", kind: "x" }
 
 // Sample input: sortEntries(false, "size", true) answers eight rows, "name:asc" first, the
 // "size:desc" row ticked; its letters are n N s S t T x X.

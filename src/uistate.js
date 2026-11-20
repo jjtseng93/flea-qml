@@ -64,7 +64,7 @@ const OPTIONAL_COLUMNS = ["mode", "size", "date", "kind"];
 const COLUMN_KEYS = ["name", "mode", "size", "date", "kind"];
 const COLUMN_WIDTH_KEYS = ["mode", "size", "date", "kind"];
 const COLUMN_WIDTH_MIN = 48, COLUMN_WIDTH_MAX = 480;
-const SORT_KEYS = ["name", "size", "date", "kind"];
+const SORT_KEYS = ["name", "size", "date", "kind", "mode"];
 const TEXT_SIZE_STOPS = [9, 10, 11, 12, 14, 16, 20];
 const SIDEBAR_STOPS = [160, 192, 224, 256];
 const MAX_LAST_TABS = 9, MAX_FOLDER_SORTS = 500, MAX_FOLDER_VIEWS = 500;

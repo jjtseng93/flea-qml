@@ -17,11 +17,15 @@ var ORDERS = FolderSorts.ORDERS
 
 // The three sort decisions, kept apart from what a pane does with them: the chooser makes the same ones over its narrower list.
 
-// The sorted column reverses; any other starts ascending, the order the canvas header draws beside "Name".
+// flea-qml: a first click on Size or Modified puts the largest and the newest on top.
+var FIRST_DESCENDING = { size: true, mtime: true }
+
+// The sorted column reverses; any other starts ascending, the order the canvas header draws beside
+// "Name", except the two FIRST_DESCENDING names.
 function columnOrder(orders, by, desc, key) {
     if (orders.indexOf(key) < 0)
         return null
-    return { key: key, desc: by === key ? !desc : false }
+    return { key: key, desc: by === key ? !desc : FIRST_DESCENDING[key] === true }
 }
 
 // Always ascending, column and direction separate; an outside order, a saved kind in the chooser, starts over at the first.

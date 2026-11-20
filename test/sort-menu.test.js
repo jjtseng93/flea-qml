@@ -6,7 +6,7 @@ async function load(name, names, deps = {}) {
   return new Function(...Object.keys(deps), source + ";return {" + names + "};")(...Object.values(deps));
 }
 const FolderSorts = await load("FolderSorts", "ORDERS");
-const Sort = await load("Sort", "ORDERS,choose,column", { DirSizes: {}, FolderSorts, RecentMode: {}, Thumbs: {} });
+const Sort = await load("Sort", "ORDERS,choose,column,columnOrder", { DirSizes: {}, FolderSorts, RecentMode: {}, Thumbs: {} });
 const Menu = await load("Menu", "sortEntries,sortMenuEntries", { Lists: {}, Archive: {}, ExtThumbs: {}, Format: {}, Sort, StateWords: {} });
 
 test("Sort by offers every order in both directions, lower-case letter ascending and upper-case descending", () => {
@@ -24,6 +24,15 @@ test("Sort by offers every order in both directions, lower-case letter ascending
   for (const row of rows) expect(row.label.toLowerCase()).toContain(row.keyHint.toLowerCase());
   // The bold letter sits in the order's name, not in a later word that shares the letter.
   expect(rows.map((r) => r.mark)).toEqual(["N", "N", "S", "S", "T", "T", "x", "x", "M", "M"]);
+});
+
+test("a first click on Size or Modified puts the largest and newest on top; a second reverses it", () => {
+  const orders = Sort.ORDERS;
+  expect(Sort.columnOrder(orders, "name", false, "size")).toEqual({ key: "size", desc: true });
+  expect(Sort.columnOrder(orders, "name", false, "mtime")).toEqual({ key: "mtime", desc: true });
+  expect(Sort.columnOrder(orders, "size", true, "size")).toEqual({ key: "size", desc: false });
+  // The text orders still start A to Z.
+  for (const key of ["name", "mode", "kind"]) expect(Sort.columnOrder(orders, "size", true, key)).toEqual({ key, desc: false });
 });
 
 test("the order in force carries the check mark, and only it", () => {

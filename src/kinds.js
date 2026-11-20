@@ -7,47 +7,48 @@ const S_IFMT = 0o170000,
   S_IFLNK = 0o120000,
   ANY_EXECUTE_BIT = 0o111;
 
-// [group, emoji, extensions, Kind]. A Kind given as a function is built from the upper-case
-// extension; a string is used as it is.
+// [group, emoji, extensions, category]. A row's Kind is its category and its upper-case
+// extension, "Image JPG", "Document PDF", "Code JS": what the Kind column shows is exactly what the
+// Kind order compares (src/order.js), so a reader can always tell why a row sorts where it does.
 const TABLE = [
-  ["image", "🖼️", "png jpg jpeg gif webp svg bmp ico avif heic", (x) => `${x} image`],
-  ["audio", "🎵", "mp3 wav flac ogg m4a aac opus mid midi", (x) => `${x} audio`],
-  ["video", "🎬", "mp4 mkv webm mov avi m4v mpeg mpg", (x) => `${x} video`],
+  ["image", "🖼️", "png jpg jpeg gif webp svg bmp ico avif heic", "Image"],
+  ["audio", "🎵", "mp3 wav flac ogg m4a aac opus mid midi", "Audio"],
+  ["video", "🎬", "mp4 mkv webm mov avi m4v mpeg mpg", "Video"],
   // A .tar.gz names its outer layer, gz, so it is compressed; a bare .tar only packs.
-  ["archive", "🗜️", "zip gz tgz xz txz bz2 tbz2 zst tzst 7z rar lz lz4 lzma z", (x) => `${x} archive`],
-  ["package", "📦", "tar deb rpm apk jar war whl appimage msi dmg pkg snap flatpak cpio", (x) => `${x} package`],
-  ["disc", "💿", "iso img qcow2 vhd vhdx vmdk", (x) => `${x} disk image`],
-  ["pdf", "📕", "pdf", "PDF document"],
-  ["document", "📘", "doc docx odt rtf", (x) => `${x} document`],
-  ["spreadsheet", "📗", "xls xlsx ods csv tsv", (x) => `${x} spreadsheet`],
-  ["presentation", "📙", "ppt pptx odp key", (x) => `${x} presentation`],
-  ["markdown", "📝", "md markdown", "Markdown document"],
-  ["text", "📄", "txt log", (x) => `${x} text`],
-  ["font", "🔤", "ttf otf woff woff2", (x) => `${x} font`],
-  ["database", "🐬", "sql db sqlite sqlite3 db3", (x) => `${x} database`],
-  ["config", "🔣", "json yaml yml toml ini xml conf cfg", (x) => `${x} data`],
-  ["shell", "💲", "sh bash zsh fish bat cmd ps1", (x) => `${x} script`],
-  ["binary", "💾", "bin dat o obj so a dll lib dylib class pyc wasm", (x) => `${x} binary`],
-  // Source code, one language per row.
-  ["code", "🟨", "js mjs cjs", "JavaScript"],
-  ["code", "🟦", "ts mts cts", "TypeScript"],
-  ["code", "🐍", "py", "Python script"],
-  ["code", "🔧", "c", "C source"],
-  ["code", "🧩", "h", "C header"],
-  ["code", "➕", "cpp cc cxx hpp hh hxx", "C++ source"],
-  ["code", "🔧", "cs", "C# source"],
-  ["code", "🦀", "rs", "Rust source"],
-  ["code", "🐹", "go", "Go source"],
-  ["code", "☕", "java", "Java source"],
-  ["code", "🟪", "kt kts", "Kotlin source"],
-  ["code", "💎", "rb", "Ruby script"],
-  ["code", "🐘", "php", "PHP script"],
-  ["code", "🌙", "lua", "Lua script"],
-  ["code", "🎯", "dart", "Dart source"],
-  ["code", "❄️", "nix", "Nix expression"],
-  ["code", "🌐", "html htm", "HTML document"],
-  ["code", "🎨", "css", "CSS stylesheet"],
-  ["code", "🐳", "dockerfile", "Dockerfile"],
+  ["archive", "🗜️", "zip gz tgz xz txz bz2 tbz2 zst tzst 7z rar lz lz4 lzma z", "Archive"],
+  ["package", "📦", "tar deb rpm apk jar war whl appimage msi dmg pkg snap flatpak cpio", "Package"],
+  ["disc", "💿", "iso img qcow2 vhd vhdx vmdk", "Disk"],
+  ["pdf", "📕", "pdf", "Document"],
+  ["document", "📘", "doc docx odt rtf", "Document"],
+  ["spreadsheet", "📗", "xls xlsx ods csv tsv", "Spreadsheet"],
+  ["presentation", "📙", "ppt pptx odp key", "Presentation"],
+  ["markdown", "📝", "md markdown", "Document"],
+  ["text", "📄", "txt log", "Text"],
+  ["font", "🔤", "ttf otf woff woff2", "Font"],
+  ["database", "🐬", "sql db sqlite sqlite3 db3", "Database"],
+  ["config", "🔣", "json yaml yml toml ini xml conf cfg", "Data"],
+  ["shell", "💲", "sh bash zsh fish bat cmd ps1", "Script"],
+  ["binary", "💾", "bin dat o obj so a dll lib dylib class pyc wasm", "Binary"],
+  // Source code, one language per row: the emoji tells them apart, the Kind names the extension.
+  ["code", "🟨", "js mjs cjs", "Code"],
+  ["code", "🟦", "ts mts cts", "Code"],
+  ["code", "🐍", "py", "Code"],
+  ["code", "🔧", "c", "Code"],
+  ["code", "🧩", "h", "Code"],
+  ["code", "➕", "cpp cc cxx hpp hh hxx", "Code"],
+  ["code", "🔧", "cs", "Code"],
+  ["code", "🦀", "rs", "Code"],
+  ["code", "🐹", "go", "Code"],
+  ["code", "☕", "java", "Code"],
+  ["code", "🟪", "kt kts", "Code"],
+  ["code", "💎", "rb", "Code"],
+  ["code", "🐘", "php", "Code"],
+  ["code", "🌙", "lua", "Code"],
+  ["code", "🎯", "dart", "Code"],
+  ["code", "❄️", "nix", "Code"],
+  ["code", "🌐", "html htm", "Code"],
+  ["code", "🎨", "css", "Code"],
+  ["code", "🐳", "dockerfile", "Code"],
 ];
 const BY_EXTENSION = new Map();
 for (const [group, icon, extensions, kind] of TABLE)
@@ -79,10 +80,12 @@ export function describeKind(name, isDir, mode, target) {
     upper = ext.toUpperCase(),
     known = BY_NAME.get(name.toLowerCase()) ?? BY_EXTENSION.get(ext);
   let icon, kind, group;
-  if (known) [icon, kind, group] = [known.icon, typeof known.kind === "function" ? known.kind(upper) : known.kind, known.group];
+  // A file known by its whole name (Dockerfile) names itself where an extension would stand.
+  const shown = upper || name.toUpperCase();
+  if (known) [icon, kind, group] = [known.icon, `${known.kind} ${shown}`, known.group];
   else if ((mode & S_IFMT) !== S_IFLNK && mode & ANY_EXECUTE_BIT) [icon, kind, group] = [PROGRAM, "Program", "program"];
   // An extension nothing names may still be text, so it keeps the plain page rather than the disk.
-  else [icon, kind, group] = [OTHER, ext ? `${upper} file` : "File", "file"];
+  else [icon, kind, group] = [OTHER, ext ? `File ${upper}` : "File", "file"];
   // A link draws as a link, whatever it names; a link to a folder still sorts with files by its own name.
   if ((mode & S_IFMT) === S_IFLNK) icon = target === null ? BROKEN_LINK : LINK;
   return { icon, kind, group };

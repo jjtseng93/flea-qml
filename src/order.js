@@ -67,7 +67,8 @@ export const NEEDS_STAT = new Set(["size", "mtime", "date"]);
 
 /**
  * Sorts rows in place. `row.dir` and `row.name` are always there; `row.st` is there for every row
- * when `by` needs a stat, and `row.group` (kinds.js's class, e.g. "image") when it is "kind" or
+ * when `by` needs a stat, `row.kind` (the Kind text the row shows, kinds.js) when it is "kind", and
+ * `row.group` (kinds.js's class, e.g. "image") when it is "kind" or
  * kinds group.
  */
 // A file's own size; a folder's is the size the user measured (src/dirsize.js), never its dirent's.
@@ -80,7 +81,7 @@ export function sortRows(rows, { by = "name", desc = false, foldersFirst = true,
       : by === "mtime" || by === "date"
         ? (a, b) => (a.trash ? Date.parse(a.trash.deleted)||0 : a.st?.mtimeMs ?? 0) - (b.trash ? Date.parse(b.trash.deleted)||0 : b.st?.mtimeMs ?? 0)
         : by === "kind"
-          ? (a, b) => (a.dir || b.dir ? 0 : (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) || extensionOrder(a, b))
+          ? (a, b) => (a.dir || b.dir ? 0 : finderCompare(encoder.encode(a.kind ?? ""), encoder.encode(b.kind ?? "")))
           : by === "extension"
             ? (a, b) => (a.dir || b.dir ? 0 : extensionOrder(a, b))
             : () => 0;

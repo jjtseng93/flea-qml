@@ -34,9 +34,20 @@ export class Listing {
     if (NEEDS_STAT.has(order.by)) for (const row of this.rows) this.stat(row);
     if (order.by === "size")
       for (const row of this.rows) row.measured = row.dir && !row.trash ? keptSize(join(this.path || ".", row.name))?.bytes : undefined;
-    // Kind ordering compares the name's class alone, so it reads no file and pays no stat.
+    // Kind ordering compares the Kind the row shows. The name alone decides it, except that a file
+    // nothing names is a Program when it is executable, which only its stat can say.
     if (order.by === "kind" || order.groupByKind)
-      for (const row of this.rows) row.group ??= describeKind(row.trash ? basename(row.trash.original || row.name) : row.name, row.dir, 0, undefined).group;
+      for (const row of this.rows) {
+        if (row.kind !== undefined) continue;
+        const name = row.trash ? basename(row.trash.original || row.name) : row.name;
+        let described = describeKind(name, row.dir, 0, undefined);
+        if (described.group === "file" && !row.trash) {
+          this.stat(row);
+          if (row.st) described = describeKind(name, row.dir, row.st.mode, undefined);
+        }
+        row.group = described.group;
+        row.kind = described.kind;
+      }
     const sorting = performance.now();
     sortRows(this.rows, order);
     return [sorting - started, performance.now() - sorting];

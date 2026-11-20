@@ -14,6 +14,8 @@ test('Trash root aliases canonicalize only at the address input boundary',()=>{
  expect(PathBar.addressTarget('/tmp','trash:///','/home/test')).toBe('/tmp');
  expect(PathBar.addressTarget('~','trash:///','/home/test')).toBe('/home/test');
  expect(PathBar.addressTarget('tmp','trash:///','/home/test')).toBe('/tmp');
+ expect(PathBar.addressTarget('tmp','/','/home/test')).toBe('/tmp');
+ expect(PathBar.addressTarget('tmp','//server/share/','/home/test')).toBe('//server/share/tmp');
 });
 test('Trash root remains a single breadcrumb and does not gain a fourth slash',()=>{
  expect(PathBar.editLine('trash:///')).toBe('trash:///');

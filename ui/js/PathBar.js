@@ -119,7 +119,7 @@ function resolve(text, current, home) {
         body = home + body.substring(1)
     } else if (body.charAt(0) !== "/" && !/^[A-Za-z]:[\\/]/.test(body) && !/^\\\\/.test(body)) {
         // Relative to where the pane is, so "Downloads" and Enter is a directory down.
-        body = current + "/" + body
+        body = current + (current.endsWith("/") ? "" : "/") + body
     }
     return normalize(body)
 }

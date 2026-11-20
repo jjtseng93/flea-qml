@@ -93,6 +93,14 @@ function isExecutable(mode) {
 
 // Shared by Row.qml's iconSource and PreviewMedia.qml's player source: encodeURI leaves # and ?
 // literal, which Qt then reads as a URL fragment or query rather than path bytes.
+// A thumbed line's file: src/thumbs.js answers a data: URL it keeps only in memory; a
+// thumbnailer's cache PNG (upstream's backend, FLEA_BIN) is a path.
+// Sample input: ("data:image/webp;base64,UklG") answers it unchanged.
+function thumbUri(file) {
+    file = String(file)
+    return /^data:image\//.test(file) ? file : fileUri(file)
+}
+
 function fileUri(path) {
     path = String(path)
     // Only Windows paths use backslashes as separators; POSIX filenames may contain them.

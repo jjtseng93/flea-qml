@@ -13,6 +13,7 @@ import { renderDiagram } from "./figure.js";
 import { clipClear, clipGet, clipSet, clipWatch } from "./clip.js";
 import { clipHostReply } from "./clip-host.js";
 import { dirsize, dirsizeCancel, dirsizeInit, forgetSizes } from "./dirsize.js";
+import { thumb, thumbCancel, thumbsInit } from "./thumbs.js";
 import { collisions, mergeCollisions, sources, transfer, transferCancel } from "./transfer.js";
 import { menuaction, capturedPaths } from "./menu.js";
 import {renameWithTrashRecord} from './trash-record.js';
@@ -326,6 +327,8 @@ const handlers = {
   mergecollisions: (request) => mergeCollisions(request, send, listing, stamp),
   dirsize,
   dirsizecancel: dirsizeCancel,
+  thumb,
+  thumbcancel: thumbCancel,
   transfer: (request) => transfer(request, send, listing, stamp),
   // One id space for both: an archive job's id is never a transfer's.
   transfercancel: (request) => archiveCancel(request.id) || transferCancel(request),
@@ -345,6 +348,7 @@ const handlers = {
 export function runBackend() {
   onChanged(send);
   dirsizeInit(send, () => listing);
+  thumbsInit(send, () => ({ listing, stamp }));
   // The command the interface runs for Find, which it spawns and reads itself; null when none exists.
   send({ t: "findcommand", argv: findCommand(), grep: grepCommand() });
   // The sidebar's Trash count, sent when it changes; upstream's UI ran `gio monitor` for it.

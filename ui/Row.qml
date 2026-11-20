@@ -376,7 +376,8 @@ Item {
         if (!root.row || root.thumb.length === 0) {
             return ""
         }
-        // A regenerated thumbnail keeps its path, so the source mtime is the only thing that moves Qt's cache key.
+        // A data: URL is its own key; a regenerated cache PNG keeps its path, so the source mtime moves Qt's cache key.
+        if (/^data:/.test(root.thumb)) return root.thumb
         return Format.fileUri(root.thumb) + "?m=" + root.row.m
     }
 

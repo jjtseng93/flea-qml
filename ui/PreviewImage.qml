@@ -107,7 +107,7 @@ Item {
         height: root.fallbackShown ? implicitHeight * ownFit : root.interimHeight
         // Only while the decode runs: a final with transparent pixels would show it through.
         visible: root.interimVisible && root.status === "loading" || root.fallbackShown
-        source: root.interimThumb.length > 0 ? Format.fileUri(root.interimThumb) : ""
+        source: root.interimThumb.length > 0 ? Format.thumbUri(root.interimThumb) : ""
         fillMode: Image.Stretch
         // A cache thumbnail decodes on the GUI thread in about a millisecond: the reader cannot drop a running decode.
         asynchronous: false

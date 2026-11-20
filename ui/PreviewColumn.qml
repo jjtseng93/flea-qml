@@ -510,7 +510,7 @@ Item {
     function frameSource() {
         if (!root.visible) return ""
         if (root.thumb.length > 0)
-            return Format.fileUri(root.thumb)
+            return Format.thumbUri(root.thumb)
         if (!root.manualHold && root.noThumbComing && root.previewState === Facts.IMAGE && root.path.length > 0 && !root.originalRefused)
             return Format.fileUri(root.path)
         return ""

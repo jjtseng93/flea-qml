@@ -142,7 +142,7 @@ Item {
             asynchronous: true
             // No cache by URL: a regenerated thumbnail keeps its path, and a cached decode would keep the old pixels.
             cache: false
-            source: root.thumb.length > 0 ? Format.fileUri(root.thumb) : ""
+            source: root.thumb.length > 0 ? Format.thumbUri(root.thumb) : ""
         }
 
         Flea.Glyph {

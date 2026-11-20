@@ -5,9 +5,11 @@ import { join, basename } from "node:path";
 import { describeKind } from "./kinds.js";
 import { NEEDS_STAT, sortRows } from "./order.js";
 import { keptSize } from "./dirsize.js";
+import { THUMB_NAME } from "./thumbs.js";
 
 const S_IFMT = 0o170000,
-  S_IFLNK = 0o120000;
+  S_IFLNK = 0o120000,
+  S_IFREG = 0o100000;
 
 export class Listing {
   constructor(path, rows) {
@@ -91,7 +93,9 @@ export class Listing {
       m: st ? Math.floor(st.mtimeMs / 1000) : 0,
       p: mode,
       i: icon,
-      t: false,
+      // A picture src/thumbs.js can draw: a regular file, or a link to one.
+      t: !row.dir && THUMB_NAME.test(row.trash ? row.trash.original || row.name : row.name)
+        && ((mode & S_IFMT) === S_IFREG || (target?.isFile?.() ?? false)),
       k: kindIndex.get(kind),
     };
     if (row.trash) out.trash = {name: basename(row.trash.original || row.name), original: row.trash.original, deleted: row.trash.deleted, identity: row.trash.identity};

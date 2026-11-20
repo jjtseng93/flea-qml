@@ -108,7 +108,23 @@ Item {
     property bool forHeader: false
     function openForHeader(scenePoint) {
         root.forHeader = true
+        root.forSort = false
         root.place(scenePoint)
+    }
+    // flea-qml: the Grid's Sort button, a fourth face: one Sort by row with its flyout already
+    // open (ui/js/Menu.js sortMenuEntries), so each order's two directions are one press away.
+    property bool forSort: false
+    // The listing's order, so the flyout ticks the row that is in force.
+    property string sortBy: ""
+    property bool sortDesc: false
+    function openForSort(scenePoint) {
+        root.clearRail()
+        root.forHeader = false
+        root.forSort = true
+        root.hasRow = false
+        root.place(scenePoint)
+        root.openSubmenu(0)
+        root.submenuCursor = 0
     }
 
     // The pane keeps its Keys handler on the list, so the menu has to hand focus back on close.
@@ -184,6 +200,8 @@ Item {
             return root.railEntries
         if (root.forHeader)
             return Menu.headerEntries(ViewState.hiddenCols, root.showHidden)
+        if (root.forSort)
+            return Menu.sortMenuEntries({ hasFolderSort: root.hasFolderSort, sortBy: root.sortBy, sortDesc: root.sortDesc })
         // Locked rows address the denied folder rather than its covered parent.
         if (root.forLocked)
             return LockedMenu.lockedEntries({ lockedMode: root.lockedMode, hiddenActions: ViewState.menuHidden })
@@ -243,6 +261,7 @@ Item {
     function openAt(scenePoint) {
         root.clearRail()
         root.forHeader = false
+        root.forSort = false
         root.hasRow = true
         root.place(scenePoint)
     }
@@ -255,6 +274,7 @@ Item {
         }
         root.clearRail()
         root.forHeader = false
+        root.forSort = false
         root.hasRow = false
         root.place(scenePoint)
     }
@@ -268,6 +288,7 @@ Item {
         if (refusal.length > 0) { root.close(); root.refused(refusal); return }
         root.clearRail()
         root.forHeader = false
+        root.forSort = false
         root.hasRow = false
         root.lockedPath = path
         root.lockedMode = mode
@@ -281,6 +302,7 @@ Item {
             return
         root.railKey = key
         root.railEntries = entries
+        root.forSort = false
         root.place(scenePoint)
     }
 
@@ -728,6 +750,12 @@ Item {
                         if (leaves[l].separator === true) continue
                         if (leaves[l].id === action) { root.chooseSub(leaves[l].id); return }
                     }
+                }
+                // flea-qml: n s t x pick an order ascending and N S T X descending, by the typed letter.
+                if (opener && opener.action === "sort" && event.text.length === 1) {
+                    var orders = root.submenuEntries
+                    for (var o = 0; o < orders.length; o++)
+                        if (orders[o].keyHint === event.text) { root.chooseSub(orders[o].id); return }
                 }
                 // 1 to 7 toggle the Tags flyout row that carries the digit, like a click.
                 if (opener && opener.action === "tags" && /^tag[1-7]$/.test(action)) { root.chooseSub(root.submenuEntries[Number(action.charAt(3)) - 1].id); return }

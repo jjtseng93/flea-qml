@@ -38,7 +38,8 @@ Item {
     signal upRequested()
     signal searchRequested()
     signal filterRequested()
-    signal sortRequested()
+    // at: the scene point under the Grid's Sort button, where its menu opens.
+    signal sortRequested(var at)
     signal viewChosen(string mode)
     // The path bar's four. ui/shell.qml navigates, hands the keyboard back, runs the peek behind Tab
     // and carries what the bar says to the status line, because this file draws the chrome and knows
@@ -308,6 +309,7 @@ Item {
         }
 
         Flea.ChromeButton {
+            id: sortButton
             inputLive: root.inputLive
             ruleRows: Theme.spacing.hairline
             visible: root.viewMode === "grid"
@@ -315,7 +317,7 @@ Item {
             glyph: "sort"
             keyboardFocused: root.stopFocused && root.focusedGlyph === glyph
             accessName: "Sort"
-            onActivated: root.sortRequested()
+            onActivated: root.sortRequested(sortButton.mapToItem(null, 0, sortButton.height))
         }
 
         Flea.ChromeModes {

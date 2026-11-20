@@ -73,6 +73,12 @@ function next(pane) {
     resort(pane, order.key, order.desc)
 }
 
+// The Sort by flyout's row: one order in one direction, as the row says.
+function choose(pane, key, desc) {
+    if (ORDERS.indexOf(key) < 0) return
+    resort(pane, key, desc === true)
+}
+
 // S: the capital-is-the-variant pair g/G and j/J use.
 function reverse(pane) {
     var order = reverseOrder(pane.backend.sortBy, pane.backend.sortDesc)

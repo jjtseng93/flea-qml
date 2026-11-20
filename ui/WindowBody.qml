@@ -207,7 +207,7 @@ Rectangle {
         searchOn: view.currentPane.searchMode.length > 0
         onSearchRequested: view.currentPane.toggleFind()
         onFilterRequested: view.currentPane.toggleFilter()
-        onSortRequested: view.currentPane.act("sortNext")
+        onSortRequested: function (at) { view.currentPane.openSortMenu(at) }
         // The primary pane is the one the window keeps after Dual, so every view choice, the secondary pane's keys included, lands there.
         onViewChosen: function (mode) { primaryPane.chooseView(mode) }
         // The path bar's four. The primaryPane navigates and answers for the keyboard exactly as it

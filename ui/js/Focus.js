@@ -289,7 +289,10 @@ function act(action, root, menuId, paths) {
     // The background menu's Sort by flyout, routed to the header click's own function so an aimed
     // click and an aimed menu row cannot come to mean different things.
     if (action.indexOf("sort:") === 0) {
-        Sort.column(root, action.substring("sort:".length))
+        // "sort:size:desc" names its direction; a bare key (and the forget row) stays the header click.
+        var sortId = action.substring("sort:".length), at = sortId.lastIndexOf(":")
+        if (at > 0) Sort.choose(root, sortId.substring(0, at), sortId.substring(at + 1) === "desc")
+        else Sort.column(root, sortId)
         return
     }
     // Tabs run here and handleKey opens the path bar, so neither answers unbuilt any more.

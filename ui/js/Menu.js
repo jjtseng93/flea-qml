@@ -264,7 +264,7 @@ function availableEntry(e, p, kind) {
         if (e.action === "dropbox") { e.mark = "dropbox"; delete e.glyph }
         if (e.disabled && p.dropboxRefreshing !== true) e.errored = true
     }
-    if (e.action === "sort") e.submenu = sortEntries(p.hasFolderSort === true)
+    if (e.action === "sort") e.submenu = sortEntries(p.hasFolderSort === true, p.sortBy, p.sortDesc === true)
     if (e.action === "toggleHidden") {
         var hidden = hiddenRow(p.showHidden)
         e.label = hidden.label
@@ -417,15 +417,38 @@ function loneChoice(action, id, forRail, forHeader, hasRow, openedIdentity, sele
 
 // The Sort by flyout, built from ui/js/Sort.js's own ORDERS so it can only ever offer an order the
 // backend really produces; a fourth key would earn a refusal instead of a listing.
-var SORT_LABELS = { name: "Name", size: "Size", mtime: "Modified", kind: "Kind" }
+var SORT_LABELS = { name: "Name", size: "Size", mtime: "Time modified", kind: "Kind (extension)" }
+// flea-qml: every order offers both directions. The letter picks it ascending and the same letter
+// upper case descending: n name, s size, t time modified, x kind (extension). Each letter is in its
+// label, so it is the one drawn bold.
+var SORT_DIRECTIONS = { name: ["A to Z", "Z to A"], size: ["smallest first", "largest first"],
+    mtime: ["oldest first", "newest first"], kind: ["A to Z", "Z to A"] }
+var SORT_LETTERS = { name: "n", size: "s", mtime: "t", kind: "x" }
 
-function sortEntries(hasOwn) {
+// Sample input: sortEntries(false, "size", true) answers eight rows, "name:asc" first, the
+// "size:desc" row ticked; its letters are n N s S t T x X.
+function sortEntries(hasOwn, by, desc) {
     var out = []
-    for (var i = 0; i < Sort.ORDERS.length; i++)
-        out.push({ id: Sort.ORDERS[i], label: SORT_LABELS[Sort.ORDERS[i]] })
+    for (var i = 0; i < Sort.ORDERS.length; i++) {
+        var key = Sort.ORDERS[i]
+        for (var d = 0; d < 2; d++) {
+            var label = SORT_LABELS[key]
+            var row = { id: key + (d ? ":desc" : ":asc"), label: label + ", " + SORT_DIRECTIONS[key][d],
+                keyHint: d ? SORT_LETTERS[key].toUpperCase() : SORT_LETTERS[key],
+                // The bold letter is the order's own, as its name spells it, whichever case the key is.
+                mark: label.charAt(label.toLowerCase().indexOf(SORT_LETTERS[key])) }
+            if (key === by && (d === 1) === (desc === true)) row.glyph = "check"
+            out.push(row)
+        }
+    }
     // The id is the spelling ui/js/Sort.js's forget branch reads, so the two must agree.
     if (hasOwn === true) { out.push({ separator: true }); out.push({ id: "__default__", label: "Use the default sort" }) }
     return out
+}
+
+// The Grid's Sort button opens a menu of this one row, its flyout already open (ui/ContextMenu.qml openForSort).
+function sortMenuEntries(p) {
+    return [{ action: "sort", label: "Sort by", glyph: "sort", submenu: sortEntries(p.hasFolderSort === true, p.sortBy, p.sortDesc === true) }]
 }
 
 // The one mark every row of an open flyout draws, keyed on the row that opened it: a Taildrop peer

@@ -534,6 +534,8 @@ FocusScope {
 
     function applyPendingSelect() { Nav.applyPendingSelect(root); Nav.applyPendingBackground(root) }
     function openBackgroundMenu(at) { menu.openBackground(at) }
+    // flea-qml: the Grid's Sort button; at is the scene point under the button, where its menu hangs.
+    function openSortMenu(at) { menu.openForSort(at) }
     // flea-qml: measure folders only when the user asks; see src/dirsize.js and ui/js/DirSizes.js.
     function measureDirs(rows) {
         var dirs = rows.filter(function (i) { var r = root.rowFor(i); return r && r.d })
@@ -1213,6 +1215,9 @@ FocusScope {
         storageClass: root.storageClass
         // Issue 179: the Sort by flyout offers its forget row only where this folder has its own sort.
         hasFolderSort: root.menuValuesLive && root.searchMode.length === 0 && root.backend ? root.backend.folderHasSort(root.path) : false
+        // The Sort by flyout ticks the order in force.
+        sortBy: root.backend ? root.backend.sortBy : ""
+        sortDesc: root.backend ? root.backend.sortDesc === true : false
         // The Locked tile's folder and mode while one is drawn; ui/ContextMenu.qml routes a
         // background right click to that folder's own menu through them.
         tileTarget: root.lockedTarget

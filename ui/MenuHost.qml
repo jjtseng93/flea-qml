@@ -64,6 +64,8 @@ Item {
     property var tagSubmenu: null
     property string storageClass: ""
     property bool hasFolderSort: false
+    property string sortBy: ""
+    property bool sortDesc: false
     property string tileTarget: ""
     property int tileMode: 0
     property rect workArea: Qt.rect(0, 0, root.width, root.height)
@@ -71,6 +73,7 @@ Item {
     property bool preparing: false
     property bool hasRow: true
     property bool forHeader: false
+    property bool forSort: false
     property string openedIdentity: ""
     property string lockedPath: ""
     property int lockedMode: 0
@@ -101,11 +104,11 @@ Item {
         "rowIsSymlink", "rowHasShebang", "selectionModes", "compareKinds", "dropboxInstalled",
         "localSend", "dropboxPath", "dropboxReason", "dropboxCode",
         "rowInDropbox", "canTrash", "dirWritable", "canLink",
-        "tagSubmenu", "storageClass", "hasFolderSort", "tileTarget",
+        "tagSubmenu", "storageClass", "hasFolderSort", "sortBy", "sortDesc", "tileTarget",
         "tileMode", "workArea"
     ]
     readonly property var stateNames: [
-        "opened", "preparing", "hasRow", "forHeader",
+        "opened", "preparing", "hasRow", "forHeader", "forSort",
         "openedIdentity", "lockedPath", "lockedMode", "railEntries",
         "railKey", "focusHolder", "cursor", "openSubmenuRow",
         "submenuCursor", "loneFlyoutAction", "lastProviderAnswer"
@@ -215,6 +218,7 @@ Item {
     function openBackground(point) { root.ensure().openBackground(point) }
     function openLocked(path, mode, point) { root.ensure().openLocked(path, mode, point) }
     function openForHeader(point) { root.ensure().openForHeader(point) }
+    function openForSort(point) { root.ensure().openForSort(point) }
     function openForRail(key, rows, point) { if (rows && rows.length) root.ensure().openForRail(key, rows, point) }
     function openSubmenu(index) { if (root.item) root.item.openSubmenu(index) }
     function openSubmenuFor(action) { return root.ensure().openSubmenuFor(action) }

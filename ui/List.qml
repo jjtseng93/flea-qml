@@ -84,6 +84,8 @@ ListView {
     contentWidth: root.listWide ? Math.max(root.width, root.rowWidth + Theme.spacing.rowPaddingX) : root.width
     flickableDirection: root.listWide && root.rowWidth + Theme.spacing.rowPaddingX > root.width ? Flickable.HorizontalAndVerticalFlick : Flickable.VerticalFlick
     onListWideChanged: if (!root.listWide) root.contentX = 0
+    // Shift+Left and Shift+Right move this far sideways (ui/js/Focus.js sideways): eight characters.
+    readonly property real sidewaysStep: 8 * Theme.glyphAdvance
     cacheBuffer: Theme.fileRowHeight * pane.cacheRows
     boundsBehavior: Flickable.StopAtBounds
     highlightMoveDuration: 0

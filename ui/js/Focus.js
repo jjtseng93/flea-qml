@@ -440,6 +440,7 @@ function handleKey(event, root, sidebar, field) {
         RailKeys.act(action, root, sidebar, event)
         return true
     }
+    if (sideways(event, root)) return true
     // An armed pair keeps Escape to cancel the arm instead of climbing.
     if (action === "escape" && escapeCancelsArm) {
         root.trashArmedAt = 0
@@ -463,6 +464,30 @@ function handleKey(event, root, sidebar, field) {
         return true
     }
     return false
+}
+
+// flea-qml: a plain listing wider than the view scrolls sideways with Shift and the keys that move
+// the cursor: Left and Right a step (ui/List.qml sidewaysStep), PageUp and PageDown a view, Home and
+// End to either edge. Elsewhere, or with no wider listing, the keys keep whatever they meant.
+function sideways(event, root) {
+    // Read inside, since a suite loads this file with no Qt global.
+    if (typeof Qt === "undefined") return false
+    var keys = [Qt.Key_Left, Qt.Key_Right, Qt.Key_PageUp, Qt.Key_PageDown, Qt.Key_Home, Qt.Key_End]
+    if ((event.modifiers & ~Qt.KeypadModifier) !== Qt.ShiftModifier || keys.indexOf(event.key) < 0)
+        return false
+    var list = root.viewMode === "list" ? root.listArea : null
+    if (!list || list.listWide !== true)
+        return false
+    var end = Math.max(0, list.contentWidth - list.width)
+    var at = list.contentX
+    if (event.key === Qt.Key_Left) at -= list.sidewaysStep
+    else if (event.key === Qt.Key_Right) at += list.sidewaysStep
+    else if (event.key === Qt.Key_PageUp) at -= list.width
+    else if (event.key === Qt.Key_PageDown) at += list.width
+    else if (event.key === Qt.Key_Home) at = 0
+    else at = end
+    list.contentX = Math.max(0, Math.min(end, at))
+    return true
 }
 
 // Keys and query actions share the window's dispatcher before reaching pane actions.

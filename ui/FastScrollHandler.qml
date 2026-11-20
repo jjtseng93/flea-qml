@@ -363,6 +363,8 @@ MouseArea {
             }
             var down = Scroll.touchDistance(wheel.pixelDelta.y)
             var across = Scroll.touchDistance(wheel.pixelDelta.x)
+            // flea-qml: Shift turns a vertical stroke sideways where the view scrolls sideways.
+            if ((wheel.modifiers & Qt.ShiftModifier) && across === 0 && root.scrollsX()) { across = down; down = 0 }
             // A dead axis takes no delta, so samples and overscroll never name it.
             if (!root.scrollsY())
                 down = 0
@@ -413,6 +415,8 @@ MouseArea {
             root.stopReturn(true)
         var notchDown = root.scrollDistance(wheel.pixelDelta.y, wheel.angleDelta.y)
         var notchAcross = root.scrollDistance(wheel.pixelDelta.x, wheel.angleDelta.x)
+        // flea-qml: Shift turns the wheel sideways where the view scrolls sideways, as most desktops do.
+        if ((wheel.modifiers & Qt.ShiftModifier) && notchAcross === 0 && root.scrollsX()) { notchAcross = notchDown; notchDown = 0 }
         if ((notchDown === 0 && notchAcross === 0) || !root.flickable.interactive) {
             wheel.accepted = false
             return false

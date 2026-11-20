@@ -969,6 +969,10 @@ FocusScope {
         dualMode: root.dualMode
         recent: root.recentMode.length > 0
         hiddenCols: root.dualMode ? ["mode", "kind"].concat(ViewState.hiddenCols) : ViewState.hiddenCols
+        // flea-qml: a plain listing's titles scroll sideways with its rows; the search strip stays put.
+        laneWidth: root.viewMode === "list" && list.listWide ? list.rowWidth : 0
+        scrollX: root.viewMode === "list" && list.listWide ? list.contentX : 0
+        assignedCols: root.viewMode === "list" && list.listWide ? list.listCols : null
         onSortRequested: function (key) { Sort.column(root, key) }
         onMenuRequested: function (pos) { menu.openForHeader(pos) }
         searchMode: root.searchMode

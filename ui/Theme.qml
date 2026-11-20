@@ -117,8 +117,8 @@ Singleton {
         readonly property int trashDate: Math.ceil(root.dateChars * bodyGlyphMetrics.advanceWidth)
         // The send picker's own, anchored the way kind below it is rather than counted in characters.
         readonly property int pickerDate: Math.round(root.pickerDateBaseWidth * root.font.bodySmall / root.pickerDateBaseBodySmall)
-        // Kind text varies too much for a character count, so its base is a pixel width scaled by the same ratio bodySmall already is.
-        readonly property int kind: root.storedWidth("kind", Math.round(root.kindBaseWidth * root.font.bodySmall / 12))
+        // flea-qml: Kind is counted in characters like the others now that every Kind is "Category EXT" (kindChars).
+        readonly property int kind: root.storedWidth("kind", Math.round(root.kindChars * glyphMetrics.advanceWidth))
         readonly property int location: 150 // Sidebar040's fixed Recent column, shared by Header and Row.
         // Not a column: the floor under the name, which the four above drop one by one to protect.
         readonly property int nameMin: Math.round(root.nameMinChars * glyphMetrics.advanceWidth)
@@ -187,17 +187,23 @@ Singleton {
     readonly property real searchNameShare: 0.66
     // An accent edge is 2px along a tall side and 3px flush along a short one, measured in Quickshell.
     readonly property int accentEdge: 3
-    // "rwxrwxrwx", Format.permissions is always exactly this wide.
-    readonly property int modeChars: 9
-    // "1000.0 kB": the SI ladder's tier-boundary rounding is one char wider than "999.9 kB".
-    readonly property int sizeChars: 9
-    // "2026-09-12 15:29", the one form Format.date prints.
-    readonly property int dateChars: 16
+    // flea-qml: each width is the wider of its title, sort mark included, and its widest cell, in the
+    // cells Bun.stringWidth counts (a CJK character or ⚖️ is two, ▴ and ▾ one).
+    // Mode: "權限 Mode ▴" 11 over "rwxrwxrwx" 9.
+    readonly property int modeChars: 11
+    // Size: ⚖️, a space and "大小 Size ▴" 14 over a measured folder's "⚖️ >1000.0 kB" 13.
+    readonly property int sizeChars: 14
+    // Modified: "更新日時 Modified ▴" 19 over "2026-09-12 15:29" 16, the one form Format.date prints.
+    readonly property int dateChars: 19
+    // Kind: "Presentation PPTX" 17, the widest Kind src/kinds.js names, over "種類 Kind ▴" 11.
+    readonly property int kindChars: 17
+    // The list's Name column is as wide as the folder's longest name, in cells, within these; 11
+    // holds its title "名稱 Name ▴" whole.
+    readonly property int nameListMinChars: 11
+    readonly property int nameListMaxChars: 32
     // SendPicker.html draws the chooser's date in an 80px slot, on a board whose base size is 14 and whose bodySmall is therefore 13.
     readonly property int pickerDateBaseWidth: 80
     readonly property int pickerDateBaseBodySmall: 13
-    // 120px at the OEM's base font size of 12, the Kind column's own anchor, see column.kind above.
-    readonly property int kindBaseWidth: 120
     // The name's floor, in the character unit the fixed columns are already written in. Twenty
     // characters holds 84.5% of a 25,473-name sample of /usr/bin, /usr/include,
     // /usr/share/applications and this repo whole, and every further two buys under five points.

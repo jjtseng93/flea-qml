@@ -8,7 +8,9 @@ var state = {
   "columns": [
     "name",
     "size",
-    "date"
+    "date",
+    "kind",
+    "mode"
   ],
   "columnsLimit": 3,
   "columnWidths": {},

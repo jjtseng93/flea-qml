@@ -28,6 +28,16 @@ export class Listing {
     return new Listing(path, rows);
   }
 
+  /** The terminal cells the longest shown name takes (Bun.stringWidth: a CJK character is two), for the list's Name width. */
+  nameCells() {
+    let widest = 0;
+    for (const row of this.rows) {
+      const cells = Bun.stringWidth(row.trash ? basename(row.trash.original || row.name) : row.name);
+      if (cells > widest) widest = cells;
+    }
+    return widest;
+  }
+
   /** Reorders the rows, returning [read, sort] in milliseconds as `listed` reports them. */
   sort(order) {
     const started = performance.now();

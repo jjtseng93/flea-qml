@@ -206,7 +206,7 @@ Item {
         // The label slot on whole pixels: a dual pane's width and mark slot are fractional, and the frame is a hairline.
         x: Math.round(icon.x + icon.width) + Theme.spacing.gap
         y: Math.round((root.height - renameLoader.height) / 2)
-        width: Math.round(mode.x - (root.modeShown ? Theme.spacing.gap : 0)) - x
+        width: Math.round(size.x - (root.sizeShown && !root.dualMode ? Theme.spacing.gap : 0)) - x
         sourceComponent: Flea.RenameField {
             height: implicitHeight
             pane: root.renamePane
@@ -223,8 +223,9 @@ Item {
         visible: !root.locating && !root.renaming
         anchors.left: icon.right
         anchors.leftMargin: Theme.spacing.gap
-        anchors.right: mode.left
-        anchors.rightMargin: (root.modeShown ? Theme.spacing.gap : 0) + (root.clipMark.length > 0 ? Theme.spacing.gap + root.clipPx : 0) + (root.dropTarget ? root.dropExtra() : 0)
+        // flea-qml: the columns follow in the order Name, Size, Modified, Kind, Mode.
+        anchors.right: size.left
+        anchors.rightMargin: (root.sizeShown && !root.dualMode ? Theme.spacing.gap : 0) + (root.clipMark.length > 0 ? Theme.spacing.gap + root.clipPx : 0) + (root.dropTarget ? root.dropExtra() : 0)
         anchors.verticalCenter: parent.verticalCenter
         text: root.elidedName
         // Hidden while the row locates, or may at its next key, so it builds no mark beside the drawn one; a filter's own run still draws.
@@ -286,8 +287,8 @@ Item {
     // The four metadata cells bind straight to the row; a hidden column holds no text, because a laid-out Text costs memory drawn or not.
     Text {
         id: mode
-        anchors.right: size.left
-        anchors.rightMargin: (root.row && root.row.shown ? Theme.tagSlotWidth + Theme.spacing.gap : 0) + (root.sizeShown && !root.dualMode ? Theme.spacing.gap : 0)
+        anchors.right: parent.right
+        anchors.rightMargin: (root.row && root.row.shown ? Theme.tagSlotWidth + Theme.spacing.gap : 0) + Theme.spacing.rowPaddingX
         anchors.verticalCenter: parent.verticalCenter
         visible: root.modeShown && !root.dropTarget
         width: root.modeShown ? Theme.column.mode : 0
@@ -339,8 +340,8 @@ Item {
     }
     Text {
         id: kind
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing.rowPaddingX
+        anchors.right: mode.left
+        anchors.rightMargin: root.modeShown ? Theme.spacing.gap : 0
         anchors.verticalCenter: parent.verticalCenter
         visible: root.kindShown && !root.dropTarget
         width: root.kindShown ? Theme.column.kind : 0

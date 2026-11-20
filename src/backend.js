@@ -60,7 +60,7 @@ const orderFrom = (request, previous) => ({
   hiddenLast: request.hiddenLast ?? previous.hiddenLast,
 });
 const listed = (read, sorted, extra = {}) =>
-  send({ t: "listed", n: listing.rows.length, read, sort: sorted, ...directoryFacts(listing.path), path: listing.path, ...extra });
+  send({ t: "listed", n: listing.rows.length, nc: listing.nameCells(), read, sort: sorted, ...directoryFacts(listing.path), path: listing.path, ...extra });
 const rows = (start, count, extra = {}) => send({ t: "rows", ...listing.window(start, count), listing: stamp, ...extra });
 // A request's `gen` rides back on its listed and rows lines, so a Find answer lands on its own query.
 const genOf = (request) => (Number.isSafeInteger(request.gen) && request.gen > 0 ? { gen: request.gen } : {});

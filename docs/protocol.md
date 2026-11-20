@@ -2202,11 +2202,12 @@ These are requested replies; `changed` remains the only unsolicited notification
 
 ### listed
 
-`{"t":"listed","n":<uint>,"read":<float>,"sort":<float>,"v":<uint>,"w":<bool>,"path":<string>}`
+`{"t":"listed","n":<uint>,"nc":<uint>,"read":<float>,"sort":<float>,"v":<uint>,"w":<bool>,"path":<string>}`
 
-Example: `{"t":"listed","n":100000,"read":26.400,"sort":2.500,"v":56,"w":true,"path":"/home/gm"}`
+Example: `{"t":"listed","n":100000,"nc":38,"read":26.400,"sort":2.500,"v":56,"w":true,"path":"/home/gm"}`
 
-`n` is the row count. `read` and `sort` are milliseconds, formatted to three decimal
+`n` is the row count. flea-qml: `nc` is the longest row name in terminal cells (a CJK character is
+two), which the list view sizes its Name column from. `read` and `sort` are milliseconds, formatted to three decimal
 places (`{:.3}`). Sent after a successful `list` and after a successful `sort`. `read` is
 the scan plus any requested metadata pass after `list`, the metadata pass after a
 `sort` by `size` or `mtime` (including its `date` alias), and `0.0` after a `sort` by

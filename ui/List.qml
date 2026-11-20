@@ -28,8 +28,10 @@ ListView {
         adopt: function (cell) { cell.live = true; cell.visible = true; cursorMark.place(cell) }
     }
 
-    // Shared once, read plainly per row, so no delegate builds its own width or array.
-    property real rowWidth: Scroll.contentWidth(root.width, Theme.spacing.rowPaddingX)
+    // Shared once, read plainly per row, so no delegate builds its own width or array. A plain listing
+    // (listWide) is as wide as its columns and scrolls sideways past the view; Dual, Recent and a
+    // search keep the lane-wide row that drops columns to fit.
+    property real rowWidth: root.listWide ? root.wideRowWidth : Scroll.contentWidth(root.width, Theme.spacing.rowPaddingX)
     // Dual mode hides mode and kind on top of the stored set; one array, never one per row.
     property var rowHiddenCols: root.pane && root.pane.dualMode ? ["mode", "kind"].concat(ViewState.hiddenCols) : ViewState.hiddenCols
     // Shared name budgets remove the per-row floor; Row keeps its local default for PickerList and drop targets.
@@ -38,7 +40,18 @@ ListView {
     readonly property real listSizeWidth: root.listDual ? Theme.dualColumn.size : Theme.column.size
     readonly property real listDateWidth: root.listDual ? Theme.dualColumn.date : Theme.column.date
     // The same set Row.cols resolves, from the same width and hidden array, so the two cannot drift.
-    readonly property var listCols: root.pane && root.pane.recentMode.length > 0 ? Theme.columns(root.rowWidth, root.rowHiddenCols, root.listDateWidth, true, root.listDual) : root.listDual ? Theme.dualColumns(root.rowWidth, root.rowHiddenCols) : Theme.columns(root.rowWidth, root.rowHiddenCols, root.listDateWidth)
+    // flea-qml: every column the user shows stays, in the order Name, Size, Modified, Kind, Mode, and
+    // Name is the folder's longest name in cells within Theme.nameListMinChars..nameListMaxChars.
+    // A search keeps it until results answer, since the rows are still the folder's while the query is typed.
+    readonly property bool listWide: !root.listDual && !!root.pane && root.pane.recentMode.length === 0
+        && (root.pane.searchMode.length === 0 || root.pane.swap.answeredQuery.length === 0)
+    readonly property real nameWidth: Math.round(Math.min(Theme.nameListMaxChars, Math.max(Theme.nameListMinChars,
+        root.pane && root.pane.backend ? root.pane.backend.nameCells : 0)) * Theme.bodyAdvance)
+    readonly property real wideRowWidth: 2 * Theme.spacing.rowPaddingX + root.listMarkSlot + Theme.spacing.gap + root.nameWidth
+        + (root.listSizeShown ? Theme.spacing.gap + root.listSizeWidth : 0) + (root.listDateShown ? Theme.spacing.gap + root.listDateWidth : 0)
+        + (root.listModeShown ? Theme.spacing.gap + Theme.column.mode : 0) + (root.listKindShown ? Theme.spacing.gap + Theme.column.kind : 0)
+    readonly property var listCols: root.listWide ? Theme.columns(Number.MAX_SAFE_INTEGER, root.rowHiddenCols, root.listDateWidth)
+        : root.pane && root.pane.recentMode.length > 0 ? Theme.columns(root.rowWidth, root.rowHiddenCols, root.listDateWidth, true, root.listDual) : root.listDual ? Theme.dualColumns(root.rowWidth, root.rowHiddenCols) : Theme.columns(root.rowWidth, root.rowHiddenCols, root.listDateWidth)
     readonly property bool listModeShown: root.listCols ? !!root.listCols.mode : false
     readonly property bool listSizeShown: root.listCols ? !!root.listCols.size : false
     readonly property bool listDateShown: root.listCols ? !!root.listCols.date : false
@@ -67,6 +80,10 @@ ListView {
     model: Flea.StableModel { id: stable; view: root; total: (root.visible || root.renameHeld) ? root.pane.shownTotal : 0
                               warm: root.visible && root.pane.searchMode.length > 0 && root.pane.swap.searchWarm === true; warmRows: Math.floor((root.height + root.cacheBuffer) / Theme.fileRowHeight) + 1 }
     clip: true
+    // Sideways only when the columns are wider than the view; the lane stays clear of the vertical bar.
+    contentWidth: root.listWide ? Math.max(root.width, root.rowWidth + Theme.spacing.rowPaddingX) : root.width
+    flickableDirection: root.listWide && root.rowWidth + Theme.spacing.rowPaddingX > root.width ? Flickable.HorizontalAndVerticalFlick : Flickable.VerticalFlick
+    onListWideChanged: if (!root.listWide) root.contentX = 0
     cacheBuffer: Theme.fileRowHeight * pane.cacheRows
     boundsBehavior: Flickable.StopAtBounds
     highlightMoveDuration: 0
@@ -86,6 +103,15 @@ ListView {
         parent: root
         anchors { top: parent.top; right: parent.right }
         flickable: root
+    }
+    // flea-qml: the columns past the view's right edge, reached by this bar or a sideways wheel.
+    Flea.ViewportScrollBar {
+        id: horizontalScroll
+        parent: root
+        orientation: Qt.Horizontal
+        anchors { left: parent.left; bottom: parent.bottom }
+        flickable: root
+        visible: root.listWide
     }
 
     Flea.SelectionBand {
@@ -123,7 +149,7 @@ ListView {
         onListingIndexChanged: cursorMark.place(cell)
         // The scroll lane stays clear so rows never reflow under the bar.
         width: root.rowWidth
-        paintWidth: root.width
+        paintWidth: Math.max(root.width, root.contentWidth)
         row: cell.live ? root.pane.rowFor(listingIndex) : cell.row
         paneFocused: root.pane.paneFocused
         dualMode: root.pane.dualMode

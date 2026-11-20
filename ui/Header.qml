@@ -71,8 +71,16 @@ Item {
 
     // The columns this width affords, less the hidden ones; rows draw lane-narrow like this header.
     property var hiddenCols: ViewState.hiddenCols
-    readonly property real contentWidth: Math.max(0, root.width - Theme.spacing.rowPaddingX)
-    readonly property var cols: root.recent ? Theme.columns(root.contentWidth, root.hiddenCols, root.dateWidth, true, root.dualMode) : root.dualMode ? Theme.dualColumns(root.contentWidth, root.hiddenCols) : Theme.columns(root.contentWidth, root.hiddenCols, root.dateWidth)
+    // flea-qml: a plain listing's rows are as wide as their columns (ui/List.qml listWide) and scroll
+    // sideways; laneWidth is that row width, 0 for the view-wide rows, and scrollX the list's contentX.
+    property real laneWidth: 0
+    property real scrollX: 0
+    // The list's own column set when it hands one in, so the titles head exactly the cells drawn.
+    property var assignedCols: null
+    readonly property real laneSpan: root.laneWidth > 0 ? root.laneWidth + Theme.spacing.rowPaddingX : root.width
+    clip: root.laneWidth > 0
+    readonly property real contentWidth: Math.max(0, root.laneSpan - Theme.spacing.rowPaddingX)
+    readonly property var cols: root.assignedCols !== null ? root.assignedCols : root.recent ? Theme.columns(root.contentWidth, root.hiddenCols, root.dateWidth, true, root.dualMode) : root.dualMode ? Theme.dualColumns(root.contentWidth, root.hiddenCols) : Theme.columns(root.contentWidth, root.hiddenCols, root.dateWidth)
 
     implicitHeight: Theme.chromeHeight
 
@@ -103,15 +111,25 @@ Item {
         color: Style.normalFill
     }
 
+    // The titles and their edges scroll with the rows; the ground and rule above and below stay put.
+    Item {
+        id: lane
+        x: -root.scrollX
+        width: Math.max(root.width + root.scrollX, root.laneSpan)
+        height: root.height
+        // The right end the titles hang from: the rows' own width, not the visible header's.
+        Item { id: laneEnd; width: root.laneSpan; height: parent.height }
+
     PanelSectionHeader {
         id: headerName
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing.rowPaddingX + root.leadingSlot + (root.dualMode ? Theme.markSize + Theme.spacing.gap : 0)
-        anchors.right: headerMode.left
-        anchors.rightMargin: (root.recent ? root.cols.location : root.cols.mode) ? Theme.spacing.gap : 0
+        // flea-qml: Name, Size, Modified, Kind, Mode; Recent keeps Location straight after Name.
+        anchors.right: root.recent ? headerMode.left : headerSize.left
+        anchors.rightMargin: root.recent ? (root.cols.location ? Theme.spacing.gap : 0) : (root.cols.size && !root.dualMode ? Theme.spacing.gap : 0)
         anchors.verticalCenter: parent.verticalCenter
         visible: !root.underStrip
-        text: root.title("Name", "name")
+        text: root.title(root.label("名稱", "Name"), "name")
         elide: Text.ElideRight
 
         TapHandler { enabled: root.sortable; onTapped: root.sortRequested("name") }
@@ -119,12 +137,13 @@ Item {
 
     PanelSectionHeader {
         id: headerMode
-        anchors.right: headerSize.left
-        anchors.rightMargin: root.cols.size && !root.dualMode ? Theme.spacing.gap : 0
+        anchors.right: root.recent ? headerSize.left : laneEnd.right
+        // The last column carries the lane the rows keep, as Kind did before Mode moved past it.
+        anchors.rightMargin: root.recent ? (root.cols.size && !root.dualMode ? Theme.spacing.gap : 0) : 2 * Theme.spacing.rowPaddingX
         anchors.verticalCenter: parent.verticalCenter
         visible: (root.recent ? root.cols.location : root.cols.mode) && !root.underStrip
         width: root.recent ? (root.cols.location ? Theme.column.location : 0) : root.cols.mode ? (root.dragKey === "mode" ? root.dragPreview : Theme.column.mode) : 0
-        text: root.recent ? "Location" : root.title("Mode", "mode")
+        text: root.recent ? "Location" : root.title(root.label("權限", "Mode"), "mode")
     }
 
     PanelSectionHeader {
@@ -134,14 +153,18 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         visible: root.cols.size && !root.underStrip
         width: root.cols.size ? (root.dragKey === "size" ? root.dragPreview : root.sizeWidth) : 0
-        text: root.title("Size", "size")
+        text: root.title(root.label("大小", "Size"), "size")
         horizontalAlignment: Text.AlignRight
 
         // flea-qml: the ⚖️ at the cell's left measures every folder in the listing (ui/Pane.qml
         // measureAllDirs); the title itself still sorts. One handler decides by where the click landed.
+        // flea-qml: the ⚖️ stands one space before the right-aligned title, not at the cell's far edge.
+        TextMetrics { id: titleSpace; font: headerSize.font; text: " " }
+        function onScale(x) { return sizeScale.visible && x >= sizeScale.x - titleSpace.advanceWidth / 2 && x < sizeScale.x + sizeScale.width + titleSpace.advanceWidth / 2 }
         Text {
             id: sizeScale
-            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.rightMargin: headerSize.contentWidth + titleSpace.advanceWidth
             anchors.verticalCenter: parent.verticalCenter
             visible: root.pane !== null && !root.recent && headerSize.width > 0
             text: DirSizes.UNMEASURED
@@ -150,12 +173,12 @@ Item {
         }
         HoverHandler {
             id: scaleHover
-            cursorShape: scaleHover.point.position.x < sizeScale.width + Theme.spacing.gap && sizeScale.visible ? Qt.PointingHandCursor : Qt.ArrowCursor
+            cursorShape: headerSize.onScale(scaleHover.point.position.x) ? Qt.PointingHandCursor : Qt.ArrowCursor
         }
         TapHandler {
             enabled: root.sortable || sizeScale.visible
             onTapped: function (eventPoint) {
-                if (sizeScale.visible && eventPoint.position.x < sizeScale.width + Theme.spacing.gap) root.pane.measureAllDirs()
+                if (headerSize.onScale(eventPoint.position.x)) root.pane.measureAllDirs()
                 else if (root.sortable) root.sortRequested("size")
             }
         }
@@ -164,11 +187,11 @@ Item {
     PanelSectionHeader {
         id: headerDate
         anchors.right: headerKind.left
-        anchors.rightMargin: root.cols.kind && !root.recent ? Theme.spacing.gap : 0
+        anchors.rightMargin: !root.recent && root.cols.kind ? Theme.spacing.gap : 0
         anchors.verticalCenter: parent.verticalCenter
         visible: root.cols.date && !root.underStrip
         width: root.cols.date ? (root.dragKey === "date" ? root.dragPreview : root.dateWidth) : 0
-        text: root.title(root.pane && root.pane.recentMode === "trash" ? "Deleted" : root.recent ? "Used" : "Modified", "mtime")
+        text: root.title(root.pane && root.pane.recentMode === "trash" ? "Deleted" : root.recent ? "Used" : root.label("更新日時", "Modified"), "mtime")
         horizontalAlignment: Text.AlignRight
         elide: Text.ElideRight
 
@@ -177,13 +200,13 @@ Item {
 
     PanelSectionHeader {
         id: headerKind
-        anchors.right: parent.right
-        // The header carries the lane the rows keep: its own padding plus the lane, so titles stay over their cells.
-        anchors.rightMargin: 2 * Theme.spacing.rowPaddingX
+        anchors.right: root.recent ? laneEnd.right : headerMode.left
+        // In Recent the header carries the lane the rows keep: its own padding plus the lane, so titles stay over their cells.
+        anchors.rightMargin: root.recent ? 2 * Theme.spacing.rowPaddingX : (root.cols.mode ? Theme.spacing.gap : 0)
         anchors.verticalCenter: parent.verticalCenter
         visible: root.cols.kind && !root.recent && !root.underStrip
         width: root.cols.kind && !root.recent ? (root.dragKey === "kind" ? root.dragPreview : Theme.column.kind) : 0
-        text: root.title("Kind", "kind")
+        text: root.title(root.label("種類", "Kind"), "kind")
         elide: Text.ElideRight
 
         TapHandler { enabled: root.sortable; onTapped: root.sortRequested("kind") }
@@ -261,6 +284,7 @@ Item {
             }
         }
     }
+    }
 
     // Built only while a fit measures, from the fit-only file, so rest carries no metrics object.
     Loader {
@@ -278,6 +302,9 @@ Item {
         color: Theme.color.foreground
         opacity: root.ruleOpacity
     }
+
+    // flea-qml: each title in Han characters first, then English, so Taiwan, China and Japan all read it.
+    function label(han, english) { return han + " " + english }
 
     function title(label, key) {
         return root.sortBy === key ? Sort.title(label, root.sortDesc) : label

@@ -20,6 +20,8 @@ Item {
     // False when the listed directory cannot be written. A drag from it copies. Absent on an
     // older reply stays true, which is the move that reply always described.
     property bool dirWritable: true
+    // flea-qml: the longest name in the listing, in cells (docs/protocol.md "listed" nc); the list sizes Name from it.
+    property int nameCells: 0
     // The device of each ancestor of the listing by path, as the backend last answered; a path missing here is unknown and copies. See docs/protocol.md "devs".
     property var pathDevs: ({})
     // The listing the ancestors were last asked for, so a re-read or a live search answer of the same folder asks nothing.

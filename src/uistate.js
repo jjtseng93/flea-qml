@@ -6,7 +6,7 @@ const DEFAULTS = {
   view: "list",
   pickerView: "list",
   density: "compact",
-  columns: ["name", "size", "date"],
+  columns: ["name", "size", "date", "kind", "mode"],
   columnsLimit: 3,
   columnWidths: {},
   addressBar: "breadcrumb",

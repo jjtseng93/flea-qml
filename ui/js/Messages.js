@@ -10,6 +10,8 @@ function route(root, message) {
     if (message.t === "listed") {
         root.dirDev = message.v || 0
         root.dirWritable = message.w !== false
+        // The longest name in cells, which the list's Name column sizes from.
+        root.nameCells = message.nc || 0
         root.listed(message.n, message.read, message.sort, message.path || "", message.changed, message.gen || 0)
     } else if (message.t === "rows") {
         var landed = sized(message)

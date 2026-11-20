@@ -15,10 +15,66 @@ import { renderDiagram } from "./figure.js";
 
 /** The largest Markdown source converted, as the QML preview's maxBytes default. */
 export const MARKDOWN_LIMIT = 1 << 20;
+// A large-page request (below) may also carry its pictures inline: up to 15 MB of them as
+// base64 data: URLs, 4/3 larger, beside the 1 MB of text, as ui/js/ExtThumbs.js's
+// markdownLimit. The text without those payloads is still held to MARKDOWN_LIMIT, so a file
+// this large is pictures, not a page of text too long to lay out.
+export const LARGE_MARKDOWN_FILE = 22 << 20;
+const DATA_PAYLOAD = /data:image\/(?:png|jpeg|gif|webp|bmp);base64,[A-Za-z0-9+\/]+=*/gi;
+
+const MD_OPTIONS = { tables: true, strikethrough: true, tasklists: true, headings: { ids: true } };
+
+// Give every candidate its own URL so even identical bytes in a code block and a real
+// picture are accounted separately. Only an image destination recognized by the parser
+// gets the picture allowance. Keep its short URL until emission so reference-style
+// images can reuse one payload without expanding it before the output budget is checked.
+function prepareMarkdown(source, fileLimit) {
+  const bytes = Buffer.byteLength(source);
+  const tooLarge = () => { throw Error("Markdown preview exceeds size limit"); };
+  if (bytes > fileLimit) tooLarge();
+  if (!/data:image\//i.test(source)) {
+    if (bytes > MARKDOWN_LIMIT) tooLarge();
+    return { source };
+  }
+  const prefix = "flea-image:" + crypto.randomUUID() + "/";
+  const matches = [];
+  let textBytes = bytes;
+  const shortened = source.replace(DATA_PAYLOAD, (url, offset) => {
+    const key = prefix + matches.length;
+    matches.push({ key, url, offset });
+    textBytes -= url.length - "data:".length;
+    return key;
+  });
+  if (textBytes > MARKDOWN_LIMIT) tooLarge();
+  if (!matches.length) return { source };
+  const used = new Set();
+  const { text } = holdFormulas(shortened);
+  new HTMLRewriter().on("img[src]", { element(el) { used.add(el.getAttribute("src")); } })
+    .transform(Bun.markdown.html(text, MD_OPTIONS));
+  const images = new Map();
+  const parts = [];
+  let start = 0;
+  for (const { key, url, offset } of matches) {
+    if (used.has(key)) {
+      images.set(key, url);
+      parts.push(source.slice(start, offset), key);
+      start = offset + url.length;
+    } else {
+      textBytes += url.length - "data:".length;
+      if (textBytes > MARKDOWN_LIMIT) tooLarge();
+    }
+  }
+  parts.push(source.slice(start));
+  return { source: parts.join(""), images };
+}
 // Qt WebEngine's loadHtml shows nothing past 2 MB (it loads a data: URL), so embedded
-// pictures share 1 MB beside the at most 1 MB of text.
+// pictures share 1 MB beside the at most 1 MB of text. buninu-browser shows the page as an
+// iframe srcdoc, which has no such limit; a request that says so (largePage, sent when the
+// QML runtime has navigator.buninu) gets 15 MB, which still scrolls acceptably there: about
+// 2000 pictures of 7 KB.
 const IMAGE_LIMIT = 1 << 20;
 const IMAGES_TOTAL = 1 << 20;
+export const LARGE_PAGE_IMAGES_TOTAL = 15 << 20;
 // Diagrams drawn for one page; past this a fence stays source, so a page of broken diagrams
 // cannot hold the backend for a deadline each.
 export const DIAGRAMS_PER_PAGE = 32;
@@ -82,12 +138,23 @@ const hostOf = (url) => {
 /**
  * A picture's source: "remote" with its host, "local" with a data: URL for a file inside
  * `folder` (symbolic links resolved, so none leads out), or "dropped". Every other scheme,
- * data: included, is dropped.
+ * except a base64 raster image, is dropped.
  */
+const DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp|bmp);base64,[A-Za-z0-9+\/]+={0,2}$/i;
+
 export function classifyImage(raw, folder, budget) {
   const url = decodedTarget(raw ?? "");
   if (!url) return { kind: "dropped" };
   if (isRemote(url)) return { kind: "remote", host: hostOf(url) };
+  // A picture the document carries itself: a raster type in base64, kept as written and
+  // counted against the same limits as a file, by its decoded size.
+  if (/^data:/i.test(url)) {
+    if (!DATA_IMAGE.test(url)) return { kind: "dropped" };
+    const size = Buffer.byteLength(url.slice(url.indexOf(",") + 1), "base64");
+    if (size > IMAGE_LIMIT || size > budget.left) return { kind: "dropped" };
+    budget.left -= size;
+    return { kind: "local", url };
+  }
   let path;
   if (/^file:/i.test(url)) path = url.replace(/^file:(\/\/)?/i, "");
   else if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return { kind: "dropped" };
@@ -113,7 +180,7 @@ export function classifyImage(raw, folder, budget) {
  * escaped, everything else dropped (DROP_CONTENT with its content, other tags keeping
  * theirs). Nothing of the source survives as markup except what is emitted here.
  */
-export function cleanHtml(source, folder, budget = { left: IMAGES_TOTAL }) {
+export function cleanHtml(source, folder, budget = { left: IMAGES_TOTAL }, images) {
   const out = [];
   let hidden = 0;
   new HTMLRewriter().on("*", {
@@ -140,7 +207,8 @@ export function cleanHtml(source, folder, budget = { left: IMAGES_TOTAL }) {
       }
       if (tag === "img" || tag === "source") {
         if (tag === "source") return; // picture keeps its img; a source set is not followed
-        const picked = classifyImage(el.getAttribute("src"), folder, budget);
+        const src = el.getAttribute("src");
+        const picked = classifyImage(images?.get(src) ?? src, folder, budget);
         if (picked.kind === "remote") {
           out.push(`<span class="remote">Remote image not loaded · ${escapeText(picked.host)}</span>`);
           return;
@@ -306,14 +374,18 @@ function unicodeHeadingIds(source, html) {
  * One complete, passive page for a Markdown source in `folder`. `drawn` holds renderDiagram's
  * answer for each Mermaid fence in order (see markdownHtml); a fence without one stays source.
  */
-export function markdownPage(source, folder, theme = {}, drawn = []) {
-  if (Buffer.byteLength(String(source)) > MARKDOWN_LIMIT) throw Error("Markdown preview exceeds size limit");
+export function markdownPage(source, folder, theme = {}, drawn = [], imagesTotal = IMAGES_TOTAL) {
+  const prepared = prepareMarkdown(String(source), imagesTotal > IMAGES_TOTAL ? LARGE_MARKDOWN_FILE : MARKDOWN_LIMIT);
+  return renderPage(prepared, folder, theme, drawn, imagesTotal);
+}
+
+function renderPage({ source, images }, folder, theme, drawn, imagesTotal) {
   const { text, formulas, diagrams } = holdFormulas(source);
-  const html = unicodeHeadingIds(text, Bun.markdown.html(text, { tables: true, strikethrough: true, tasklists: true, headings: { ids: true } }));
+  const html = unicodeHeadingIds(text, Bun.markdown.html(text, MD_OPTIONS));
   // Diagrams take their share of the picture budget first, in document order; pictures the rest.
-  const budget = { left: IMAGES_TOTAL };
+  const budget = { left: imagesTotal };
   const figures = diagrams.map((diagram, index) => diagramHtml(diagram, drawn[index], budget));
-  const body = cleanHtml(html, folder, budget)
+  const body = cleanHtml(html, folder, budget, images)
     .replace(new RegExp(`(?:<p>)?${OPEN}d(\\d+)${CLOSE}(?:</p>)?`, "g"), (_, index) => figures[Number(index)] ?? "")
     .replace(new RegExp(`${OPEN}(\\d+)${CLOSE}`, "g"), (_, index) => formulas[Number(index)] ? formulaHtml(formulas[Number(index)]) : "");
   return `<!doctype html><meta charset="utf-8"><style>${pageStyle(theme)}</style>${body}`;
@@ -333,12 +405,15 @@ export async function markdownHtml(request) {
   try {
     const path = String(request.path ?? "");
     const inline = typeof request.source === "string";
-    if (!path || (!inline && statSync(path).size > MARKDOWN_LIMIT)) return answer;
+    const large = request.largePage === true;
+    const fileLimit = large ? LARGE_MARKDOWN_FILE : MARKDOWN_LIMIT;
+    if (!path || (!inline && statSync(path).size > fileLimit)) return answer;
     const source = inline ? request.source : await Bun.file(path).text();
-    if (Buffer.byteLength(source) > MARKDOWN_LIMIT) return answer;
+    const prepared = prepareMarkdown(source, fileLimit);
     const theme = request.theme ?? {};
-    const drawn = await drawDiagrams(source, theme);
-    return { ...answer, state: "ready", html: markdownPage(source, dirname(resolve(path)), theme, drawn) };
+    const drawn = await drawDiagrams(prepared.source, theme);
+    return { ...answer, state: "ready", html: renderPage(prepared, dirname(resolve(path)), theme, drawn,
+      large ? LARGE_PAGE_IMAGES_TOTAL : IMAGES_TOTAL) };
   } catch {
     return answer;
   }

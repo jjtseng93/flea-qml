@@ -113,3 +113,19 @@ function textLimit(storageClass) {
     if (storageClass === "network" || storageClass === "phone") return REMOTE_TEXT_PREVIEW_MAX
     return TEXT_PREVIEW_MAX
 }
+
+// buninu-browser shows the rendered Markdown as an iframe srcdoc, free of Qt WebEngine's 2 MB
+// loadHtml limit, so there a Markdown file may carry up to 15 MB of pictures inline as base64
+// data: URLs (4/3 larger) beside its 1 MB of text: 22 MB in all. src/markdown-html.js still
+// holds the text without those pictures to 1 MB. Qt has no navigator, and keeps textLimit.
+// Sample input: ("local") answers 23068672 under buninu-browser and 1048576 under Qt.
+var LARGE_MARKDOWN_MAX = 23068672
+
+function largePages() {
+    return typeof navigator !== "undefined" && navigator.buninu !== undefined
+}
+
+function markdownLimit(storageClass) {
+    var limit = textLimit(storageClass)
+    return limit === TEXT_PREVIEW_MAX && largePages() ? LARGE_MARKDOWN_MAX : limit
+}

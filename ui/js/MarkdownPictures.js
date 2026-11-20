@@ -1,14 +1,15 @@
 .pragma library
+.import "MdUrl.js" as MdUrl
 
 // MarkdownPictures: a Markdown text's inline pictures, read for their addresses and capped at the width the text has.
-var PICTURE = /!\[[^\]]*\]\(([^)\s]*)[^)]*\)/g
+var PICTURE = /!\[[^\]]*\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g
 
 // Sample input: "`![t](https://tracker.example/p.png)` and ![l](file:///d/p.png)" answers ["file:///d/p.png"].
-// Only file: addresses load (the parser leaves every other picture as a placeholder), so a remote address never reaches an Image.
+// Only file: and data: image addresses load (the parser leaves every other picture as a placeholder), so a remote address never reaches an Image.
 function urls(source) {
     var found = []
     String(source).replace(PICTURE, function (whole, url) {
-        if (/^file:/i.test(url))
+        if (/^file:/i.test(url) || MdUrl.isDataImage(url))
             found.push(url)
         return whole
     })

@@ -8,6 +8,7 @@ import "js/Swap.js" as Swap
 import "js/FleaBin.js" as FleaBin
 import "js/Find.js" as Find
 import "js/HostClipboard.js" as HostClipboard
+import "js/ExtThumbs.js" as ExtThumbs
 
 Item {
     id: root
@@ -510,6 +511,9 @@ Item {
         root.codeToken += 1
         var request = { c: "markdownhtml", token: root.codeToken, slot: slot, path: path, theme: theme }
         if (typeof sourceText === "string") request.source = sourceText
+        // buninu-browser shows the page as an iframe srcdoc, free of Qt WebEngine's 2 MB
+        // loadHtml limit, so its pictures may share 15 MB (src/markdown-html.js, ui/js/ExtThumbs.js).
+        if (ExtThumbs.largePages()) request.largePage = true
         root.send(request)
         return root.codeToken
     }

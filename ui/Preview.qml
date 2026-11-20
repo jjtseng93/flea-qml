@@ -38,7 +38,7 @@ Item {
     readonly property bool isFont: root.kind === "font"
     readonly property bool fontFailed: root.isFont && fontLoader.item !== null && fontLoader.item.failed
     // RenderedPreviews: a Markdown file keeps the text kind and draws its own bar and pane.
-    readonly property bool isMarkdown: root.kind === "text" && root.size <= ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "") && Kinds.isMarkdown(root.path)
+    readonly property bool isMarkdown: root.kind === "text" && root.size <= ExtThumbs.markdownLimit(root.pane ? root.pane.storageClass : "") && Kinds.isMarkdown(root.path)
     // An office document is converted by the backend, so it needs local storage and has its own size gate.
     readonly property bool isOffice: root.kind === "text" && root.size <= Kinds.OFFICE_LIMIT && Kinds.isOfficeDocument(root.path)
         && !(root.pane && (root.pane.storageClass === "network" || root.pane.storageClass === "phone"))
@@ -817,7 +817,9 @@ Item {
                     item.size = Qt.binding(function () { return root.size })
                     item.view = Qt.binding(function () { return root.markdownSource ? "source" : "rendered" })
                     item.maxBytes = Qt.binding(function () {
-                        return root.isOffice ? Kinds.OFFICE_LIMIT : ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "")
+                        var storage = root.pane ? root.pane.storageClass : ""
+                        if (root.isOffice) return Kinds.OFFICE_LIMIT
+                        return root.isHtml ? ExtThumbs.textLimit(storage) : ExtThumbs.markdownLimit(storage)
                     })
                     item.truncate = Qt.binding(function () {
                         return root.pane ? (root.pane.storageClass === "network"

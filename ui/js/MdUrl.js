@@ -126,11 +126,26 @@ function normalizeSubpath(name, absolute) {
     return kept.join("/")
 }
 
-// Classify images as remote placeholders, local file URLs inside the document folder, or dropped alt text.
+// A data: picture the document carries itself: a raster type, base64, and no larger than this.
+// Larger ones are dropped to their alt text, so one pasted photo cannot stall the preview.
+// The preview reads at most 1 MB of source (MARKDOWN_LIMIT), so no longer picture can occur in one.
+var MAX_DATA_IMAGE_CHARS = 1024 * 1024
+var DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp|bmp);base64,[A-Za-z0-9+\/]+=*$/i
+
+// Sample input: "data:image/webp;base64,UklGR..." answers true; data:image/svg+xml, a non-base64 body or one past the limit answers false.
+function isDataImage(url) {
+    var text = String(url)
+    return text.length <= MAX_DATA_IMAGE_CHARS && DATA_IMAGE.test(text)
+}
+
+// Classify images as remote placeholders, local file URLs inside the document folder, data: pictures, or dropped alt text.
 function classifyImage(raw, dir) {
     var url = String(raw === undefined || raw === null ? "" : raw)
     if (url.length === 0)
         return { kind: "dropped" }
+    // A base64 body holds no & or %, so decoding cannot change it: skip the per-character scan.
+    if (isDataImage(url))
+        return { kind: "local", url: url }
     var seen = canonicalUrl(url)
     if (seen.length === 0)
         return { kind: "dropped" }
@@ -139,6 +154,8 @@ function classifyImage(raw, dir) {
     // data:, file: and every other scheme never reach Qt unexamined.
     var scheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.exec(seen)
     if (scheme !== null) {
+        if (/^data:/i.test(seen))
+            return isDataImage(seen) ? { kind: "local", url: seen } : { kind: "dropped" }
         if (/^file:/i.test(seen)) {
             var fp = seen.replace(/^file:\/\//i, "").replace(/^file:/i, "")
             return localAbsolute(fp, dir)

@@ -4,6 +4,10 @@
 .import "MdInline.js" as Md
 
 var TARGET_SCAN_LIMIT = 8192
+// A data: picture's base64 body is read by its own linear pattern, up to MdUrl's limit, so it can
+// run past TARGET_SCAN_LIMIT; anything else in it ends the body. Keep the limit equal to MdUrl's.
+var DATA_TARGET_LIMIT = 1024 * 1024
+var DATA_TARGET = /data:image\/(?:png|jpeg|gif|webp|bmp);base64,[A-Za-z0-9+\/]*=*/iy
 var LABEL_SCAN_LIMIT = 1000
 var MIN_BARELINK_LENGTH = 9
 var HTTP_PREFIX_LENGTH = 7
@@ -56,7 +60,14 @@ function readInlineTarget(text, i) {
     if (j < 0)
         return null
     var url = ""
-    if (text.charAt(j) === "<") {
+    DATA_TARGET.lastIndex = j
+    var data = text.charCodeAt(j) === 100 || text.charCodeAt(j) === 68 ? DATA_TARGET.exec(text) : null
+    if (data !== null && data[0].length <= DATA_TARGET_LIMIT) {
+        url = data[0]
+        j += url.length
+        // The title and the closing parenthesis keep the ordinary limit, counted from the body's end.
+        cap = j + TARGET_SCAN_LIMIT
+    } else if (text.charAt(j) === "<") {
         j++
         var start = j
         j = angleClose(text, j, cap, true)

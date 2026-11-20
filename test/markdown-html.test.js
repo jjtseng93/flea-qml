@@ -69,11 +69,13 @@ test("only the allowed attributes stay; links keep http, https, mailto and relat
 });
 
 test("pictures: inside the folder embedded, remote ones named, escapes dropped", () => {
-  const html = body("![a](pic.png) ![r](https://img.shields.io/badge/x.svg) ![up](../secret.png) ![abs](/etc/passwd.png) ![ln](link.png) ![d](data:image/png;base64,AAAA)");
+  const html = body("![a](pic.png) ![r](https://img.shields.io/badge/x.svg) ![up](../secret.png) ![abs](/etc/passwd.png) ![ln](link.png) ![d](data:image/svg+xml;base64,PHN2Zz4=) ![k](data:image/png;base64,AAAA)");
   expect(html).toMatch(/<img alt="a" src="data:image\/png;base64,[A-Za-z0-9+/=]+">/);
+  // A base64 raster data: picture the document carries is kept as written.
+  expect(html).toContain('<img alt="k" src="data:image/png;base64,AAAA">');
   expect(html).toContain('<span class="remote">Remote image not loaded · img.shields.io</span>');
-  // Outside the folder (by .., by absolute path or through a symbolic link) and data: are not loaded.
-  expect((html.match(/<img/g) ?? []).length).toBe(1);
+  // Outside the folder (by .., by absolute path or through a symbolic link) and non-raster data: are not loaded.
+  expect((html.match(/<img/g) ?? []).length).toBe(2);
   for (const alt of ["up", "abs", "ln", "d"]) expect(html).toContain(`<span class="alt">${alt}</span>`);
 });
 

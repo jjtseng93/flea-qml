@@ -23,6 +23,8 @@ Item {
     property bool manualHold: false
     // ExtThumbs: how much of a text file the frame may read; 256 KiB on network and phone storage.
     property int textLimit: 1048576
+    // ExtThumbs.markdownLimit: a Markdown file may be larger where its pictures can ride inline.
+    property int markdownLimit: root.textLimit
     // True where the board truncates instead of refusing: an over-limit remote file shows its first bytes.
     property bool truncateText: false
     // True once no thumbnail is coming: the backend answered with none, or never offered one at all.
@@ -85,7 +87,7 @@ Item {
     readonly property bool tallRow: root.previewState !== Facts.MULTI && Facts.tall(root.rowState)
     // Document rows always render in the tall column frame, independently of Quick Look.
     readonly property bool isMarkdownRow: root.rowState === Facts.TEXT && root.row !== null
-        && root.row.s <= root.textLimit && Kinds.isMarkdown(root.row.n)
+        && root.row.s <= root.markdownLimit && Kinds.isMarkdown(root.row.n)
     // An office document is converted by the backend, so it needs local storage and has its own size gate.
     readonly property bool isOfficeRow: root.rowState === Facts.TEXT && root.row !== null && !root.truncateText
         && root.row.s <= Kinds.OFFICE_LIMIT && Kinds.isOfficeDocument(root.row.n)
@@ -274,7 +276,7 @@ Item {
                 onLoaded: {
                     item.path = Qt.binding(function () { return root.path })
                     item.size = Qt.binding(function () { return root.row ? root.row.s : 0 })
-                    item.maxBytes = Qt.binding(function () { return root.isOfficeRow ? Kinds.OFFICE_LIMIT : root.textLimit })
+                    item.maxBytes = Qt.binding(function () { return root.isOfficeRow ? Kinds.OFFICE_LIMIT : root.isHtmlRow ? root.textLimit : root.markdownLimit })
                     item.active = Qt.binding(function () { return root.markdownActive })
                     item.truncate = Qt.binding(function () { return root.truncateText })
                     item.compact = true

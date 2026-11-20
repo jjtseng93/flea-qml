@@ -90,6 +90,7 @@ Flea.PreviewColumn {
 
     // ExtThumbs: how much of a text file this frame may read; the column passes it on.
     textLimit: ExtThumbs.textLimit(root.pane ? root.pane.storageClass : "")
+    markdownLimit: ExtThumbs.markdownLimit(root.pane ? root.pane.storageClass : "")
     truncateText: root.pane ? (root.pane.storageClass === "network" || root.pane.storageClass === "phone") : false
 
     function identity(row) {

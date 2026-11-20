@@ -7,7 +7,18 @@ import { statSync } from "node:fs";
 import { join } from "node:path";
 
 /** The pictures Bun.Image decodes everywhere; HEIC, AVIF and TIFF need an OS codec. */
-export const THUMB_NAME = /\.(?:jpe?g|png|webp|gif|bmp)$/i;
+const DRAWN_NAME = /\.(?:jpe?g|png|webp|gif|bmp)$/i;
+// Pictures Bun.Image cannot read but the window's own image decoder always can: ICO, CUR and WBMP
+// are codecs built into Skia (CanvasKit), and SVG is buninu-browser's own. These are not redrawn
+// here: the answer is the file itself, which the tile decodes at its own size. The decode runs in the
+// window, so a file past its limit is answered empty and keeps its glyph rather than stall a frame.
+// Measured in Grid (60 tiles, scrolling 240 px a step): an SVG costs by its content, about 16 KB
+// keeps the slowest step near a quarter second (5 KB: 0.14 s, 16 KB: 0.25 s, 24 KB: every step
+// 0.18 s, 47 KB: 0.5–0.9 s, 233 KB: 2–3 s); a 240 KB ICO stays at 0.14 s, so the raster ones get 1 MB.
+const SHOWN_NAME = /\.(?:svg|ico|cur|wbmp)$/i;
+const SHOWN_MAX = { svg: 16 << 10, ico: 1 << 20, cur: 1 << 20, wbmp: 1 << 20 };
+/** Every picture a row can show as its thumbnail, drawn here or shown as itself. */
+export const THUMB_NAME = /\.(?:jpe?g|png|webp|gif|bmp|svg|ico|cur|wbmp)$/i;
 const SIDE = 256, QUALITY = 70;
 // A source larger than this is answered empty rather than decoded for a 7 KB picture.
 const SOURCE_MAX = 64 << 20;
@@ -81,6 +92,9 @@ export function thumb(request) {
     let st = null;
     try { st = path && statSync(path); } catch {}
     if (!st || !st.isFile() || st.size > SOURCE_MAX) { answer(index, "", started); continue; }
+    const shown = SHOWN_NAME.exec(path);
+    if (shown) { answer(index, st.size <= SHOWN_MAX[shown[0].slice(1).toLowerCase()] ? path : "", started); continue; }
+    if (!DRAWN_NAME.test(path)) { answer(index, "", started); continue; }
     const key = keyOf(path, st);
     const kept = recall(key);
     if (kept !== undefined) { answer(index, kept, started); continue; }

@@ -104,6 +104,27 @@ test("a cancelled row is not answered", async () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("SVG, ICO, CUR and WBMP are answered with the file itself, within their size limits", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "flea-thumbs-shown-"));
+  try {
+    const svg = (bytes) => `<svg xmlns="http://www.w3.org/2000/svg">${"<g/>".repeat(Math.ceil(bytes / 4))}</svg>`;
+    writeFileSync(join(dir, "small.svg"), svg(8 << 10));
+    writeFileSync(join(dir, "large.svg"), svg(20 << 10));
+    writeFileSync(join(dir, "a.ico"), new Uint8Array(4096));
+    writeFileSync(join(dir, "b.cur"), new Uint8Array(4096));
+    writeFileSync(join(dir, "c.wbmp"), new Uint8Array(64));
+    const names = ["small.svg", "large.svg", "a.ico", "b.cur", "c.wbmp"];
+    const listing = new Listing(dir, names.map((name) => ({ name, dir: false, link: false })));
+    expect(listing.window(0, 10).rows.every((row) => row.t === true)).toBe(true);
+    const { lines } = harness(listing);
+    thumb({ rows: [0, 1, 2, 3, 4] });
+    // No decode happens here, so every answer is on the same line as the ask.
+    expect(lines.map((l) => [l.row, l.file])).toEqual([
+      [0, join(dir, "small.svg")], [1, ""], [2, join(dir, "a.ico")], [3, join(dir, "b.cur")], [4, join(dir, "c.wbmp")],
+    ]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("the memory cache holds 50 MB of thumbnails", () => {
   expect(CACHE_BYTES).toBe(50 << 20);
   expect(Math.floor(CACHE_BYTES / (7 * 1024))).toBeGreaterThan(7000);

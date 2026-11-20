@@ -11,7 +11,7 @@ const S_IFMT = 0o170000,
 // extension, "Image JPG", "Document PDF", "Code JS": what the Kind column shows is exactly what the
 // Kind order compares (src/order.js), so a reader can always tell why a row sorts where it does.
 const TABLE = [
-  ["image", "🖼️", "png jpg jpeg gif webp svg bmp ico avif heic", "Image"],
+  ["image", "🖼️", "png jpg jpeg gif webp svg bmp ico cur wbmp avif heic", "Image"],
   ["audio", "🎵", "mp3 wav flac ogg m4a aac opus mid midi", "Audio"],
   ["video", "🎬", "mp4 mkv webm mov avi m4v mpeg mpg", "Video"],
   // A .tar.gz names its outer layer, gz, so it is compressed; a bare .tar only packs.

@@ -66,7 +66,8 @@ export async function runTerminalServer() {
       const session=await sessionRequest(base,{Arguments:'?'+args},'5');
       record.token=session.token;
       if(tabs.get(request.id)!==record||stopping){await closeSession(record.token);return;}
-      send({id:request.id,url:base+'?reconnect-token='+encodeURIComponent(record.token),pid:session.pid});
+      // The directory rides in the URL too: a Reconnect after the shell exits starts a new one from the page's own query, which would otherwise carry no directory.
+      send({id:request.id,url:base+'?reconnect-token='+encodeURIComponent(record.token)+'&'+args,pid:session.pid});
     } catch(error){send({id:request?.id,error:error.message});}
   });
   lines.on('close',stop);process.on('SIGTERM',stop);process.on('SIGINT',stop);

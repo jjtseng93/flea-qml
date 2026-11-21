@@ -11,6 +11,7 @@ import "js/Tap.js" as Tap
 import "js/Thumbs.js" as Thumbs
 import "js/DirSizes.js" as DirSizes
 import "js/Sort.js" as Sort
+import "js/ColumnTitles.js" as ColumnTitles
 import "js/DragOut.js" as DragOut
 import "js/DropDev.js" as DropDev
 
@@ -248,22 +249,54 @@ Item {
         readonly property string sortBy: own && root.pane.backend ? root.pane.backend.sortBy : ""
         readonly property bool sortDesc: own && root.pane.backend ? root.pane.backend.sortDesc : false
         function title(label, key) { return columnHeader.sortBy === key ? Sort.title(label, columnHeader.sortDesc) : label }
+        // flea-qml: the titles thin out as the column narrows (ui/js/ColumnTitles.js): Han and English, Han alone,
+        // "名N 大S", then "名N ⚖️" with no Size title. Each tier is measured whole with its sort mark, so
+        // sorting never changes which tier a column shows.
+        readonly property real nameRoom: columnHeader.width - (Theme.spacing.rowPaddingX + Theme.iconSize + Theme.spacing.gap) - (columnHeader.lane + Theme.spacing.rowPaddingX)
+        readonly property real sideWidth: root.showsSize ? Theme.spacing.gap + columnScale.implicitWidth : 0
+        // Eight fixed measures rather than a Repeater: a Repeater's items are not a property, so a tier read while this
+        // column was still being built (a view switched in from hidden) would never be read again.
+        TextMetrics { id: nameM0; font: columnName.font; text: ColumnTitles.TIERS[0].name + " \u25b4" }
+        TextMetrics { id: nameM1; font: columnName.font; text: ColumnTitles.TIERS[1].name + " \u25b4" }
+        TextMetrics { id: nameM2; font: columnName.font; text: ColumnTitles.TIERS[2].name + " \u25b4" }
+        TextMetrics { id: nameM3; font: columnName.font; text: ColumnTitles.TIERS[3].name + " \u25b4" }
+        TextMetrics { id: sizeM0; font: columnName.font; text: ColumnTitles.TIERS[0].size + " \u25b4" }
+        TextMetrics { id: sizeM1; font: columnName.font; text: ColumnTitles.TIERS[1].size + " \u25b4" }
+        TextMetrics { id: sizeM2; font: columnName.font; text: ColumnTitles.TIERS[2].size + " \u25b4" }
+        readonly property int tier: ColumnTitles.pick([
+            nameM0.advanceWidth + columnHeader.sideWidth + (root.showsSize ? Theme.spacing.gap + sizeM0.advanceWidth : 0),
+            nameM1.advanceWidth + columnHeader.sideWidth + (root.showsSize ? Theme.spacing.gap + sizeM1.advanceWidth : 0),
+            nameM2.advanceWidth + columnHeader.sideWidth + (root.showsSize ? Theme.spacing.gap + sizeM2.advanceWidth : 0),
+            nameM3.advanceWidth + columnHeader.sideWidth
+        ], columnHeader.nameRoom)
         Rectangle { anchors.fill: parent; color: Style.normalFill }
+        // The Name title gives way before its sort mark does: the label elides, the mark stays beside it.
+        readonly property real nameRight: columnScale.visible ? columnScale.x - Theme.spacing.gap : columnHeader.width - columnHeader.lane - Theme.spacing.rowPaddingX
+        readonly property bool nameSorted: columnHeader.sortBy === "name"
         PanelSectionHeader {
             id: columnName
             anchors.left: parent.left
             anchors.leftMargin: Theme.spacing.rowPaddingX + Theme.iconSize + Theme.spacing.gap
-            anchors.right: columnScale.visible ? columnScale.left : parent.right
-            anchors.rightMargin: columnScale.visible ? Theme.spacing.gap : columnHeader.lane + Theme.spacing.rowPaddingX
             anchors.verticalCenter: parent.verticalCenter
-            text: columnHeader.title("Name", "name")
+            width: Math.max(0, Math.min(implicitWidth, columnHeader.nameRight - x - (columnHeader.nameSorted ? nameMark.implicitWidth + markSpace.advanceWidth : 0)))
+            text: ColumnTitles.TIERS[columnHeader.tier].name
             elide: Text.ElideRight
+            TapHandler { enabled: columnHeader.own; onTapped: Sort.column(root.pane, "name") }
+        }
+        TextMetrics { id: markSpace; font: columnName.font; text: " " }
+        PanelSectionHeader {
+            id: nameMark
+            anchors.left: columnName.right
+            anchors.leftMargin: markSpace.advanceWidth
+            anchors.verticalCenter: parent.verticalCenter
+            visible: columnHeader.nameSorted
+            text: Sort.mark(columnHeader.sortDesc)
             TapHandler { enabled: columnHeader.own; onTapped: Sort.column(root.pane, "name") }
         }
         Text {
             id: columnScale
-            anchors.right: columnSize.left
-            anchors.rightMargin: Theme.spacing.gap
+            anchors.right: columnSize.visible ? columnSize.left : parent.right
+            anchors.rightMargin: columnSize.visible ? Theme.spacing.gap : columnHeader.lane + Theme.spacing.rowPaddingX
             anchors.verticalCenter: parent.verticalCenter
             visible: root.showsSize
             text: DirSizes.UNMEASURED
@@ -272,13 +305,28 @@ Item {
             HoverHandler { cursorShape: Qt.PointingHandCursor }
             TapHandler { onTapped: root.pane.measureAllDirs() }
         }
+        // With the Size title given up, the room to the ⚖️'s right still sorts by size and carries its mark.
+        Item {
+            id: sizeSortZone
+            anchors.left: columnScale.right
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            visible: root.showsSize && !columnSize.visible
+            TapHandler { enabled: columnHeader.own; onTapped: Sort.column(root.pane, "size") }
+            PanelSectionHeader {
+                anchors.centerIn: parent
+                visible: columnHeader.sortBy === "size"
+                text: Sort.mark(columnHeader.sortDesc)
+            }
+        }
         PanelSectionHeader {
             id: columnSize
             anchors.right: parent.right
             anchors.rightMargin: columnHeader.lane + Theme.spacing.rowPaddingX + Theme.spacing.gap
             anchors.verticalCenter: parent.verticalCenter
-            visible: root.showsSize
-            text: columnHeader.title("Size", "size")
+            visible: root.showsSize && ColumnTitles.TIERS[columnHeader.tier].size !== ""
+            text: columnHeader.title(ColumnTitles.TIERS[columnHeader.tier].size, "size")
             horizontalAlignment: Text.AlignRight
             TapHandler { onTapped: Sort.column(root.pane, "size") }
         }

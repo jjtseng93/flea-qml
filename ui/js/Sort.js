@@ -140,5 +140,10 @@ function preferences(state) {
 
 // A sorted column's title: the label and the geometric mark of the direction, characters the stock monospace has, so the mark scales with the font like the label.
 function title(label, descending) {
-    return label + " " + (descending ? "\u25be" : "\u25b4")
+    return label + " " + mark(descending)
+}
+
+// The mark alone, for a title that keeps it when the label has to give way.
+function mark(descending) {
+    return descending ? "\u25be" : "\u25b4"
 }

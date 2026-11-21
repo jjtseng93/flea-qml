@@ -11,6 +11,14 @@ export function terminalCommand(which = Bun.which, exists = existsSync, repo = r
   const executable = which('jsgotty');
   return executable ? [executable] : null;
 }
+// buninu-browser's --cache turns on Bun's verbose disk-cache log and the QML cache mode for the QML host; a shell that inherited them
+// would print "[Disk Cache] ..." from every bun command it runs, so none of the shells see them.
+export const HOST_ONLY_ENV = ['BUN_JSC_verboseDiskCache', 'BUNINU_QML_CACHE'];
+export function shellEnvironment(env = process.env) {
+  const out = {...env};
+  for (const name of HOST_ONLY_ENV) delete out[name];
+  return out;
+}
 export function terminalArguments() {
   return ['--address','127.0.0.1','--port','0','--permit-write','--random-url',
     '--random-url-length',String(RANDOM_URL_LENGTH),'--session','--permit-arguments',
@@ -72,7 +80,7 @@ export async function runTerminalServer() {
   });
   lines.on('close',stop);process.on('SIGTERM',stop);process.on('SIGINT',stop);
   try {
-    child=spawn(command[0],[...command.slice(1),...terminalArguments()],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+    child=spawn(command[0],[...command.slice(1),...terminalArguments()],{stdio:['pipe','pipe','pipe'],windowsHide:true,env:shellEnvironment()});
     const read=chunk=>{
       buffer=(buffer+chunk.toString()).slice(-16384);
       if(base)return;

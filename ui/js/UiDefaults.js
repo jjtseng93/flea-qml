@@ -99,7 +99,6 @@ var state = {
   "menu": {
     "hidden": [
       "delete",
-      "openTerminal",
       "placeMenu",
       "runScript",
       "moveto",

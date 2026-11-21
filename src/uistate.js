@@ -52,7 +52,7 @@ const DEFAULTS = {
   keys: "default",
   display: { textSize: { mode: "system" }, hyprlandIcons: false },
   menu: {
-    hidden: ["delete", "openTerminal", "placeMenu", "runScript", "moveto", "copyto", "properties", "permissions",
+    hidden: ["delete", "placeMenu", "runScript", "moveto", "copyto", "properties", "permissions",
       "copyAs", "pasteAs", "invertSelection", "extThumbs", "run", "openAsText", "openAgent"],
   },
   plugins: {},

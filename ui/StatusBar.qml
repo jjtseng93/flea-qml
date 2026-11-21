@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import "." as Flea
 import "js/Format.js" as Format
+import "js/DirSizes.js" as DirSizes
 import "js/Filter.js" as Filter
 import "js/Focus.js" as Focus
 import "js/Ops.js" as Ops
@@ -22,21 +23,47 @@ Item {
     property var filePane: root.pane
     readonly property string selectedName: root.filePane && root.filePane.selectionVersion >= 0
         ? Status.fileName(root.filePane) : ""
-    // Cursor-only focus has no selection total; show its already-known file size
-    // here without starting directory-size scans or changing count semantics.
-    readonly property string fileLabel: (root.selectionCount === 0 && root.filePane
-        && root.filePane.cursorRow && !root.filePane.cursorRow.d
-        && typeof root.filePane.cursorRow.s === "number" && root.filePane.cursorRow.s >= 0
-        ? Format.size(root.filePane.cursorRow.s) + " · " : "") + root.selectedName
+    // The name beside the counts: the size and position of the cursor row live in the counts now.
+    readonly property string fileLabel: root.selectedName
+    // The cursor row's size when it is a folder: its finished measurement, else null (unmeasured or partial).
+    readonly property var cursorFolderSize: {
+        var pane = root.filePane
+        var row = pane ? pane.cursorRow : null
+        if (!pane || pane.selectionVersion < 0 || pane.dirSizeState === undefined || !row || !row.d) return null
+        var walked = DirSizes.known(DirSizes.sizeFor(pane.dirSizeState, pane.cursorIndex), row)
+        return walked && !walked.partial ? walked : null
+    }
+    // 第#(place/shown) then the cursor row's bytes, whole: a file's own, a measured folder's total.
+    readonly property string cursorPlace: {
+        var pane = root.filePane
+        if (!pane || pane.selectionVersion < 0 || root.selectedName.length === 0 || root.flashCount.length > 0) return ""
+        var row = pane.cursorRow
+        var text = "\u7b2c#(" + Format.count(pane.cursorIndex + 1) + "/" + Format.count(root.shownTotal) + ")"
+        if (row && !row.d && typeof row.s === "number" && row.s >= 0) return text + Format.count(row.s)
+        return root.cursorFolderSize !== null ? text + Format.count(root.cursorFolderSize.bytes) : text
+    }
+    // The ⚖️ where the bytes would be: an unmeasured folder under the cursor, or among the selected rows.
+    readonly property bool cursorNeedsScale: root.markCount === 0 && root.cursorPlace.length > 0
+        && root.filePane.cursorRow && root.filePane.cursorRow.d === true && root.cursorFolderSize === null
     property var fileNameItem: null
     readonly property bool showFileName: root.selectedName.length > 0 && root.listingState === "ready"
         && root.flashCount.length === 0 && !root.busy && root.centreText().length === 0
         && root.restText.length === 0 && !root.undoSplit
     readonly property int shownTotal: root.pane ? root.pane.shownTotal : root.total
     // selectionVersion is read here so a selection mutated in place still re-runs this binding.
-    readonly property real selectionBytes: root.pane && root.pane.selectionVersion >= 0
+    readonly property real selectionBytes: root.pane && root.pane.selectionVersion >= 0 && root.pane.dirSizeState !== undefined
         ? Status.selectionBytes(root.pane) : -1
+    // The ⚖️ that stands where an unknown total would be, while a selected folder is still unmeasured.
+    readonly property bool selectionNeedsScale: root.markCount > 0 && root.selectionBytes < 0 && root.pane !== null
+        && root.pane.selectionVersion >= 0 && root.pane.selection.indices().some(function (i) {
+            var row = root.pane.rowFor(i)
+            return row && row.d
+        })
     property int selectionCount: 0
+    // A click selects its own row, which says nothing the cursor does not: that lone row is no selection here, so
+    // the strip gives its place (第#) rather than 選. Two rows, or one that is not under the cursor, is a selection.
+    readonly property int markCount: root.selectionCount === 1 && root.filePane && root.filePane.selectionVersion >= 0
+        && root.filePane.selection.indices()[0] === root.filePane.cursorIndex ? 0 : root.selectionCount
     property string fsName: ""
     property real fsFree: 0
     // True while the pane's fs facts for its folder are still out, so the slot draws nothing yet.
@@ -256,10 +283,13 @@ Item {
         if (root.flashCount.length > 0) {
             return root.flashCount
         }
-        if (root.selectionCount > 0) {
-            var head = Format.count(root.selectionCount) + " of " + Format.count(root.total) + " selected"
-            return root.selectionBytes >= 0 ? head + " · " + Format.size(root.selectionBytes) : head
+        if (root.markCount > 0) {
+            // 選$(selected/total) then the byte total, whole, when it is known.
+            var head = "\u9078$(" + Format.count(root.selectionCount) + "/" + Format.count(root.total) + ")"
+            return root.selectionBytes >= 0 ? head + Format.count(root.selectionBytes) : head
         }
+        // No selection and a cursor row: its place in the shown rows, and a file's whole byte count.
+        if (root.cursorPlace.length > 0) return root.cursorPlace
         // SearchFilter rule 2: the same sentence the strip carries, scope and all, because the count
         // is of the rows the filter could see and those are a window on the directory, not all of it.
         // The trash view and the picker both draw this strip with no pane behind it, so the filter's
@@ -314,18 +344,17 @@ Item {
     }
 
     // Left: what is in front of you.
-    Text {
+    // flea-qml: the counts scroll sideways like the name beside them rather than elide.
+    Flea.StatusFileName {
         id: counts
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing.rowPaddingX
         anchors.verticalCenter: strip.verticalCenter
+        height: strip.height
         width: root.showFileName ? Math.min(implicitWidth, root.zoneWidth) : root.zoneWidth
-        text: root.countText()
-        color: Theme.color.foreground
-        font.family: Theme.font.family
-        font.pixelSize: Theme.font.caption
-        elide: Text.ElideRight
-        textFormat: Text.PlainText
+        name: root.countText()
+        tail: root.selectionNeedsScale || root.cursorNeedsScale ? DirSizes.UNMEASURED : ""
+        onTailTapped: root.pane.measureDirs(root.markCount > 0 ? root.pane.selection.indices() : [root.pane.cursorIndex])
     }
 
     // Like TagSlot, build this optional surface only on first use. Parent ownership

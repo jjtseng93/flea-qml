@@ -11,13 +11,12 @@ Item {
     // False while Quick Look is open: the entry is for the next Space.
     readonly property bool resting: !(root.look !== null && root.look.active)
     readonly property alias prepare: prepare
-    // Quick Look's own unit and the swap wrapper, held from the first idle after the window settles on a file Quick Look opens, and never instantiated, so the first Space compiles and loads no unit.
+    // Quick Look's own unit, held from the first idle after the window settles on a file Quick Look opens, and never instantiated, so the first Space compiles and loads no unit.
     property var previewUnit: null
-    property var swapUnit: null
     // The unit the rested file's kind opens its content from, "" for a folder or a kind with none (ui/js/QuickLookKinds.js).
     readonly property string kindUnit: LookKinds.unitOf(root.pane ? root.pane.cursorRow : null)
     onKindUnitChanged: if (unitTimer.running) unitTimer.restart()
-    // The kind units the cursor has rested on, held by file name as the two above are, so a kind the window never rested on (PdfViewer, PreviewMedia) is never compiled.
+    // The kind units the cursor has rested on, held by file name as the preview unit is, so a kind the window never rested on (PdfViewer, PreviewMedia) is never compiled.
     property var kindUnits: ({})
     readonly property var markdownUnit: root.kindUnits[LookKinds.MARKDOWN] || null
     readonly property int unitWarmMs: 1000
@@ -25,12 +24,10 @@ Item {
     readonly property var restUnit: root.kindUnit !== "" ? (root.kindUnits[root.kindUnit] || null) : null
     readonly property bool unitsReady: root.previewUnit !== null && root.previewUnit.status === Component.Ready
         && root.restUnit !== null && root.restUnit.status === Component.Ready
-        && root.swapUnit !== null && root.swapUnit.status === Component.Ready
-    // The cursor has rested on a file whose kind opens from a unit, every unit compiled: the card and its swap wrapper are built now, hidden and inactive, so the first Space only opens them.
+    // The cursor has rested on a file whose kind opens from a unit, every unit compiled: the card is built now, hidden and inactive, so the first Space only opens it.
     readonly property bool cardDue: root.unitsReady && prepare.rested && root.pane !== null
     onCardDueChanged: if (root.cardDue && root.pane.previewLoader) {
         root.pane.previewLoader.active = true
-        if (root.pane.previewLoader.item) root.pane.previewLoader.item.ensureSwap()
     }
     readonly property bool windowSettled: root.pane !== null && root.pane.listingState === "ready" && !root.pane.listInFlight
 
@@ -41,7 +38,6 @@ Item {
         interval: root.unitWarmMs
         onTriggered: {
             root.previewUnit = Qt.createComponent("Preview.qml", Component.Asynchronous)
-            root.swapUnit = Qt.createComponent("QuickLookSwap.qml", Component.Asynchronous)
             root.holdKind()
         }
     }

@@ -31,8 +31,6 @@ Item {
     property bool noThumbComing: false
     // A move cleared the row and its settle is running, so the column is loading, not showing a file with no preview.
     property bool pending: false
-    // Set by ui/PreviewSwap.qml when a hold ran out, which already spent LoadingState's own hold-off.
-    property bool loadingHeldOff: false
     property int selectionCount: 0
     property var selectedRows: []
     property string path: ""
@@ -336,7 +334,6 @@ Item {
             Flea.LoadingState {
                 anchors.fill: parent
                 visible: root.previewState === Facts.LOADING
-                heldOff: root.loadingHeldOff
             }
 
             // The one sentence an error is, in the theme's error role; the facts below still show. An office file's

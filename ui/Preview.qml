@@ -106,7 +106,7 @@ Item {
     readonly property string status: {
         if (!root.active) return ""
         // A fresh media item still carries its empty path until onLoaded binds it; its
-        // "stopped" there is not a whole preview, so the swap never releases on it.
+        // "stopped" there is not a whole preview, so wait for the binding.
         if (root.isMedia) return (mediaLoader.item && mediaLoader.item.path === root.path) ? mediaLoader.item.status : "loading"
         if (root.isPdf) return (pdfLoader.item && pdfLoader.item.failed) ? "This file could not be read." : "pdf"
         if (root.isImage) return imageLoader.item ? imageLoader.item.status : "loading"
@@ -117,7 +117,7 @@ Item {
         if (root.isFont) return fontLoader.item ? fontLoader.item.status : "loading"
         return "This file cannot be previewed."
     }
-    // The swap's answer: nothing loading, and a PDF with a page on screen or refused.
+    // Ready when nothing is loading, and a PDF with a page on screen or refused.
     // An interim cache thumbnail shown counts as whole, never as a half-built frame.
     readonly property bool lookReady: !root.active || PreviewSwap.lookReady(root.status, root.isPdf,
         root.pdfItem !== null && root.pdfItem.shownPage >= 0 && root.pdfItem.opened === root.path, root.pdfItem !== null && root.pdfItem.failed,
@@ -155,49 +155,21 @@ Item {
     readonly property bool isRawFile: root.isImage && Kinds.isRaw(root.path)
     property var rawCopy: null
     property bool rawAnswered: false
-    // See ui/js/QuickLookRect.js: shapeNext follows the file shown and its size reply, shape is what the card draws, taken once no swap holds a picture.
-    property var shapeNext: ({ kind: "", known: false, w: 0, h: 0, orient: 1 })
-    property var shape: root.shapeNext
+    property var shape: ({ kind: "", known: false, w: 0, h: 0, orient: 1 })
     readonly property var rectTokens: ({ fraction: Theme.preview.fraction, edge: Theme.preview.edge, bar: Theme.chromeHeight })
     readonly property var rect: QuickLookRect.surface(root.shape, root.width, root.height, root.pdfExpanded, root.rectTokens)
-    readonly property var nextRect: QuickLookRect.surface(root.shapeNext, root.width, root.height, root.pdfExpanded, root.rectTokens)
-    readonly property bool held: root.swap !== null && (root.swap.holding || root.swap.capturing)
-    // Plain, as a binding on its own releases loops: set by show(), cleared by the reply, an early reveal or the swap's release a turn later.
     property bool sizeWait: false
-    onHeldChanged: {
-        root.commitShape()
-        if (!root.held) Qt.callLater(function () { root.sizeWait = false })
-    }
-    function commitShape() { if (!root.held) root.shape = root.shapeNext }
-    // A size reply counts until the card shows or the swap lets go of its picture; a later one leaves the card alone.
     function sizeArrived(w, h, orient, known) {
-        if (!root.revealed || root.held) {
-            root.shapeNext = { kind: root.kind, known: known, w: w, h: h, orient: orient }
-            root.commitShape()
-        }
+        if (!root.revealed || root.sizeWait || (root.isPdf && !root.shape.known))
+            root.shape = { kind: root.kind, known: known, w: w, h: h, orient: orient }
         root.sizeWait = false
     }
-    function swapState() {
-        if (root.swap) return root.swap.describe()
-        return { holding: false, capturing: false, fellBack: false, holds: 0, fallbacks: 0,
-                 bursts: 0, heldFrames: 0, midFrames: 0, loadingFrames: 0, last: { ms: 0, end: "" } }
-    }
-    // The 0.3.6 swap additions, null until the first open builds them below; every reader guards it.
-    readonly property var swap: swapLoader.item
-    readonly property bool swapBuilt: swapLoader.active
     // The memory suite asserts both Markdown loader items are null without a Markdown file.
     readonly property var markdownItem: markdownLoader.item
     // The open Markdown document, null unless Quick Look shows one; the guarded readers share this null.
     readonly property var markdownShown: root.active && root.isDocument ? markdownLoader.item : null
-    // Exposes the eager panes for the live swap gate, so it can pin the wiring.
+    // Provides the card geometry to the HTML preview.
     readonly property var panesItem: panes
-    // Synchronous: a local source: URL answers item on the same call that sets active.
-    function ensureSwap() {
-        if (!swapLoader.active)
-            swapLoader.active = true
-        return swapLoader.item
-    }
-
     property string pendingPath: ""
     property string pendingIcon: ""
     property string pendingKind: ""
@@ -218,7 +190,7 @@ Item {
     property bool revealedEarly: false
     // When the early loading state first drew, 0 while none stands; content replaces it only after Swap.MIN_SHOW_MS.
     property double loadingSince: 0
-    // True once this open's content first drew; later moves are the swap's to count.
+    // True once this open's content first drew.
     property bool landed: false
     readonly property bool revealedOpen: root.active && root.revealed
     // The hold: the card and dim draw nothing, a reopen inside the close fade included, and a move takes no picture.
@@ -272,7 +244,7 @@ Item {
             Qt.callLater(root.revealIfReady)
     }
     onLookReadyChanged: root.revealIfReady()
-    // Armed by load(): before show() for a warm kind, after it for a kind's first build, beside the swap's own cap.
+    // Armed by load(): before show() for a warm kind, after it for a kind's first build.
     Timer {
         id: revealCap
         objectName: "revealCap"
@@ -399,12 +371,6 @@ Item {
         root.pendingKind = newKind
         root.pendingThumb = newThumb || ""
         root.pendingImageRow = root.pane ? root.pane.cursorIndex : -1
-        // During the hold a move takes no picture, and a burst still trails so it asks nothing per row.
-        if (root.revealedOpen) {
-            var held = root.ensureSwap()
-            if (held)
-                held.hold(null, newPath)
-        }
         if (decision === "now") {
             followSettle.stop()
             root.load(newPath, newIcon, newSize, newKind, newThumb, root.pendingImageRow)
@@ -423,7 +389,6 @@ Item {
 
     // Dropping the loader's source is what stops playback: media dies with the loader.
     function close() {
-        if (root.swap) root.swap.cancel()
         root.revealCapStart = null
         followSettle.stop()
         root.lastMoveKey = ""
@@ -460,28 +425,18 @@ Item {
         if (root.pane) root.pane.listArea.forceActiveFocus()
     }
 
-    // Under the held picture when a move took one; Space's own open has none and reveals once its content can draw.
-    // The swap starts after its mutation: show runs at once or waits for the capture, start runs with it.
     function load(newPath, newIcon, newSize, newKind, newThumb, newRow) {
         var isPdf = Kinds.quickLookKind(newIcon, newPath) === Kinds.PDF
-        var swapItem = root.ensureSwap()
-        var show = function () {
-            // A warm kind counts from the key, before show() builds the Loader items; a kind's first build (a PDF's compile above all) is outside the cap, which starts once show() returns; a move during the hold keeps the open's deadline.
-            var kindKey = root.kindFor(newPath, newIcon, newThumb, newRow)
-            var arm = (!root.active || !root.revealed) && !revealCap.running
-            var warm = root.builtKinds[kindKey] === true
-            if (arm && warm) root.armRevealCap(isPdf)
-            root.show(newPath, newIcon, newSize, newKind, newThumb, newRow)
-            if (swapItem) swapItem.start(isPdf)
-            root.shownSeq = ++root.openSeq
-            root.builtKinds[kindKey] = true
-            if (arm && !warm) root.armRevealCap(isPdf)
-            else if (!arm && !revealCap.running) root.revealCapStart = null
-        }
-        if (swapItem && (swapItem.holding || swapItem.capturing))
-            swapItem.hold(show, newPath, true)
-        else
-            show()
+        // A warm kind counts from the key, before show() builds the Loader items; a kind's first build (a PDF's compile above all) is outside the cap, which starts once show() returns; a move during the hold keeps the open's deadline.
+        var kindKey = root.kindFor(newPath, newIcon, newThumb, newRow)
+        var arm = (!root.active || !root.revealed) && !revealCap.running
+        var warm = root.builtKinds[kindKey] === true
+        if (arm && warm) root.armRevealCap(isPdf)
+        root.show(newPath, newIcon, newSize, newKind, newThumb, newRow)
+        root.shownSeq = ++root.openSeq
+        root.builtKinds[kindKey] = true
+        if (arm && !warm) root.armRevealCap(isPdf)
+        else if (!arm && !revealCap.running) root.revealCapStart = null
     }
 
     // The row at index while its name under the listing's base is path, else null: how this file identifies a row.
@@ -528,8 +483,7 @@ Item {
         root.thumbRelist = false
         root.rawCopy = null
         root.rawAnswered = false
-        root.shapeNext = { kind: root.kind, known: false, w: 0, h: 0, orient: 1 }
-        root.commitShape()
+        root.shape = { kind: root.kind, known: false, w: 0, h: 0, orient: 1 }
         root.path = newPath
         root.thumbRow = root.thumbOwed(newRow)
         root.iconName = newIcon
@@ -774,13 +728,10 @@ Item {
             NumberAnimation { duration: Motion.durMs.open; easing.type: Easing.OutCubic }
         }
 
-        // Every kind's pane, eager the way 0.3.5 drew them: the first Space decodes and never
-        // builds. Moving to the next file holds this one's picture through the swap below until that one is whole.
         Item {
             id: panes
-            // The size the next card has, so a preview built under a held picture is whole at the size it lands on.
-            width: Theme.cardSpan(root.nextRect.w, root.width)
-            height: Theme.cardSpan(root.nextRect.h, root.height)
+            width: Theme.cardSpan(root.rect.w, root.width)
+            height: Theme.cardSpan(root.rect.h, root.height)
 
             Flea.PreviewText {
                 id: textPane
@@ -966,7 +917,7 @@ Item {
             Flea.LoadingState {
                 anchors.fill: parent
                 visible: root.loadingEarly || (root.isMedia || root.isImage || root.isArchive || root.isFont) && root.status === "loading"
-                heldOff: root.loadingEarly || root.swap !== null && root.swap.fellBack
+                heldOff: root.loadingEarly
             }
 
             // MediaStrip unframed: quiet over the video, permanent on audio, and the column draws the framed form of the same file.
@@ -983,22 +934,6 @@ Item {
                 onToggled: root.togglePlay()
                 onSeeked: function (ms) { root.seekTo(ms) }
                 onTouched: root.revealStrip()
-            }
-        }
-
-        // The swap wrapper waits for the first open, so launch pays no Loader, compile or picture.
-        Loader {
-            id: swapLoader
-            anchors.fill: parent
-            active: false
-            source: "QuickLookSwap.qml"
-            onLoaded: {
-                // The surface's own fill, inside its hairline, so the live border and rounded corners show round the picture.
-                item.panesSource = panes
-                item.ready = Qt.binding(function () { return root.lookReady })
-                item.ground = Qt.binding(function () { return surface.color })
-                item.groundInset = Qt.binding(function () { return surface.border.width })
-                item.groundRadius = Qt.binding(function () { return Math.max(0, surface.radius - surface.border.width) })
             }
         }
     }

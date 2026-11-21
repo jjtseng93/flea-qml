@@ -52,15 +52,10 @@ Item {
     readonly property string childPath: root.cursorIsDir
         ? root.pane.join(Search.baseOf(root.pane), root.cursorRow.n) : ""
 
-    // What the third column shows: the cursor row as of the last swap, so a picture is taken before it changes.
+    // What the third column shows: the cursor row after its folder listing arrives or the wait expires.
     property bool shownHasRow: false
     property bool shownIsDir: false
     property string shownChildPath: ""
-    // The swap's answer for the third column: the folder's rows in, or the file's preview whole.
-    readonly property bool thirdReady: root.shownIsDir ? root.answered(root.shownChildPath)
-        : (!root.shownHasRow || !ViewState.previewColumn || preview.ready)
-    // True while an unanswered folder waits under the live picture: the file work's readiness and cap stay out of the swap.
-    readonly property bool folderWaiting: Columns.folderDataHold(root.cursorIsDir, root.answered(root.childPath))
 
     // The raw stored value, so cappedLimit reads a missing key or a hand-edited false or "" as the shipped default instead of the 0 an int property coerces.
     readonly property var columnsLimit: ViewState.state.columnsLimit
@@ -148,10 +143,9 @@ Item {
         id: folderFallback
         interval: Swap.HOLD_MS
         repeat: false
-        onTriggered: if (root.cursorIsDir && !root.answered(root.childPath)) { thirdSwap.cancel(); root.showCursorRow(true) }
+        onTriggered: if (root.cursorIsDir && !root.answered(root.childPath)) { root.showCursorRow(true) }
     }
 
-    // Only a file load takes a hold and an unanswered folder waits by data; a manual load, a hidden preview column or a held frame lands at once, or the cap would never arm and the frozen picture would block the pointer.
     function moveThird(settled) {
         if (root.cursorIsDir === root.shownIsDir && root.childPath === root.shownChildPath
                 && (root.cursorRow !== null) === root.shownHasRow)
@@ -163,7 +157,6 @@ Item {
             Qt.callLater(root.settleThird)
             return
         }
-        var idle = !thirdSwap.capturing && !thirdSwap.holding
         // Unknown is never held: the class has not named its verdict yet, so a file waits
         // for it the way a load does and onStorageKnownChanged decides when it lands.
         var held = ExtThumbs.manualHold(root.pane.storageClass, ViewState.preview)
@@ -171,42 +164,22 @@ Item {
         var fileLoad = Columns.isFileRow(root.cursorRow) && ViewState.previewColumn && ViewState.previewAutomatic && !held
         // An unanswered folder waits by data under the live picture, which the landing or the cap releases with the folder in one pass.
         if (Columns.folderDataHold(root.cursorIsDir, root.answered(root.childPath))) {
-            thirdSwap.stopCap()
             folderFallback.restart()
             return
         }
         folderFallback.stop()
-        if (!fileLoad) {
-            // A hold already live owns the picture, so the no-load change joins it under
-            // the cap; landing it at once would freeze the column and block the pointer.
-            if (!idle) {
-                thirdSwap.hold(root.showCursorRow, root.swapKey())
-                thirdSwap.start(false)
-                if (!root.cursorIsDir) preview.followSelection()
-            } else {
-                root.showCursorRow()
-                if (!root.cursorIsDir) preview.followSelection()
-            }
-            return
-        }
-        thirdSwap.hold(root.showCursorRow, root.swapKey())
-        // A file's work starts with its settle, which runs from the key.
-        preview.armSettle()
+        root.showCursorRow()
+        if (fileLoad) preview.armSettle()
+        else if (!root.cursorIsDir) preview.followSelection()
     }
 
     function settleThird() { if (!Filter.cursorShown(root.pane)) root.moveThird(true) }
 
-    function swapKey() { return root.pane.path + "\n" + root.pane.cursorIndex }
-
-    // The third column first, so a hold is in place before the preview clears under it.
     function followCursor() {
-        // The thumbnail ask needs no pixel, so an idle press sends it before the capture it then overlaps.
         preview.askCursorThumb()
         root.moveThird()
         root.askMeta()
     }
-
-    function swapState() { return thirdSwap.describe() }
 
     // The listArea contract every caller of the pane's own navigation uses: the listing's column plans its own viewport's thumbnails, the way the list and the grid do.
     function primeSettle() { active.primeSettle() }
@@ -372,7 +345,6 @@ Item {
             root.landing.answered(path)
             // A landed peek shows the waiting folder whole; a live picture ends before those rows do.
             if (Columns.showFolderOnPeek(root.childPath, root.shownChildPath, root.answered(root.childPath))) {
-                thirdSwap.cancel()
                 root.showCursorRow()
             }
             if (heroSettles) { childColumn.emptyItem.markItem.settle(); childColumn.emptyItem.animateEntrance = true }
@@ -520,15 +492,9 @@ Item {
         }
 
         // The cursor row: what is inside it when it is a directory, what it is when it is a file.
-        Flea.PreviewSwap {
-            id: thirdSwap
+        Item {
             width: root.thirdWidth
             height: parent.height
-            burstEnds: true
-            ready: root.thirdReady
-            folderHold: root.folderWaiting
-            // On glass the pane's ground is already under the picture, so a second would stack; see ui/Glass.qml.
-            ground: Glass.on ? "transparent" : Theme.color.background
 
             Flea.ColumnPane {
                 id: childColumn
@@ -553,7 +519,6 @@ Item {
                 anchors.fill: parent
                 visible: root.shownHasRow && !root.shownIsDir && ViewState.previewColumn
                 pane: root.pane
-                swap: thirdSwap
                 onThumbsApplied: function (work) { root.thumbsApplied(work) }
             }
         }

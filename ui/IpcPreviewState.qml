@@ -101,10 +101,8 @@ QtObject {
         var viewport = surface ? (column ? surface.linesItem.viewport : surface.viewport) : null
         if (!code || !viewport) return "{}"
         var bounds = Scroll.limitsY(viewport)
-        var swap = column ? surface.swap : root.look.swapState()
-        var ready = code.firstScreen && !(swap && (swap.holding || swap.capturing))
         return JSON.stringify({ path: surface.path, visible: surface.visible,
-            ready: ready && (column ? !surface.textLoading : root.look.openState().landed),
+            ready: code.firstScreen && (column ? !surface.textLoading : root.look.openState().landed),
             focused: surface.activeFocus, wrap: code.wrap === undefined ? null : code.wrap, y: viewport.contentY,
             minY: bounds.min, maxY: bounds.max, height: viewport.height, total: code.total })
     }
@@ -155,7 +153,7 @@ QtObject {
                 hovered: control.hovered, pressed: control.pressed, ring: control.ringItem.visible } }) })
     }
     function previewExpanded(): string { var p = root.look.pdfItem; return p ? String(p.expanded) : "" }
-    function previewSwapState(): string { return JSON.stringify({ column: root.columns ? root.columns.swapState() : null, look: root.look.swapState(), lookOpen: root.look.openState(), lookVisible: root.look.visible }) }
+    function previewSwapState(): string { return JSON.stringify({ column: root.columns ? root.idle.swapState() : null, look: root.idle.swapState(), lookOpen: root.look.openState(), lookVisible: root.look.visible }) }
     function previewSurfaceRect(): string { return root.fleaWindow.rectOf(root.look.surfaceItem()) }
     function previewPictureRect(): string { var p = root.look; if (!p) return ""; if (p.isImage) { var im = p.surfaceItem(); return im ? root.fleaWindow.rectOf(im.pictureItem) : "" } if (p.isMedia) { var me = p.surfaceItem(); return me ? root.fleaWindow.rectOf(me.contentItem) : "" } return "" }
     function previewMediaLoaded(): bool { return root.look.mediaLoaded() }

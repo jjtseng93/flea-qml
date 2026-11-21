@@ -53,7 +53,6 @@ MarkdownTableWheel 1.0 MarkdownTableWheel.qml
 MarkdownFigure 1.0 MarkdownFigure.qml
 singleton FigureService 1.0 FigureService.qml
 PreviewPdf 1.0 PreviewPdf.qml
-PreviewSwap 1.0 PreviewSwap.qml
 PreviewImage 1.0 PreviewImage.qml
 PreviewImagePan 1.0 PreviewImagePan.qml
 PreviewImageSharp 1.0 PreviewImageSharp.qml
@@ -135,7 +134,6 @@ PreviewFactsLine 1.0 PreviewFactsLine.qml
 PreviewMedia 1.0 PreviewMedia.qml
 QuickLookPrepare 1.0 QuickLookPrepare.qml
 QuickLookWarm 1.0 QuickLookWarm.qml
-QuickLookSwap 1.0 QuickLookSwap.qml
 QuickLookArchive 1.0 QuickLookArchive.qml
 PreviewText 1.0 PreviewText.qml
 Row 1.0 Row.qml

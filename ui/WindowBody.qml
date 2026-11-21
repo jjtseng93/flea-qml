@@ -33,7 +33,9 @@ Rectangle {
     readonly property int dualEqualSplit: 5000
     readonly property real dualRoom: view.width - primaryPane.railInset - Theme.spacing.hairline
     readonly property real dualSplit: typeof (ViewState.state.dual || {}).split === "number" ? ViewState.state.dual.split : view.dualEqualSplit
-    readonly property real dualShare: view.dualShareOf(view.dualSplit)
+    // A terminal in the focused pane takes the whole room: the other listing steps aside while it is open, and the stored split is untouched.
+    readonly property bool terminalSolo: dualMode && currentPane.terminalId.length > 0
+    readonly property real dualShare: terminalSolo ? (focusSide === 1 ? 0 : 1) : view.dualShareOf(view.dualSplit)
     // False when the room fits no two narrowest listings: nothing moves there, so a drag writes nothing.
     readonly property bool dualFits: Theme.dualMinWidth / view.dualRoom <= 0.5
     // Held between the narrowest listing and its mirror, equal when the room fits no two; the stored split is never rewritten by it.
@@ -362,7 +364,7 @@ Rectangle {
         anchors.leftMargin: Theme.spacing.hairline
         property bool built: false
         active: view.dualMode || built
-        visible: view.dualMode
+        visible: view.dualMode && !(view.terminalSolo && view.focusSide === 0)
         sourceComponent: Item {
             readonly property alias pane: otherPane
             readonly property alias backend: otherBackend
@@ -435,7 +437,7 @@ Rectangle {
     Loader {
         x: primaryPane.width
         y: primaryPane.y
-        active: view.dualMode
+        active: view.dualMode && !view.terminalSolo
         sourceComponent: Item {
             id: divider
             property bool dragging: false

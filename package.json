@@ -31,7 +31,7 @@
   "scripts": {
     "start": "bun index.js",
     "test": "bun test",
-    "browser": "bunx buninu-browser@0.11.2",
+    "browser": "bunx buninu-browser@0.11.3",
     "qml": "find . -iname '*.qml.cjs*'",
     "qmlc": "find . -iname '*.qml.cjs*' -exec rm {} +"
   }

@@ -350,7 +350,9 @@ Item {
         var point = root.mapFromItem(null, scenePoint)
         root.placeX = point.x
         root.placeY = point.y
-        root.setEntries(root.buildEntries())
+        var next = root.buildEntries()
+        if (!MenuRefresh.unchanged(root.entries, next))
+            root.setEntries(next)
         root.openedIdentity = root.selectionIdentity()
         root.loneFlyoutAction = ""
         scroll.contentY = 0

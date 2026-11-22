@@ -2,12 +2,12 @@
 // stdin is the GUI's lifetime lease; EOF also closes all PTYs after a GUI crash.
 import {existsSync} from 'node:fs';
 import {resolve, join, isAbsolute} from 'node:path';
-import {spawn} from 'node:child_process';
+import {Readable} from 'node:stream';
 import {createInterface} from 'node:readline';
 export const RANDOM_URL_LENGTH = 48;
 export function terminalCommand(which = Bun.which, exists = existsSync, repo = resolve(import.meta.dir, '..')) {
   const sibling = join(repo, '..', 'jsgotty', 'gotty.js');
-  if (exists(sibling)) return [which('bun') || process.execPath, sibling];
+  if (exists(sibling)) return [which('bun') || process.argv0, sibling];
   const executable = which('jsgotty');
   return executable ? [executable] : null;
 }
@@ -23,9 +23,7 @@ export function terminalArguments() {
   return ['--address','127.0.0.1','--port','0','--permit-write','--random-url',
     '--random-url-length',String(RANDOM_URL_LENGTH),'--session','--permit-arguments',
     '--close-signal','SIGTERM','--close-timeout','1',
-    // QtWebEngine's isolated iframe sends Origin:null. No arbitrary site origins.
-    '--ws-origin','^(|null|http://127\\.0\\.0\\.1:[0-9]+)$',
-    Bun.which('bun') || process.execPath, join(import.meta.dir,'terminal-shell.js')];
+    Bun.which('bun') || process.argv0, join(import.meta.dir,'terminal-shell.js')];
 }
 // Use jsgotty's existing WebTTY session protocol rather than scraping a session list.
 export function sessionRequest(base, init, type) {
@@ -80,22 +78,20 @@ export async function runTerminalServer() {
   });
   lines.on('close',stop);process.on('SIGTERM',stop);process.on('SIGINT',stop);
   try {
-    child=spawn(command[0],[...command.slice(1),...terminalArguments()],{stdio:['pipe','pipe','pipe'],windowsHide:true,env:shellEnvironment()});
+    child=Bun.spawn([...command,...terminalArguments()],{stdin:'pipe',stdout:'pipe',stderr:'pipe',windowsHide:true,env:shellEnvironment()});
     const read=chunk=>{
       buffer=(buffer+chunk.toString()).slice(-16384);
       if(base)return;
       const match=buffer.match(/http:\/\/127\.0\.0\.1:(\d+)\/([A-Za-z0-9]{48})\//);
       if(match&&+match[1]>0&&+match[1]<=65535){base=match[0];readyResolve();send({ready:true});}
     };
-    child.stdout.on('data',read);child.stderr.on('data',read);
-    return await new Promise(resolveExit=>{
-      child.on('error',error=>{readyReject(error);send({error:error.message});resolveExit(1);});
-      child.on('close',code=>{
-        readyReject(Error('Terminal server exited'));
-        if(!stopping)send({error:base?'Terminal server exited.':'jsgotty failed to start: '+buffer.slice(-2000)});
-        resolveExit(stopping?0:code||1);
-      });
-    });
+    const drain=async stream=>{for await(const chunk of Readable.fromWeb(stream))read(chunk);};
+    const [code]=await Promise.all([child.exited,drain(child.stdout),drain(child.stderr)]);
+    readyReject(Error('Terminal server exited'));
+    if(!stopping)send({error:base?'Terminal server exited.':'jsgotty failed to start: '+buffer.slice(-2000)});
+    return stopping?0:code||1;
+  } catch(error) {
+    readyReject(error);send({error:error.message});return 1;
   } finally {
     clearTimeout(killer);lines.removeAllListeners();lines.close();process.stdin.pause();
     process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);

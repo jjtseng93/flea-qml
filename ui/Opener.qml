@@ -34,6 +34,8 @@ Item {
 
     Process {
         id: child
+        // Override inherited cache settings with disabled values in both QML runtimes.
+        environment: ({ BUN_JSC_verboseDiskCache: "0", BUNINU_QML_CACHE: "" })
         // xdg-open's nonzero exit codes are failures, not Flea's private statuses.
         onExited: function (exitCode, exitStatus) {
             root.pending = false

@@ -1,3 +1,5 @@
+import { win32 } from 'node:path';
+
 // ui.json's shape, the rule each key is measured against and the merges, with no disk in them:
 // read a file onto the defaults, apply one caller patch, carry 0.1.3's view.json across.
 // Upstream: src/uischema.rs, src/uistate.rs, src/uimigrate.rs, src/uiplugins.rs.
@@ -138,7 +140,7 @@ const SCHEMA = {
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isWhole = (v) => typeof v === "number" && Number.isFinite(v) && Number.isInteger(v);
 // A remembered place: an absolute path or a URI naming its root.
-const isPlace = (s) => typeof s === "string" && (s.startsWith("/") || s.includes("://"));
+const isPlace = (s) => typeof s === "string" && (s.startsWith("/") || win32.isAbsolute(s) || s.includes("://"));
 const isActionId = (s) => typeof s === "string" && /^[A-Za-z0-9_-]+$/.test(s);
 const isSortOrder = (v) =>
   isObject(v) && Object.keys(v).length === 2 && SORT_KEYS.includes(v.key) && typeof v.reverse === "boolean";

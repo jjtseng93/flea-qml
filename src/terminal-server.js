@@ -20,7 +20,7 @@ export function shellEnvironment(env = process.env) {
   return out;
 }
 export function terminalArguments() {
-  return ['--address','127.0.0.1','--port','0','--permit-write','--random-url',
+  return ['--address','127.0.0.1','--port','0','--permit-write','--webgl','--random-url',
     '--random-url-length',String(RANDOM_URL_LENGTH),'--session','--permit-arguments',
     '--close-signal','SIGTERM','--close-timeout','1',
     Bun.which('bun') || process.argv0, join(import.meta.dir,'terminal-shell.js')];
@@ -52,6 +52,9 @@ export async function runTerminalServer() {
   const ready=new Promise((res,rej)=>{readyResolve=res;readyReject=rej;});ready.catch(()=>{});
   const stop=()=>{
     if(stopping)return;stopping=true;readyReject(Error('Terminal server stopped'));
+    // Kill the launcher and its descendants before the Windows parent disappears.
+    if (process.platform === 'win32' && child?.pid && child.exitCode === null &&
+        Bun.spawnSync([join(process.env.SystemRoot || 'C:/Windows','System32','taskkill.exe'),'/PID',String(child.pid),'/T','/F'],{stdout:'ignore',stderr:'ignore',windowsHide:true}).exitCode === 0) return;
     child?.kill('SIGTERM');killer=setTimeout(()=>child?.kill('SIGKILL'),7000);killer.unref();
   };
   const closeSession=async token=>{if(base&&token&&!stopping)await sessionRequest(base,{ReconnectToken:token,TerminateSession:true},'b');};
